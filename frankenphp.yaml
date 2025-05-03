@@ -2,13 +2,6 @@ listeners:
   - address: 0.0.0.0
     port: 80
 
-workers:
-  - command: "/usr/local/bin/php /app/artisan octane:frankenphp"
-    env:
-      APP_ENV: production
-      APP_DEBUG: false
-    restart: always
-
 static:
   root: public
   index: index.php

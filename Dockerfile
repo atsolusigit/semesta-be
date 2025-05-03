@@ -6,7 +6,7 @@ COPY composer.json composer.lock ./
 
 
 RUN install-php-extensions \
-    pcntl 
+    pcntl \
     pdo_mysql \
     zip \
     bcmath \

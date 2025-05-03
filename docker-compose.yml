@@ -3,7 +3,16 @@ services:
     build: .
     ports:
       - "80:80"
+      - "443:443"
     environment:
       APP_ENV: production
       APP_DEBUG: false
       APP_KEY: base64:+pZsUWwY5+Fq1jH62fAZ0g3VacLL44+IwYCkrmqRwY8=
+      OCTANE_SERVER: frankenphp
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'while true; do sleep 3600; done'"

@@ -15,4 +15,4 @@ RUN chmod -R 777 storage bootstrap/cache
 
 COPY frankenphp.yaml /etc/frankenphp/config.frankenphp.yaml
 
-EXPOSE 80
+EXPOSE 80 443

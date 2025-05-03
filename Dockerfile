@@ -1,5 +1,7 @@
 FROM dunglas/frankenphp:latest
 
+ENV SERVER_NAME="examfortis.my.id"
+
 WORKDIR /app
 
 COPY . /app

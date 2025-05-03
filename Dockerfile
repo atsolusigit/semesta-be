@@ -7,6 +7,9 @@ COPY composer.json composer.lock ./
 
 RUN install-php-extensions \
     pcntl 
+    pdo_mysql \
+    zip \
+    bcmath \
     
 RUN curl -sS https://getcomposer.org/installer | php && \
     php composer.phar install --no-dev --optimize-autoloader && \

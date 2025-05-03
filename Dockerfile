@@ -2,7 +2,7 @@ FROM dunglas/frankenphp
 
 WORKDIR /app
 
-COPY composer.json composer.lock ./
+COPY . /app
 
 RUN install-php-extensions \
     pcntl \
@@ -10,8 +10,6 @@ RUN install-php-extensions \
     
 RUN curl -sS https://getcomposer.org/installer | php && \
     php composer.phar install --no-dev --optimize-autoloader
-
-COPY . .
 
 RUN chmod -R 777 storage bootstrap/cache
 

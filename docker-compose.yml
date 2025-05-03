@@ -17,8 +17,6 @@ services:
       APP_KEY: base64:+pZsUWwY5+Fq1jH62fAZ0g3VacLL44+IwYCkrmqRwY8=
       OCTANE_SERVER: frankenphp
 
-    volumes:
-
 volumes:
   caddy_data:
   caddy_config:

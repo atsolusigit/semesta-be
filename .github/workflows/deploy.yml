@@ -24,12 +24,11 @@ jobs:
       - name: Deploy via SSH
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
-            if [ ! -d "/root/project/.git" ]; then
-              git clone git@github.com:aldinaufal21/exam-fortis.git /root/project
-            else
-              cd /root/project
-              git pull origin main
-            fi
+            cd /root/project
+
+            # Pull the latest code from the repository
+            git pull origin master
+            git checkout master
 
             # Build docker if needed
             docker compose down

@@ -12,10 +12,7 @@ RUN install-php-extensions \
     bcmath \
     
 RUN curl -sS https://getcomposer.org/installer | php && \
-    php composer.phar install --no-dev --optimize-autoloader && \
-    chmod -R 755 storage bootstrap/cache
-
-RUN composer install --no-dev --optimize-autoloader
+    php composer.phar install --no-dev --optimize-autoloader
 
 COPY . .
 

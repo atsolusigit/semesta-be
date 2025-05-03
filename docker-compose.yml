@@ -1,6 +1,7 @@
 services:
   app:
     build: .
+    entrypoint: php artisan octane:frankenphp --workers=1 --max-requests=1 --host=0.0.0.0 --port=80
     ports:
       - "80:80"
     volumes:

@@ -14,5 +14,7 @@ RUN curl -sS https://getcomposer.org/installer | php && \
 RUN chmod -R 777 storage bootstrap/cache
 
 EXPOSE 80
+COPY frankenphp.yaml /etc/frankenphp/config.frankenphp.yaml
 
-CMD ["frankenphp", "-c", "frankenphp.yaml", "artisan", "octane:start", "--server=frankenphp", "--host=0.0.0.0", "--port=80"]
+
+# CMD ["frankenphp", "-c", "frankenphp.yaml", "artisan", "octane:start", "--server=frankenphp", "--host=0.0.0.0", "--port=80"]

@@ -3,8 +3,6 @@ services:
     build: .
     ports:
       - "80:80"
-    volumes:
-      - .:/app
     environment:
       APP_ENV: production
       APP_DEBUG: false

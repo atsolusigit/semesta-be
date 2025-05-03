@@ -11,11 +11,6 @@ services:
       APP_DEBUG: false
       APP_KEY: base64:+pZsUWwY5+Fq1jH62fAZ0g3VacLL44+IwYCkrmqRwY8=
       OCTANE_SERVER: frankenphp
-    command: >
-      frankenphp serve
-      --host 0.0.0.0
-      --port 443
-      --tls /etc/letsencrypt/live/examfortis.my.id/fullchain.pem /etc/letsencrypt/live/examfortis.my.id/privkey.pem
 
   certbot:
     image: certbot/certbot

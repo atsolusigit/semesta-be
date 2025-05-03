@@ -3,7 +3,7 @@ name: Deploy Laravel to Droplet
 on:
   push:
     branches:
-      - main  # Ganti kalau kamu mau deploy dari branch lain
+      - master
 
 jobs:
   deploy:

@@ -5,7 +5,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/conf/live/examfortis.my.id/fullchain.pem:/etc/ssl/certs/fullchain.pem:ro
+      - ./certbot/conf/live/examfortis.my.id/privkey.pem:/etc/ssl/private/privkey.pem:ro
     environment:
       APP_ENV: production
       APP_DEBUG: false

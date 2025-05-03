@@ -19,12 +19,17 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+          
 
       - name: Deploy via SSH
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.DROPLET_IP }} << 'EOF'
-            cd /path/to/your/project  # Ganti path ke project Laravel kamu di server
-            git pull origin main
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
+            if [ ! -d "/root/project/.git" ]; then
+              git clone git@github.com:aldinaufal21/exam-fortis.git /root/project
+            else
+              cd /root/project
+              git pull origin main
+            fi
 
             # Build docker if needed
             docker compose down

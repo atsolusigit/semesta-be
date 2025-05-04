@@ -14,6 +14,7 @@ services:
       APP_DEBUG: false
       APP_KEY: base64:+pZsUWwY5+Fq1jH62fAZ0g3VacLL44+IwYCkrmqRwY8=
       OCTANE_SERVER: frankenphp
+      APP_DATAKU: dataku
 
 volumes:
   caddy_data:

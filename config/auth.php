@@ -40,6 +40,16 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        // you need to implement this
+        'api' => [
+            'driver' => 'jwt',
+            'provider' => 'users',
+            'hash' => true,
+        ],
+        'jwt' => [
+            'driver' => 'jwt',
+            'provider' => 'users',
+        ],
     ],
 
     /*

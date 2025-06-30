@@ -9,7 +9,6 @@ COPY . /app
 RUN install-php-extensions \
     pcntl \
     zip \
-    php-mysql \
     pdo_mysql
 
 RUN curl -sS https://getcomposer.org/installer | php && \

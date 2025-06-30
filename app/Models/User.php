@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -10,37 +9,26 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'email',
         'username',
         'password',
-        'profile_img'
+        'profile_img',
+        'role_id',
+        'jtkn',
+        'fbtk',
+        'department_id',
+        'status',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -58,4 +46,42 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
+
+    /**
+     * Relasi ke tabel mst_roles
+     */
+    public function role()
+    {
+        return $this->belongsTo(MstRole::class, 'role_id');
+    }
+
+    /**
+     * Relasi ke halaman melalui departemen
+     */
+   public function pages()
+{
+    return $this->belongsToMany(MstPage::class, 'user_page', 'user_id', 'mst_page_id')
+                ->withTimestamps()
+                ->withPivot(['created_by']);
+}
+
+    /**
+     * Relasi ke departemen (banyak ke banyak)
+     */
+  public function departments()
+{
+    return $this->belongsToMany(MstDepartment::class, 'tr_user_department', 'user_id', 'department_id')
+                ->withTimestamps()
+                ->withPivot(['created_by']);
+}
+
+
+    /**
+     * (Opsional) Relasi ke divisi
+     */
+    // public function divisions()
+    // {
+    //     return $this->belongsToMany(MstDivision::class, 'tr_user_division', 'user_id', 'division_id')
+    //                 ->withTimestamps();
+    // }
 }

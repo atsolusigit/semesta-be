@@ -15,8 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->integer('status')->default(1);
-            $table->integer('created_by')->nullable();
-            $table->integer('deleted_by')->nullable();
+            $table->string('created_by',100)->nullable();
             $table->timestamps();
         });
     }

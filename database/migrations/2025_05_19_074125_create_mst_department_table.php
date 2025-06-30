@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('mst_department', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('abbreviation')->nullable();
             $table->integer('created_by');
-            $table->integer('deleted_by')->nullable();
             $table->timestamps();
         });
     }

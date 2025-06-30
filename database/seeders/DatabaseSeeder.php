@@ -3,21 +3,34 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Database\Seeders\MstPageSeeder;
+use Database\Seeders\MstDivisionSeeder;
+use Database\Seeders\MstRoleSeeder;
+use Database\Seeders\MstDepartmentSeeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        User::firstOrCreate(
+            ['username' => 'testuser'],
+            [
+                'name'        => 'Test User',
+                'email'       => 'test@example.com',
+                'password'    => Hash::make('password123'),
+                'profile_img' => 'default.png',
+            ]
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            MstPageSeeder::class,
+            // MstDivisionSeeder::class,
+            MstDepartmentSeeder::class,
+            MstRoleSeeder::class,
         ]);
     }
 }

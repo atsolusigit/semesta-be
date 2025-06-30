@@ -18,7 +18,7 @@ return new class extends Migration
             $table->integer('is_web')->default(1);
             $table->integer('is_mobile')->default(0);
             $table->integer('status')->default(1);
-            $table->integer('deleted_by')->nullable();
+            $table->unsignedBigInteger('created_by');
             $table->timestamps();
         });
     }

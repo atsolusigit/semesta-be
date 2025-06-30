@@ -20,9 +20,10 @@ return new class extends Migration
             $table->string('password');
             $table->integer('status')->default(1);
             $table->longText('profile_img');
+            $table->integer('department_id');
             $table->longText('jtkn');
             $table->longText('fbtk');
-            $table->integer('login_department')->default(0);
+            $table->integer('role_id');
             $table->rememberToken();
             $table->timestamps();
         });

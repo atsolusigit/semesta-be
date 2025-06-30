@@ -2,220 +2,305 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-// use App\Models\UserToken;
-// use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-// use Validator;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use App\Models\MstPage;
+use App\Models\MstDepartment;
+use App\Models\MstDivision;
+use App\Http\Middleware\IsSuperAdmin;
 use Illuminate\Validation\Rules\Password;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Models\UserToken; //aktifkan jika dibutuhkan
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
-{
-    public function __construct(User $user)
     {
-        // model as dependency injection
-        $this->user = $user;
+
+        public function __construct(User $user)
+        {
+            $this->user = $user;
+        }
+
+  public function register(Request $request)
+{
+    DB::beginTransaction();
+
+    $array_validation = [
+        'email' => 'required|string|email:rfc,dns|max:255|unique:users',
+        'username' => 'required|string|max:100|unique:users',
+        'password' => [
+            'required',
+            'string',
+            'confirmed',
+            Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
+        ],
+    ];
+
+    $validation = check_validation($request->all(), $array_validation);
+    if ($validation[0] != 0) {
+        return $validation[1];
     }
 
-    public function register(Request $request)
-    {
-        // validate the incoming request
-        // set every field as required
-        // set email field so it only accept the valid email format
+    try {
+        // Default value
+        $name = $request['username'];
+        $profile_img = 'default.png';
+        $role_id = 3; // user biasa
+        $department_id = 1; // default department
+        $fbtk = 'FBTK-' . strtoupper(Str::random(10));
 
-        //check validation
-        $array_validation = [
-            'name' => 'required|string|min:2|max:255',
-            'email' => 'required|string|email:rfc,dns|max:255|unique:users',
-            'username' => 'required|unique:users',
-            'password' => [
-                'required',
-                'string',
-                Password::min(8)
-                    ->mixedCase()
-                    ->letters()
-                    ->numbers()
-                    ->symbols()
-                    ->uncompromised(),
-            ],
-            'profile_img' => 'required|string|max:255',
-        ];
-
-        if (check_validation($request->all(), $array_validation)[0] != 0) {
-            return check_validation($request->all(), $array_validation)[1];
-        }
-        //check validation
-
-        // if the request valid, create user
         $user = $this->user::create([
-            'name' => $request['name'],
+            'name' => $name,
             'email' => $request['email'],
             'username' => $request['username'],
             'password' => bcrypt($request['password']),
-            'profile_img' => $request['profile_img'],
-            
+            'profile_img' => $profile_img,
+            'role_id' => $role_id,
+            'jtkn' => '',
+            'fbtk' => $fbtk,
+            'department_id' => $department_id,
+            'status' => 0, // pending approval
         ]);
 
+        // Enkripsi email
         User::where('id', $user->id)->update([
             'email' => DB::raw(encrypt_decrypt_db('enc', $request['email'], $user->id))
         ]);
 
-        // login the user immediately and generate the token
-        // $token = auth()->login($user);
+        DB::commit();
 
-        $token = JWTAuth::fromUser($user);
+        return json(200, 'true', 'success', 'Akun berhasil didaftarkan. Menunggu persetujuan admin.', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'username' => $user->username,
+                'email' => $request->email,
+                'role_id' => $user->role_id,
+                'role_name' => optional($user->role)->name,
+                'status' => $user->status,
+                'profile_img' => $user->profile_img,
+            ]
+        ]);
+    } catch (\Exception $e) {
+        DB::rollback();
+        return json(500, 'false', 'register_failed', $e->getMessage(), []);
+    }
+}
 
-        //return success
-        $data = [
+   public function login(Request $request)
+{
+    // Validasi input login
+    $array_validation = [
+        'username' => 'required|string', // Bisa username atau email terenkripsi
+        'password' => 'required',
+    ];
+
+    if (check_validation($request->all(), $array_validation)[0] != 0) {
+        return check_validation($request->all(), $array_validation)[1];
+    }
+
+    // Ambil user berdasarkan username ATAU email terenkripsi
+    $userQuery = User::where('username', $request->username)
+        ->orWhereRaw("BINARY AES_DECRYPT(email, CONCAT('SM', id)) = ?", [$request->username])
+        ->first();
+
+    if (!$userQuery) {
+        return json(200, 'false', 'Login Gagal', 'Username/email tidak ditemukan.', []);
+    }
+
+    //  Cek status user (pending / ditolak)
+    if ($userQuery->status == 0) {
+        return json(200, 'false', 'Login Ditolak', 'Akun Anda belum disetujui oleh superadmin.', []);
+    }
+
+    if ($userQuery->status == 2) {
+        return json(200, 'false', 'Login Ditolak', 'Pendaftaran Akun Anda ditolak.', []);
+    }
+
+    //  Autentikasi password
+    $token = JWTAuth::attempt([
+        'username' => $userQuery->username, // JWTAuth tidak bisa pakai email terenkripsi
+        'password' => $request->password
+    ]);
+
+    if ($token) {
+        //  Ambil user aktif dari token
+        $user = JWTAuth::user();
+
+        //  Simpan token ke kolom jtkn
+        $user->jtkn = $token;
+        $user->save();
+
+        //  Dekripsi email
+        $user['email'] = encrypt_decrypt_db('dec', $user['email'], $user['id']);
+
+        //  Tambahkan nama role
+        $user['role_name'] = optional($user->role)->name;
+
+        //  Kembalikan token dan data user
+        return json(200, 'true', 'Login Berhasil', 'Selamat datang!', [
             'user' => $user,
             'access_token' => [
                 'token' => $token,
                 'type' => 'Bearer',
-                'expires_in' => JWTAuth::factory()->getTTL() * 60,    // get token expires in seconds
+                'expires_in' => JWTAuth::factory()->getTTL() * 60,
             ],
-        ];
-
-        return json(200, 'true', 'success', 'User created successfully!', $data);
-        //return success
+            'jtkn' => $user->jtkn,
+            'fbtk' => $user->fbtk,
+        ]);
     }
 
-    public function login(Request $request)
-    {
-        // $asdp = $request->header('asdp');
-        
-        //check validation
-        // 'email' => 'required|string|email:rfc,dns|max:255',
-        $array_validation = [
-            'username' => 'required|string',
-            'password' => 'required',
-        ];
+    //  Gagal login
+    return json(200, 'false', 'Login Gagal', 'Username/email atau password salah.', []);
+}
 
-        if (check_validation($request->all(), $array_validation)[0] != 0) {
-            return check_validation($request->all(), $array_validation)[1];
-        }
-        //check validation
-
-        $token = JWTAuth::attempt([
-            'username' => $request->username,
-            'password' => $request->password
-        ]);
-
-        // if token successfully generated then display success response
-        // if attempt failed then "unauthenticated" will be returned automatically
-        if ($token)
+        public function logout(Request $request)
         {
-            $user = auth()->user();
-            $user['email'] = encrypt_decrypt_db('dec', $user['email'], $user['id']);
-            // $menu_rigths = menu_rights(auth()->user()->id);
-            
-            // UserToken::create([
-            //     'userid' => auth()->user()->id,
-            //     'token' => $token,
-            //     'asdp' => $asdp
-            // ]);
+            $token = JWTAuth::getToken();
 
-            //return success
-            $data = [
-                'user' => $user,
-                // 'menu_rights' => $menu_rigths, 
-                'access_token' => [
-                    'token' => $token,
-                    'type' => 'Bearer',
-                    'expires_in' => JWTAuth::factory()->getTTL() * 60,
+            try {
+                $invalidate = JWTAuth::invalidate($token);
+            } catch (\Throwable $th) {
+                $invalidate = true;
+            }
+
+            if ($invalidate) {
+                return json(200, 'false', 'success', 'Berhasil logged out', []);
+            }
+        }
+
+        public function changePassword(Request $request)
+        {
+            $token = JWTAuth::getToken();
+
+            $array_validation = [
+                'password' => [
+                    'required',
+                    'string',
+                    Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
                 ],
             ];
 
-            return json(200, 'true', 'success', 'Login successfully.', $data);
-            //return success
-        }
-        else {
-            return json(200, 'false', 'Informasi Login Salah', 'Username atau password anda salah!', []);
-        }
-    }
+            if (check_validation($request->all(), $array_validation)[0] != 0) {
+                return check_validation($request->all(), $array_validation)[1];
+            }
 
-    public function logout(Request $request)
+            $asdp = $request->header('asdp');
+            $userid = \App\Models\UserToken::where('asdp', $asdp)->where('token', $token)->first()->userid;
+
+            User::where('id', $userid)->update([
+                'password' => bcrypt($request->password)
+            ]);
+
+            return json(200, 'true', 'success', 'Berhasil Mengganti Password', []);
+        }
+
+
+        public function checkToken(Request $request)
     {
-        // get token
         $token = JWTAuth::getToken();
-        
-        // invalidate token
-        try {
-            $invalidate = JWTAuth::invalidate($token);
-        } catch (\Throwable $th) {
-            $invalidate = true;
+
+        $array_validation = ['asdp' => 'required'];
+
+        if (check_validation($request->header(), $array_validation)[0] != 0) {
+            return check_validation($request->all(), $array_validation)[1];
         }
 
-        if($invalidate) {
-            return json(200, 'false', 'success', 'Successfully logged out', []);
+        $asdp = $request->header('asdp');
+
+        if (check_security($asdp, $token) == 0) {
+            return json(404, 'false', 'Invalid Token', 'your token is invalid! ' . $asdp . ' - ' . $token, []);
+        }
+
+        try {
+            $user = auth()->user();
+            if (!$user) {
+                return json(401, false, 'unauthorized', 'Token tidak valid / kadaluwarsa', []);
+            }
+
+            // Load relasi dari ERD
+            $user->load(['role.pages', 'departments']);
+
+            return json(200, true, 'success', 'Token masih aktif', [
+                'user' => [
+                    'id'           => $user->id,
+                    'name'         => $user->name,
+                    'username'     => $user->username,
+                    'email'        => encrypt_decrypt_db($user->email, 'decrypt'),
+                    'jtkn'         => $user->jtkn,
+                    'fbtk'         => $user->fbtk,
+                    'role'         => [
+                        'id'   => $user->role->id ?? null,
+                        'name' => $user->role->name ?? null,
+                    ],
+                    'pages' => $user->role?->pages->map(function ($page) {
+                        return [
+                            'id'       => $page->id,
+                            'name'     => $page->name,
+                            'head_url' => $page->head_url,
+                        ];
+                    }),
+                    'departments' => $user->departments->map(function ($dept) {
+                        return [
+                            'id'   => $dept->id,
+                            'name' => $dept->name,
+                        ];
+                    }),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return json(500, false, 'server_error', 'Terjadi kesalahan sistem', []);
         }
     }
 
-    // public function changePassword(Request $request) {
-    //     // $token = $request->header('Authorization');
-        
-    //     // get token
-    //     $token = JWTAuth::getToken();
-        
-    //     //check validation
-    //     $array_validation = [
-    //         'password' => [
-    //             'required',
-    //             'string',
-    //             Password::min(8)
-    //             ->mixedCase()
-    //             ->letters()
-    //             ->numbers()
-    //             ->symbols()
-    //             ->uncompromised(),
-    //         ],
-    //     ];
-        
-    //     if (check_validation($request->all(), $array_validation)[0] != 0) {
-    //         return check_validation($request->all(), $array_validation)[1];
-    //     }
-    //     //check validation
-        
-    //     $asdp = $request->header('asdp');
-    //     //check security
-    //     // if (check_security($asdp, $token) == 0) {
-    //     //     return json(404, 'false', 'Invalid Token', 'your token is invalid!', []);
-    //     // }
-    //     //check security
+    public function profile(Request $request)
+    {
+        try {
+            $user = auth()->user();
 
-    //     $userid = UserToken::where('asdp', $asdp)->where('token', $token)->first()->userid;
+            if (!$user) {
+                return json(401, false, 'unauthorized', 'User tidak ditemukan / token tidak valid', []);
+            }
 
-    //     User::where('id', $userid)->update([
-    //         'password' => bcrypt($request->password)
-    //     ]);
+            // Load relasi yang sesuai ERD
+            $user->load(['role.pages', 'departments']);
 
-    //     return json(200, 'true', 'success', 'Successfully change password', []);
-    // }
+            return json(200, true, 'success', 'Data profil berhasil diambil', [
+                'user' => [
+                    'id'       => $user->id,
+                    'name'     => $user->name,
+                    'username' => $user->username,
+                    'email'    => encrypt_decrypt_db($user->email, 'decrypt'),
+                    'jtkn'     => $user->jtkn,
+                    'fbtk'     => $user->fbtk,
+                    'role'     => [
+                        'id'   => $user->role->id ?? null,
+                        'name' => $user->role->name ?? null,
 
-    // public function checkToken(Request $request) {
-        // get token
-        // $token = JWTAuth::getToken();
-        
-        //check validation
-        // $array_validation = [
-        //     'asdp' => 'required',
-        // ];
-        
-        // if (check_validation($request->header(), $array_validation)[0] != 0) {
-        //     return check_validation($request->all(), $array_validation)[1];
-        // }
-        //check validation
+                    ],
+                    'pages' => $user->role?->pages->map(function ($page) {
+                        return [
+                            'id'       => $page->id,
+                            'name'     => $page->name,
+                            'head_url' => $page->head_url,
+                        ];
+                    }),
+                    'departments' => $user->departments->map(function ($dept) {
+                        return [
+                            'id'   => $dept->id,
+                            'name' => $dept->name,
+                        ];
+                    }),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return json(500, false, 'server_error', 'Gagal mengambil profil user', []);
+        }
+    }
 
-        // $asdp = $request->header('asdp');
 
-        //check security
-        // if (check_security($asdp, $token) == 0) {
-        //     return json(404, 'false', 'Invalid Token', 'your token is invalid! '.$asdp.' - '.$token, []);
-        // }
-        //check security
+    }
 
-        // return json(200, 'true', 'success', 'your token still an active', []);
-    // }
-}

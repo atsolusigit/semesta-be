@@ -104,7 +104,7 @@ class AuthController extends Controller
 
     // Ambil user berdasarkan username ATAU email terenkripsi
     $userQuery = User::where('username', $request->username)
-        ->orWhereRaw("BINARY AES_DECRYPT(email, CONCAT('SM', id)) = ?", [$request->username])
+        ->orWhereRaw("AES_DECRYPT(email, CONCAT('SM', id)) = ?", [$request->username])
         ->first();
 
     if (!$userQuery) {
@@ -257,50 +257,58 @@ class AuthController extends Controller
     }
 
     public function profile(Request $request)
-    {
-        try {
-            $user = auth()->user();
+{
+    try {
+        // Gunakan JWTAuth agar pasti ambil dari token
+        $user = JWTAuth::parseToken()->authenticate();
 
-            if (!$user) {
-                return json(401, false, 'unauthorized', 'User tidak ditemukan / token tidak valid', []);
-            }
-
-            // Load relasi yang sesuai ERD
-            $user->load(['role.pages', 'departments']);
-
-            return json(200, true, 'success', 'Data profil berhasil diambil', [
-                'user' => [
-                    'id'       => $user->id,
-                    'name'     => $user->name,
-                    'username' => $user->username,
-                    'email'    => encrypt_decrypt_db($user->email, 'decrypt'),
-                    'jtkn'     => $user->jtkn,
-                    'fbtk'     => $user->fbtk,
-                    'role'     => [
-                        'id'   => $user->role->id ?? null,
-                        'name' => $user->role->name ?? null,
-
-                    ],
-                    'pages' => $user->role?->pages->map(function ($page) {
-                        return [
-                            'id'       => $page->id,
-                            'name'     => $page->name,
-                            'head_url' => $page->head_url,
-                        ];
-                    }),
-                    'departments' => $user->departments->map(function ($dept) {
-                        return [
-                            'id'   => $dept->id,
-                            'name' => $dept->name,
-                        ];
-                    }),
-                ]
-            ]);
-        } catch (\Exception $e) {
-            return json(500, false, 'server_error', 'Gagal mengambil profil user', []);
+        if (!$user) {
+            return json(401, false, 'unauthorized', 'User tidak ditemukan / token tidak valid', []);
         }
+
+        // Load relasi yang sesuai ERD
+        $user->load(['role.pages', 'departments']);
+
+        return json(200, true, 'success', 'Data profil berhasil diambil', [
+            'user' => [
+                'id'       => $user->id,
+                'name'     => $user->name,
+                'username' => $user->username,
+               'email' => encrypt_decrypt_db('decrypt', $user->email, $user->id),
+                'jtkn'     => $user->jtkn,
+                'fbtk'     => $user->fbtk,
+                'role'     => [
+                    'id'   => $user->role->id ?? null,
+                    'name' => $user->role->name ?? null,
+                ],
+                'pages' => $user->role?->pages?->map(function ($page) {
+                    return [
+                        'id'       => $page->id,
+                        'name'     => $page->name,
+                        'head_url' => $page->head_url,
+                    ];
+                }) ?? [],
+                'departments' => $user->departments?->map(function ($dept) {
+                    return [
+                        'id'   => $dept->id,
+                        'name' => $dept->name,
+                    ];
+                }) ?? [],
+            ]
+        ]);
     }
 
+    // Untuk debugging sementara, bisa aktifkan ini:
+        catch (\Exception $e) {
+        return json(500, false, 'server_error', 'Gagal mengambil profil user', [
+            'error' => $e->getMessage(),
+            'line' => $e->getLine()
+        ]);
+
+        // Kalau sudah production, sebaiknya kembalikan ini saja:
+        // return json(500, false, 'server_error', 'Gagal mengambil profil user', []);
+    }
+}
 
     }
 

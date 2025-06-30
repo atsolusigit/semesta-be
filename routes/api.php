@@ -19,7 +19,7 @@ use App\Http\Controllers\RolePageController;
 
 Route::post('/register', [AuthController::class, 'register']); // Registrasi user baru (status = pending)
 Route::post('/login', [AuthController::class, 'login']);       // Login dan menerima JWT token
-Route::get('/profile', [AuthController::class, 'profile']);    // Cek profile user
+Route::middleware('auth:api')->get('/profile', [AuthController::class, 'profile']);   // Cek profile user
 
 // ============================
 //  Auth Routes (dengan token)

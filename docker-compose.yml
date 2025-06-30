@@ -21,6 +21,8 @@
        DB_DATABASE: semesta
        DB_USERNAME: semesta
        DB_PASSWORD: cbw8i@22d2
+       JWT_SECRET: CBsF7HoNeqqG0oIIwbJZBl5XvhKVa6WvJ90E8SFcB2rOACjum6z53g3MBZQYPEF
+
 
  volumes:
    caddy_data:

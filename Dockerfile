@@ -1,35 +1,21 @@
-FROM dunglas/frankenphp:1.1.3-php8.2
+FROM dunglas/frankenphp:latest
 
-ENV SERVER_NAME=localhost
+ENV SERVER_NAME="examfortis.my.id"
 
 WORKDIR /app
 
-# Copy semua source code ke dalam container
 COPY . /app
 
-# Install dependency dasar
-RUN apt-get update && apt-get install -y git zip unzip curl openssl && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install ekstensi PHP yang dibutuhkan Laravel
 RUN install-php-extensions \
     pcntl \
-    zip \
-    pdo \
-    pdo_mysql \
-    mbstring \
-    tokenizer \
-    xml \
-    ctype
+    zip
 
-# Copy Composer dari image resmi Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN curl -sS https://getcomposer.org/installer | php && \
+    php composer.phar install --no-dev --optimize-autoloader
 
-# Set permission storage & cache
 RUN chmod -R 777 storage bootstrap/cache
 
-# Copy konfigurasi Caddy/FrankenPHP
-COPY Caddyfile /etc/frankenphp/Caddyfile
+COPY frankenphp.yaml /etc/frankenphp/config.frankenphp.yaml
 
-# Expose port HTTP dan HTTPS
 EXPOSE 80 443
+

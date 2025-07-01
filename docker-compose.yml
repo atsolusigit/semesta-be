@@ -22,6 +22,11 @@
        DB_USERNAME: semesta
        DB_PASSWORD: cbw8i@22d2
        JWT_SECRET: CBsF7HoNeqqG0oIIwbJZBl5XvhKVa6WvJ90E8SFcB2rOACjum6z53g3MBZQYPEF
+       AWS_ACCESS_KEY_ID: DO801Y8ETN7TMHMF9R4W
+       AWS_SECRET_ACCESS_KEY: YaKHMGMZSdhdODrpWjWdNZ5xCLARJ/Zlvcd59xH8POE
+       AWS_DEFAULT_REGION: ap-southeast-1
+       AWS_BUCKET: fortisid
+       AWS_ENDPOINT: https://sgp1.digitaloceanspaces.com
 
 
  volumes:

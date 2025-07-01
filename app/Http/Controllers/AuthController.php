@@ -168,7 +168,7 @@ class AuthController extends Controller
             }
 
             if ($invalidate) {
-                return json(200, 'false', 'success', 'Berhasil logged out', []);
+                return json(200, 'true', 'success', 'Berhasil logged out', []);
             }
         }
 

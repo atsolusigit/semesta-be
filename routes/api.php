@@ -11,8 +11,8 @@ use App\Http\Controllers\RoleController;
 use App\Models\MstRole;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\RolePageController;
+use App\Http\Controllers\RiskHeaderController;
 use App\Http\Controllers\UploadController;
-
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -79,7 +79,7 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group
     Route::put('/knowledge-base/{id}', [KnowledgeBaseController::class, 'update']);
 
     //  Departments
-    Route::get('/departments', [MstDepartmentController::class, 'index']);
+    Route::get('/   ', [MstDepartmentController::class, 'index']);
     Route::get('/departments/{id}', [MstDepartmentController::class, 'show']);
     Route::post('/departments', [MstDepartmentController::class, 'store']);
     Route::put('/departments/{id}', [MstDepartmentController::class, 'update']);
@@ -140,6 +140,15 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group
 // ============================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,6'])->group(function () {
     Route::delete('/knowledge-base/{id}', [KnowledgeBaseController::class, 'destroy']);
+});
+
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/my-profile', [UserController::class, 'getProfile']);
+    Route::post('/profile/update', [UserController::class, 'updateProfile']);
+});
+
+Route::middleware(['auth:api'])->group(function () {
+    Route::post('/risk-header', [RiskHeaderController::class, 'store']);
 });
 
 // ============================

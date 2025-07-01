@@ -11,6 +11,7 @@ use App\Http\Controllers\RoleController;
 use App\Models\MstRole;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\RolePageController;
+use App\Http\Controllers\UploadController;
 
 
 // ============================
@@ -139,4 +140,12 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group
 // ============================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,6'])->group(function () {
     Route::delete('/knowledge-base/{id}', [KnowledgeBaseController::class, 'destroy']);
+});
+
+// ============================
+//  Upload files
+// ============================
+Route::prefix('/upload')->group(function () {
+    Route::post('/single', [UploadController::class, 'singleUpload']);
+    Route::post('/multiple', [UploadController::class, 'multipleUpload']);
 });

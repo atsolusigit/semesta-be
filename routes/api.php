@@ -12,6 +12,7 @@ use App\Models\MstRole;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\RolePageController;
 use App\Http\Controllers\RiskHeaderController;
+use App\Http\Controllers\UploadController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -148,4 +149,12 @@ Route::middleware(['auth:api'])->group(function () {
 
 Route::middleware(['auth:api'])->group(function () {
     Route::post('/risk-header', [RiskHeaderController::class, 'store']);
+});
+
+// ============================
+//  Upload files
+// ============================
+Route::prefix('/upload')->group(function () {
+    Route::post('/single', [UploadController::class, 'singleUpload']);
+    Route::post('/multiple', [UploadController::class, 'multipleUpload']);
 });

@@ -154,7 +154,7 @@ class AuthController extends Controller
     }
 
     //  Gagal login
-    return json(200, 'false', 'Login Gagal', 'Username/email atau password salah.', []);
+    return json(200, 'false', 'Login Gagal', 'Username/ email atau password salah.', []);
 }
 
         public function logout(Request $request)

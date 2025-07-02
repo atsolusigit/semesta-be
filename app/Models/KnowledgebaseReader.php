@@ -16,7 +16,7 @@ class KnowledgebaseReader extends Model
     {
         return $this->belongsTo(KnowledgeBase::class, 'id_knowledge');
     }
-
+//ganti class typo
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');

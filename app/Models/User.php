@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
+use App\Models\MstRole;
+use App\Models\MstPage;
+use App\Models\MstDepartment;
 
 class User extends Authenticatable implements JWTSubject
 {
@@ -22,6 +25,9 @@ class User extends Authenticatable implements JWTSubject
         'fbtk',
         'department_id',
         'status',
+        'nip',
+        'phone_number',
+        'photo',
     ];
 
     protected $hidden = [
@@ -75,6 +81,10 @@ class User extends Authenticatable implements JWTSubject
                 ->withPivot(['created_by']);
 }
 
+public function department()
+{
+    return $this->belongsTo(MstDepartment::class, 'department_id');
+}
 
     /**
      * (Opsional) Relasi ke divisi

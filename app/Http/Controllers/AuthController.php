@@ -49,7 +49,7 @@ class AuthController extends Controller
         $name = $request['username'];
         $profile_img = 'default.png';
         $role_id = 3; // user biasa
-        $department_id = 1; // default department
+        $department_id = 1; //default department
         $fbtk = 'FBTK-' . strtoupper(Str::random(10));
 
         $user = $this->user::create([
@@ -92,7 +92,7 @@ class AuthController extends Controller
 
    public function login(Request $request)
 {
-    // Validasi input login
+    // Validasi input loginc
     $array_validation = [
         'username' => 'required|string', // Bisa username atau email terenkripsi
         'password' => 'required',

@@ -7,6 +7,7 @@ use App\Models\Knowledgebase;
 use App\Models\KnowledgeBaseReader;
 use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\File;
 
 
 class KnowledgeBaseController extends Controller

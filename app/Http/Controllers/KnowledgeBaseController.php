@@ -25,6 +25,7 @@ class KnowledgeBaseController extends Controller
 
     public function show($id)
     {
+// ganti knoledgebase dengan knowledgebase
         $data = KnowledgeBase::with('creator')->find($id);
         if (!$data) {
             return json(404, 'false', 'not_found', 'Data tidak ditemukan', null);

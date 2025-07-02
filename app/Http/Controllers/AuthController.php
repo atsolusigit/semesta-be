@@ -92,7 +92,7 @@ class AuthController extends Controller
 
    public function login(Request $request)
 {
-    // Validasi input login
+    // Validasi input loginc
     $array_validation = [
         'username' => 'required|string', // Bisa username atau email terenkripsi
         'password' => 'required',

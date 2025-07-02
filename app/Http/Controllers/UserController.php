@@ -12,53 +12,76 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Helpers\check_validation;
 use Illuminate\Support\Str;
 
+
 class UserController extends Controller
 {
-    public function index()
-    {
-        $users = User::with('role:id,name')
-            ->select('id','name','username','email','role_id','status')
-            ->latest('id')
-            ->get();
+   public function index()
+{
+    $users = User::with('role:id,name')
+        ->select('id','name','username','email','role_id','status')
+        ->latest('id')
+        ->get();
 
-        foreach ($users as $user) {
-            try {
-                $user->email = encrypt_decrypt_db('dec', $user->email, $user->id);
-            } catch (\Throwable $e) {
-                \Log::warning("Gagal decrypt email #{$user->id}: {$e->getMessage()}");
+    foreach ($users as $user) {
+        try {
+            $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
+
+            // Pastikan hasil dekripsi valid UTF-8
+            if (!mb_check_encoding($decryptedEmail, 'UTF-8')) {
+                \Log::warning("Email hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
+                $decryptedEmail = null;
             }
 
-            $user->role_name = $user->role->name ?? '-';
-        }
-
-        return json(200, 'success', 'Success','Berhasil menampilkan semua data user', $users);
-    }
-
-    public function show(Request $request, $id)
-    {
-        $check = check_validation(['id' => $id], [
-            'id' => 'required|numeric|exists:users,id'
-        ]);
-        if ($check[0] === 1) return $check[1];
-
-        $user = User::with('role')
-            ->select('id', 'name', 'username', 'email', 'role_id', 'status')
-            ->find($id);
-
-        if (!$user) {
-            return json(404, 'error', 'Not Found', 'User tidak ditemukan', null);
-        }
-
-        try {
-            $user->email = encrypt_decrypt_db('dec', $user->email, $user->id);
+            $user->email = $decryptedEmail;
         } catch (\Throwable $e) {
-            \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+            \Log::warning("Gagal decrypt email #{$user->id}: {$e->getMessage()}");
+            $user->email = null;
         }
 
-        $user->role_name = optional($user->role)->name ?? '-';
-
-        return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', $user);
+        $user->role_name = $user->role->name ?? '-';
     }
+
+    return json(200, 'success', 'Success','Berhasil menampilkan semua data user', $users);
+}
+
+
+   public function show(Request $request, $id)
+{
+    $check = check_validation(['id' => $id], [
+        'id' => 'required|numeric|exists:users,id'
+    ]);
+    if ($check[0] === 1) return $check[1];
+
+    $user = User::with('role')
+        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+        ->find($id);
+
+    if (!$user) {
+        return json(404, 'error', 'Not Found', 'User tidak ditemukan', null);
+    }
+
+    // Decrypt email
+    try {
+        $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
+
+        // Validasi UTF-8
+        if (!mb_check_encoding($decryptedEmail, 'UTF-8')) {
+            \Log::warning("Email hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
+            $decryptedEmail = null;
+        }
+
+        $user->email = $decryptedEmail;
+    } catch (\Throwable $e) {
+        \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+        $user->email = null;
+    }
+
+    $user->role_name = optional($user->role)->name ?? '-';
+
+    // Jangan lupa return JSON-nya
+    return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', $user);
+}
+
 
  public function store(Request $request)
 {
@@ -261,15 +284,16 @@ public function update(Request $request, $id)
     }
 
     public function dropdownData()
-    {
-        $roles = MstRole::select('id', 'name')->get();
-        $departments = \App\Models\MstDepartment::select('id', 'name')->get();
+{
+    $roles = \App\Models\MstRole::select('id', 'name')->get();
+    $departments = \App\Models\MstDepartment::select('id', 'name')->get();
 
-        return json(200, 'success', 'success', 'Dropdown data berhasil dimuat', [
-            'roles' => $roles,
-            'departments' => $departments,
-        ]);
-    }
+    return json(200, 'success', 'Success', 'Dropdown data berhasil dimuat', [
+        'roles' => $roles,
+        'departments' => $departments,
+    ]);
+}
+
 
     // Approve user
 public function approveUser($id)
@@ -310,7 +334,7 @@ public function getPendingUsers(Request $request)
                 'id' => $user->id,
                 'name' => mb_convert_encoding($user->name, 'UTF-8', 'UTF-8'),
                 'username' => mb_convert_encoding($user->username, 'UTF-8', 'UTF-8'),
-                'email' => mb_convert_encoding($user->email, 'UTF-8', 'UTF-8'),
+               'email' => encrypt_decrypt_db('dec', $user->email, $user->id),
                 'profile_img' => $user->profile_img,
                 'role_id' => $user->role_id,
                 'status' => $user->status,
@@ -327,6 +351,81 @@ public function getPendingUsers(Request $request)
     } catch (\Exception $e) {
         return json(500, 'false', 'server_error', $e->getMessage(), []);
     }
+}
+public function updateProfile(Request $request)
+{
+    $user = auth()->user();
+
+    // Validasi
+    $validation = check_validation($request->all(), [
+        'name' => 'required|string|max:255',
+        'username' => 'required|string|max:255',
+        'nip' => 'nullable|string|max:100',
+        'phone_number' => 'nullable|string|max:100',
+        'department_id' => 'required|exists:mst_department,id',
+    ]);
+
+    if ($validation[0] !== 0) return $validation;
+
+    // Update profil user (email tidak diubah)
+    $user->name = $request->name;
+    $user->username = $request->username;
+    $user->nip = $request->nip; // penting!
+    $user->phone_number = $request->phone_number; // penting!
+    $user->department_id = $request->department_id;
+    $user->save();
+
+    // Ambil data lengkap user
+    $user = User::with('role')->find($user->id);
+
+    return response()->json([
+        'code' => 200,
+        'status' => 'true',
+        'title' => 'update_success',
+        'message' => 'Profil berhasil diperbarui.',
+        'data' => [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'username' => $user->username,
+                'email' => null, // tetap disembunyikan (tidak perlu didekripsi saat update)
+                'nip' => $user->nip,
+                'phone_number' => $user->phone_number,
+                'department_id' => $user->department_id,
+                'role_id' => $user->role_id,
+                'role_name' => $user->role->name ?? null,
+                'status' => $user->status,
+                'profile_img' => $user->profile_img ?? 'default.png',
+            ]
+        ]
+    ]);
+}
+public function getProfile()
+{
+    $user = auth()->user();
+    $user = User::with('role')->find($user->id);
+
+    return response()->json([
+        'code' => 200,
+        'status' => true,
+        'title' => 'get_profile_success',
+        'message' => 'Data profil berhasil diambil.',
+        'data' => [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'username' => $user->username,
+               'email' => encrypt_decrypt_db('dec', $user->email, $user->id),
+                'nip' => $user->nip,
+                'phone_number' => $user->phone_number,
+                'department_id' => $user->department_id,
+                'role_id' => $user->role_id,
+                'role_name' => $user->role->name ?? null,
+                'status' => $user->status,
+                'profile_img' => $user->profile_img ?? 'default.png',
+            ]
+        ]
+    ]);
 }
 
 }

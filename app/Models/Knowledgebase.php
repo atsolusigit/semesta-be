@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\KnowledgeBaseReader;
 
-class Knowledgebase extends Model
+class KnowledgeBase extends Model
 {
     protected $table = 'knowledgebase';
 

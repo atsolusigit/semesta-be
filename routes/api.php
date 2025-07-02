@@ -79,7 +79,7 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group
     Route::put('/knowledge-base/{id}', [KnowledgeBaseController::class, 'update']);
 
     //  Departments
-    Route::get('/   ', [MstDepartmentController::class, 'index']);
+    Route::get('/departments', [MstDepartmentController::class, 'index']);
     Route::get('/departments/{id}', [MstDepartmentController::class, 'show']);
     Route::post('/departments', [MstDepartmentController::class, 'store']);
     Route::put('/departments/{id}', [MstDepartmentController::class, 'update']);

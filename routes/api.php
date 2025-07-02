@@ -5,12 +5,13 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\KnowledgeBaseController;
+use App\Http\Controllers\KnowledgeBaseReaderController;
 use App\Http\Controllers\MstDepartmentController;
 use App\Http\Middleware\RoleAccessMiddleware;
 use App\Http\Controllers\RoleController;
-use App\Models\MstRole;
-use App\Http\Controllers\PageController;
 use App\Http\Controllers\RolePageController;
+use App\Http\Controllers\PageController;
+use App\Models\MstRole;
 use App\Http\Controllers\RiskHeaderController;
 use App\Http\Controllers\UploadController;
 
@@ -20,7 +21,7 @@ use App\Http\Controllers\UploadController;
 
 Route::post('/register', [AuthController::class, 'register']); // Registrasi user baru (status = pending)
 Route::post('/login', [AuthController::class, 'login']);       // Login dan menerima JWT token
-Route::middleware('auth:api')->get('/profile', [AuthController::class, 'profile']);   // Cek profile user
+// Route::middleware('auth:api')->get('/profile', [AuthController::class, 'profile']);   // Cek profile user
 
 // ============================
 //  Auth Routes (dengan token)
@@ -67,12 +68,12 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6'])->group(f
 //  User, Knowledge, Department (Admin & Super Admin)
 // ============================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group(function () {
+    Route::get('/users/dropdowns', [UserController::class, 'dropdownData']);
     //  Users
     Route::get('/users', [UserController::class, 'index']);
     Route::get('/users/{id}', [UserController::class, 'show']);
     Route::post('/users', [UserController::class, 'store']);
     Route::put('/users/{id}', [UserController::class, 'update']);
-    Route::get('/users/dropdowns', [UserController::class, 'dropdownData']);
 
     //  Knowledge Base
     Route::post('/knowledge-base', [KnowledgeBaseController::class, 'store']);

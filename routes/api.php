@@ -12,8 +12,8 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\RolePageController;
 use App\Http\Controllers\PageController;
 use App\Models\MstRole;
-
-
+use App\Http\Controllers\RiskHeaderController;
+use App\Http\Controllers\UploadController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -146,4 +146,16 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,6'])->group(fun
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/my-profile', [UserController::class, 'getProfile']);
     Route::post('/profile/update', [UserController::class, 'updateProfile']);
+});
+
+Route::middleware(['auth:api'])->group(function () {
+    Route::post('/risk-header', [RiskHeaderController::class, 'store']);
+});
+
+// ============================
+//  Upload files
+// ============================
+Route::prefix('/upload')->group(function () {
+    Route::post('/single', [UploadController::class, 'singleUpload']);
+    Route::post('/multiple', [UploadController::class, 'multipleUpload']);
 });

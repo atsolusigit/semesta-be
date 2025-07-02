@@ -9,19 +9,8 @@
      volumes:
        - caddy_data:/data
        - caddy_config:/config
-     environment:
-       APP_ENV: production
-       APP_DEBUG: true
-       APP_KEY: base64:+pZsUWwY5+Fq1jH62fAZ0g3VacLL44+IwYCkrmqRwY8=
-       OCTANE_SERVER: frankenphp
-       APP_DATAKU: dataku
-       DB_CONNECTION: mysql
-       DB_HOST: 146.190.96.159
-       DB_PORT: 3306
-       DB_DATABASE: semesta
-       DB_USERNAME: semesta
-       DB_PASSWORD: cbw8i@22d2
-       JWT_SECRET: CBsF7HoNeqqG0oIIwbJZBl5XvhKVa6WvJ90E8SFcB2rOACjum6z53g3MBZQYPEF
+     env_file:
+       - .env.docker
 
 
  volumes:

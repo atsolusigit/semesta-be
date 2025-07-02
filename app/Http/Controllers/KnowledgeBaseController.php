@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\KnowledgeBase;
+use App\Models\Knowledgebase;
 use App\Models\KnowledgeBaseReader;
 use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -13,7 +13,7 @@ class KnowledgeBaseController extends Controller
 {
     public function index(Request $request)
     {
-        $query = KnowledgeBase::query();
+        $query = Knowledgebase::query();
 
         if ($request->has('type')) {
             $query->where('type', $request->type);
@@ -26,7 +26,7 @@ class KnowledgeBaseController extends Controller
     public function show($id)
     {
 // ganti knoledgebase dengan knowledgebase
-        $data = KnowledgeBase::with('creator')->find($id);
+        $data = Knowledgebase::with('creator')->find($id);
         if (!$data) {
             return json(404, 'false', 'not_found', 'Data tidak ditemukan', null);
         }
@@ -63,7 +63,7 @@ class KnowledgeBaseController extends Controller
     DB::beginTransaction();
 
     try {
-        $Base = KnowledgeBase::create([
+        $Base = Knowledgebase::create([
             'creator_id' => $user->id,
             'img_path' => $request->img_path,
             'description' => $request->description,
@@ -87,7 +87,7 @@ class KnowledgeBaseController extends Controller
         return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk mengupdate data', null);
     }
 
-    $Base = KnowledgeBase::find($id);
+    $Base = Knowledgebase::find($id);
     if (!$Base) {
         return json(404, 'false', 'not_found', 'Data tidak ditemukan', null);
     }
@@ -143,7 +143,7 @@ class KnowledgeBaseController extends Controller
             return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk menghapus data', null);
         }
 
-        $Base = KnowledgeBase::find($id);
+        $Base = Knowledgebase::find($id);
         if (!$Base) {
             return json(404, 'false', 'not_found', 'Data tidak ditemukan', null);
         }
@@ -162,7 +162,7 @@ public function trackReader($id)
     try {
         $user = JWTAuth::parseToken()->authenticate();
 
-        $knowledge = KnowledgeBase::find($id);
+        $knowledge = Knowledgebase::find($id);
         if (!$knowledge) {
             return json(404, false, 'not_found', 'Knowledge Base tidak ditemukan', null);
         }

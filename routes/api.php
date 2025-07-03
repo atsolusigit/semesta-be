@@ -46,7 +46,9 @@ Route::get('/user', function (Request $request) {
 // ============================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,6'])->group(function () {
     Route::delete('/users/{id}', [UserController::class, 'destroy']); // Hapus user
-    Route::delete('/knowledge-base/{id}', [KnowledgeBaseController::class, 'destroy']); // Hapus knowledge base
+    Route::delete('/knowledge-base/{id}', [KnowledgeBaseController::class, 'destroy']);
+    Route::delete('/departments/{id}', [MstDepartmentController::class, 'destroy']);
+
 });
 
 
@@ -84,7 +86,7 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group
     Route::get('/departments/{id}', [MstDepartmentController::class, 'show']);
     Route::post('/departments', [MstDepartmentController::class, 'store']);
     Route::put('/departments/{id}', [MstDepartmentController::class, 'update']);
-    Route::delete('/departments/{id}', [MstDepartmentController::class, 'destroy']);
+
 });
 
 
@@ -103,7 +105,7 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,6'])->group(fun
 // ============================
 //  Page & Role-Page Access Management
 // ============================
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,6'])->group(function () {
     // Halaman
     Route::get('page', [PageController::class, 'index']);
     Route::post('/page-with-role', [PageController::class, 'storeWithRoles']);

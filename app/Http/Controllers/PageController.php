@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\MstPage;
-
+use App\Models\MstRole;
+use Illuminate\Support\Facades\DB;
 class PageController extends Controller
 {
     // Get semua halaman
@@ -73,7 +74,7 @@ class PageController extends Controller
             \DB::table('tr_role_page')->insert([
                 'role_id' => $roleAccess['role_id'],
                 'page_id' => $page->id,
-                'access' => json_encode($this->mapAccessArray($roleAccess['access'])),
+                'access' => json_encode(map_access_array($roleAccess['access'])), // ✅ perbaikan di sini
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -86,17 +87,6 @@ class PageController extends Controller
         \DB::rollBack();
         return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
     }
-}
-
-// Helper untuk konversi akses string ke struktur boolean
-private function mapAccessArray(array $access)
-{
-    return [
-        'view' => in_array('view', $access),
-        'create' => in_array('create', $access),
-        'update' => in_array('update', $access),
-        'delete' => in_array('delete', $access),
-    ];
 }
 
 }

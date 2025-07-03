@@ -120,4 +120,24 @@ if (!function_exists('encrypt_decrypt_db')) {
 
         return $value;
     }
+
 }
+
+if (!function_exists('map_access_array')) {
+    /**
+     * Konversi array akses ke struktur boolean
+     *
+     * @param array $access
+     * @return array
+     */
+    function map_access_array(array $access)
+    {
+        return [
+            'view' => in_array('view', $access),
+            'create' => in_array('create', $access),
+            'update' => in_array('update', $access),
+            'delete' => in_array('delete', $access),
+        ];
+    }
+}
+

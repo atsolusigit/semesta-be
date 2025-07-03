@@ -347,59 +347,75 @@ public function getPendingUsers()
     return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $users);
 }
 
+
 public function updateProfile(Request $request)
 {
     $user = auth()->user();
 
     $validation = check_validation($request->all(), [
         'name' => 'required|string|max:255',
-        'username' => 'required|string|max:255',
+        'username' => 'required|string|max:255|unique:users,username,' . $user->id,
+        'email' => 'nullable|email:rfc,dns|max:255|unique:users,email,' . $user->id,
         'nip' => 'nullable|string|max:100',
         'phone_number' => 'nullable|string|max:100',
         'department_id' => 'required|exists:mst_department,id',
-        'profile_img' => 'nullable|url', // ini supaya bisa diisi link dari FE
+        'profile_img' => 'nullable|url',
     ]);
+
     if ($validation[0] !== 0) return $validation;
 
-    // Update data
-    $user->name = $request->name;
-    $user->username = $request->username;
-    $user->nip = $request->nip;
-    $user->phone_number = $request->phone_number;
-    $user->department_id = $request->department_id;
+    try {
+        DB::beginTransaction();
 
-    // Jika ada input image dari FE
-    if ($request->filled('profile_img')) {
-        $user->profile_img = $request->profile_img;
+        // Update data user
+        $user->name = $request->name;
+        $user->username = $request->username;
+        $user->nip = $request->nip;
+        $user->phone_number = $request->phone_number;
+        $user->department_id = $request->department_id;
+
+        if ($request->filled('profile_img')) {
+            $user->profile_img = $request->profile_img;
+        }
+
+        $user->save();
+
+        // Update email terenkripsi jika diisi
+        if ($request->filled('email')) {
+            User::where('id', $user->id)->update([
+                'email' => DB::raw(encrypt_decrypt_db('enc', $request->email, $user->id))
+            ]);
+        }
+
+        DB::commit();
+
+        // Ambil ulang data user setelah update
+        $updatedUser = User::with(['role', 'departments'])->find($user->id);
+        $emailDecrypted = encrypt_decrypt_db('dec', $updatedUser->email, $updatedUser->id);
+        $department = $updatedUser->departments->first();
+
+        $result = [
+            'id' => $updatedUser->id,
+            'name' => $updatedUser->name,
+            'username' => $updatedUser->username,
+            'email' => $emailDecrypted,
+            'nip' => $updatedUser->nip,
+            'phone_number' => $updatedUser->phone_number,
+            'profile_img' => $updatedUser->profile_img,
+            'department_id' => $department?->id,
+            'department_name' => $department?->name,
+            'role_id' => $updatedUser->role?->id,
+            'role_name' => $updatedUser->role?->name,
+        ];
+
+        return json(200, 'success', 'update_success', 'Profil berhasil diperbarui.', $result);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        logger("Gagal update profil: " . $e->getMessage());
+        return json(500, 'false', 'update_failed', 'Terjadi kesalahan saat memperbarui profil.', null);
     }
-
-    $user->save();
-
-    // Ambil data lengkap user
-    $user = User::with('role')->find($user->id);
-
-    return response()->json([
-        'code' => 200,
-        'status' => 'true',
-        'title' => 'update_success',
-        'message' => 'Profil berhasil diperbarui.',
-        'data' => [
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'username' => $user->username,
-                'email' => null,
-                'nip' => $user->nip,
-                'phone_number' => $user->phone_number,
-                'department_id' => $user->department_id,
-                'role_id' => $user->role_id,
-                'role_name' => $user->role->name ?? null,
-                'status' => $user->status,
-                'profile_img' => $user->profile_img,
-            ]
-        ]
-    ]);
 }
+
 
 public function getProfile()
 {

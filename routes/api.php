@@ -106,7 +106,8 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,6'])->group(fun
 Route::middleware('auth:api')->group(function () {
     // Halaman
     Route::get('page', [PageController::class, 'index']);
-    Route::post('page', [PageController::class, 'store']);
+    Route::post('/page-with-role', [PageController::class, 'storeWithRoles']);
+    // Route::post('page', [PageController::class, 'store']);
 
     // Hak Akses Role ke Halaman
     Route::get('role-page', [RolePageController::class, 'index']);

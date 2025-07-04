@@ -16,21 +16,13 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        User::firstOrCreate(
-            ['username' => 'testuser'],
-            [
-                'name'        => 'Test User',
-                'email'       => 'test@example.com',
-                'password'    => Hash::make('password123'),
-                'profile_img' => 'default.png',
-            ]
-        );
-
-        $this->call([
-            MstPageSeeder::class,
-            // MstDivisionSeeder::class,
-            MstDepartmentSeeder::class,
-            MstRoleSeeder::class,
-        ]);
-    }
+         $this->call([
+        MstHeatmapDampakSeeder::class,
+        MstHeatmapKemungkinanSeeder::class,
+        MstHeatmapSeeder::class,
+        MstHeatmapRiskRangeSeeder::class,
+        MstRiskCodeSeeder::class,
+        MstOptionSeeder::class,
+    ]);
+}
 }

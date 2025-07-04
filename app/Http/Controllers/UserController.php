@@ -424,7 +424,7 @@ public function updateProfile(Request $request)
 public function getProfile()
 {
     $user = auth()->user();
-    $user = User::with('role')->find($user->id);
+    $user = User::with('role','departments')->find($user->id);
 
     return response()->json([
         'code' => 200,
@@ -440,6 +440,7 @@ public function getProfile()
                 'nip' => $user->nip,
                 'phone_number' => $user->phone_number,
                 'department_id' => $user->department_id,
+                 'department_name' => $user->departments->first()->name ?? null,
                 'role_id' => $user->role_id,
                 'role_name' => $user->role->name ?? null,
                 'status' => $user->status,

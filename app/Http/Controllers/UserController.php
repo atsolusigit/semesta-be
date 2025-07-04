@@ -358,6 +358,7 @@ public function updateProfile(Request $request)
         'email' => 'nullable|email:rfc,dns|max:255|unique:users,email,' . $user->id,
         'nip' => 'nullable|string|max:100',
         'phone_number' => 'nullable|string|max:100',
+        'gender' => 'nullable|in:male,female,other',
         'department_id' => 'required|exists:mst_department,id',
         'profile_img' => 'nullable|url',
     ]);
@@ -367,11 +368,11 @@ public function updateProfile(Request $request)
     try {
         DB::beginTransaction();
 
-        // Update data user
         $user->name = $request->name;
         $user->username = $request->username;
         $user->nip = $request->nip;
         $user->phone_number = $request->phone_number;
+        $user->gender = $request->gender;
         $user->department_id = $request->department_id;
 
         if ($request->filled('profile_img')) {
@@ -401,6 +402,7 @@ public function updateProfile(Request $request)
             'email' => $emailDecrypted,
             'nip' => $updatedUser->nip,
             'phone_number' => $updatedUser->phone_number,
+            'gender' => $updatedUser->gender,
             'profile_img' => $updatedUser->profile_img,
             'department_id' => $department?->id,
             'department_name' => $department?->name,
@@ -416,11 +418,14 @@ public function updateProfile(Request $request)
     }
 }
 
-
 public function getProfile()
 {
     $user = auth()->user();
+<<<<<<< Updated upstream
     $user = User::with('role')->find($user->id);
+=======
+    $user = User::with('role', 'departments')->find($user->id);
+>>>>>>> Stashed changes
 
     return response()->json([
         'code' => 200,
@@ -435,7 +440,12 @@ public function getProfile()
                 'email' => encrypt_decrypt_db('dec', $user->email, $user->id),
                 'nip' => $user->nip,
                 'phone_number' => $user->phone_number,
+                'gender' => $user->gender,
                 'department_id' => $user->department_id,
+<<<<<<< Updated upstream
+=======
+                'department_name' => $user->departments->first()->name ?? null,
+>>>>>>> Stashed changes
                 'role_id' => $user->role_id,
                 'role_name' => $user->role->name ?? null,
                 'status' => $user->status,

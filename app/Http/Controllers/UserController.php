@@ -17,10 +17,11 @@ class UserController extends Controller
 {
    public function index()
 {
-    $users = User::with('role:id,name')
-        ->select('id','name','username','email','role_id','status')
-        ->latest('id')
-        ->get();
+    $users = User::with(['role:id,name', 'departments:id,name'])
+    ->select('id','name','username','email','role_id','status')
+    ->latest('id')
+    ->get();
+
 
     foreach ($users as $user) {
         try {
@@ -39,6 +40,7 @@ class UserController extends Controller
         }
 
         $user->role_name = $user->role->name ?? '-';
+        $user->department_name = $user->departments->pluck('name');
     }
 
     return json(200, 'success', 'Success','Berhasil menampilkan semua data user', $users);
@@ -52,9 +54,10 @@ class UserController extends Controller
     ]);
     if ($check[0] === 1) return $check[1];
 
-    $user = User::with('role')
-        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
-        ->find($id);
+    $user = User::with(['role', 'departments:id,name'])
+    ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+    ->find($id);
+
 
     if (!$user) {
         return json(404, 'error', 'Not Found', 'User tidak ditemukan', null);
@@ -77,6 +80,7 @@ class UserController extends Controller
     }
 
     $user->role_name = optional($user->role)->name ?? '-';
+    $user->department_name = $user->departments->pluck('name');
 
     // Jangan lupa return JSON-nya
     return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', $user);
@@ -421,11 +425,7 @@ public function updateProfile(Request $request)
 public function getProfile()
 {
     $user = auth()->user();
-<<<<<<< Updated upstream
-    $user = User::with('role')->find($user->id);
-=======
     $user = User::with('role', 'departments')->find($user->id);
->>>>>>> Stashed changes
 
     return response()->json([
         'code' => 200,
@@ -442,10 +442,7 @@ public function getProfile()
                 'phone_number' => $user->phone_number,
                 'gender' => $user->gender,
                 'department_id' => $user->department_id,
-<<<<<<< Updated upstream
-=======
                 'department_name' => $user->departments->first()->name ?? null,
->>>>>>> Stashed changes
                 'role_id' => $user->role_id,
                 'role_name' => $user->role->name ?? null,
                 'status' => $user->status,

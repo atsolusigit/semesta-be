@@ -74,11 +74,12 @@ class User extends Authenticatable implements JWTSubject
     /**
      * Relasi ke departemen (banyak ke banyak)
      */
-  public function departments()
+ public function departments()
 {
     return $this->belongsToMany(MstDepartment::class, 'tr_user_department', 'user_id', 'department_id')
                 ->withTimestamps()
-                ->withPivot(['created_by']);
+                ->withPivot(['created_by'])
+                ->distinct();
 }
 
 public function department()

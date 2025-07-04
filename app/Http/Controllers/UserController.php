@@ -17,10 +17,11 @@ class UserController extends Controller
 {
    public function index()
 {
-    $users = User::with('role:id,name')
-        ->select('id','name','username','email','role_id','status')
-        ->latest('id')
-        ->get();
+    $users = User::with(['role:id,name', 'departments:id,name'])
+    ->select('id','name','username','email','role_id','status')
+    ->latest('id')
+    ->get();
+
 
     foreach ($users as $user) {
         try {
@@ -39,6 +40,7 @@ class UserController extends Controller
         }
 
         $user->role_name = $user->role->name ?? '-';
+        $user->department_name = $user->departments->pluck('name');
     }
 
     return json(200, 'success', 'Success','Berhasil menampilkan semua data user', $users);
@@ -52,9 +54,10 @@ class UserController extends Controller
     ]);
     if ($check[0] === 1) return $check[1];
 
-    $user = User::with('role')
-        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
-        ->find($id);
+    $user = User::with(['role', 'departments:id,name'])
+    ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+    ->find($id);
+
 
     if (!$user) {
         return json(404, 'error', 'Not Found', 'User tidak ditemukan', null);
@@ -77,6 +80,7 @@ class UserController extends Controller
     }
 
     $user->role_name = optional($user->role)->name ?? '-';
+    $user->department_name = $user->departments->pluck('name');
 
     // Jangan lupa return JSON-nya
     return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', $user);

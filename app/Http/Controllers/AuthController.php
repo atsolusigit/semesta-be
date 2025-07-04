@@ -16,6 +16,7 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\UserToken; //aktifkan jika dibutuhkan
 use Illuminate\Support\Str;
 
+
 class AuthController extends Controller
     {
 

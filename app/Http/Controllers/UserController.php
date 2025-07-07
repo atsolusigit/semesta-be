@@ -18,36 +18,46 @@ class UserController extends Controller
    public function index()
 {
     $users = User::with(['role:id,name', 'departments:id,name'])
-    ->select('id','name','username','email','role_id','status')
-    ->latest('id')
-    ->get();
+        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+        ->latest('id')
+        ->get();
 
+    $result = [];
 
     foreach ($users as $user) {
+        // Dekripsi email
         try {
             $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
-
-            // Pastikan hasil dekripsi valid UTF-8
             if (!mb_check_encoding($decryptedEmail, 'UTF-8')) {
                 \Log::warning("Email hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
                 $decryptedEmail = null;
             }
-
-            $user->email = $decryptedEmail;
         } catch (\Throwable $e) {
-            \Log::warning("Gagal decrypt email #{$user->id}: {$e->getMessage()}");
-            $user->email = null;
+            \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+            $decryptedEmail = null;
         }
 
-        $user->role_name = $user->role->name ?? '-';
-        $user->department_name = $user->departments->pluck('name');
+        $firstDepartment = $user->departments->first();
+
+        // Format ulang data
+        $result[] = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->username,
+            'email' => $decryptedEmail,
+            'role_id' => $user->role_id,
+            'department_id' => optional($firstDepartment)->id,
+            'status' => $user->status,
+            'role_name' => optional($user->role)->name ?? '-',
+            'department_name' => optional($firstDepartment)->name ?? '-',
+        ];
     }
 
-    return json(200, 'success', 'Success','Berhasil menampilkan semua data user', $users);
+    return json(200, 'success', 'Success', 'Berhasil menampilkan semua data user', $result);
 }
 
 
-   public function show(Request $request, $id)
+public function show(Request $request, $id)
 {
     $check = check_validation(['id' => $id], [
         'id' => 'required|numeric|exists:users,id'
@@ -55,9 +65,8 @@ class UserController extends Controller
     if ($check[0] === 1) return $check[1];
 
     $user = User::with(['role', 'departments:id,name'])
-    ->select('id', 'name', 'username', 'email', 'role_id', 'status')
-    ->find($id);
-
+        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+        ->find($id);
 
     if (!$user) {
         return json(404, 'error', 'Not Found', 'User tidak ditemukan', null);
@@ -66,28 +75,35 @@ class UserController extends Controller
     // Decrypt email
     try {
         $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
-
-        // Validasi UTF-8
         if (!mb_check_encoding($decryptedEmail, 'UTF-8')) {
             \Log::warning("Email hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
             $decryptedEmail = null;
         }
-
         $user->email = $decryptedEmail;
     } catch (\Throwable $e) {
         \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
         $user->email = null;
     }
 
-    $user->role_name = optional($user->role)->name ?? '-';
-    $user->department_name = $user->departments->pluck('name');
+    $firstDepartment = $user->departments->first();
 
-    // Jangan lupa return JSON-nya
-    return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', $user);
+    // Susun data custom
+    $data = [
+        'id' => $user->id,
+        'name' => $user->name,
+        'username' => $user->username,
+        'email' => $user->email,
+        'role_id' => $user->role_id,
+        'department_id' => optional($firstDepartment)->id,
+        'status' => $user->status,
+        'role_name' => optional($user->role)->name ?? '-',
+        'department_name' => optional($firstDepartment)->name ?? '-',
+    ];
+
+    return json(200, 'success', 'Success', 'Berhasil menampilkan semua data user', [$data]);
 }
 
-
- public function store(Request $request)
+public function store(Request $request)
 {
     DB::beginTransaction();
 
@@ -176,7 +192,6 @@ class UserController extends Controller
         return json(500, 'false', 'error', 'Gagal tambah user!', []);
     }
 }
-
 
 public function update(Request $request, $id)
 {
@@ -451,6 +466,4 @@ public function getProfile()
         ]
     ]);
 }
-
-
 }

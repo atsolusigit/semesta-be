@@ -103,6 +103,96 @@ public function show(Request $request, $id)
     return json(200, 'success', 'Success', 'Berhasil menampilkan semua data user', [$data]);
 }
 
+public function store(Request $request)
+{
+    DB::beginTransaction();
+
+    $array_validation = [
+        'name' => 'required|string|min:2|max:255',
+        'email' => 'required|string|email:rfc,dns|max:255|unique:users',
+        'username' => 'required|string|max:100|unique:users',
+        'password' => [
+            'required',
+            'string',
+            Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
+        ],
+        'profile_img' => 'nullable|string|max:255', // hanya link
+        'role_id' => 'required|integer|exists:mst_role,id',
+        'jtkn' => 'nullable|string|max:500',
+        'fbtk' => 'nullable|string|max:500',
+        'department_id' => 'required|integer',
+        'status' => 'required',
+        'access_pages' => 'array',
+        'access_departments' => 'array',
+    ];
+
+    $validation = check_validation($request->all(), $array_validation);
+    if ($validation[0] != 0) {
+        return $validation[1];
+    }
+
+    try {
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'username' => $request->username,
+            'password' => bcrypt($request->password),
+            'profile_img' => $request->profile_img ?? '',
+            'role_id' => $request->role_id,
+            'jtkn' => '',
+            'fbtk' => $request->fbtk ?? 'FBTK-' . strtoupper(Str::random(10)),
+            'department_id' => $request->department_id,
+            'status' => $request->status === 'aktif' || $request->status == 1 ? 1 : 0,
+        ]);
+
+        User::where('id', $user->id)->update([
+            'email' => DB::raw(encrypt_decrypt_db('enc', $request->email, $user->id))
+        ]);
+
+        $token = JWTAuth::fromUser($user);
+        $user->jtkn = $token;
+        $user->save();
+
+        // Simpan akses halaman
+        if (!empty($request->access_pages)) {
+            $pivotPages = [];
+            foreach ($request->access_pages as $pageId) {
+                $pivotPages[] = [
+                    'user_id' => $user->id,
+                    'mst_page_id' => $pageId,
+                    'created_by' => auth()->id(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+            DB::table('user_page')->insert($pivotPages);
+        }
+
+        // Simpan akses department
+        if (!empty($request->access_departments)) {
+            $pivotDepartments = [];
+            foreach ($request->access_departments as $deptId) {
+                $pivotDepartments[] = [
+                    'user_id' => $user->id,
+                    'department_id' => $deptId,
+                    'created_by' => auth()->id(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+            DB::table('tr_user_department')->insert($pivotDepartments);
+        }
+
+        DB::commit();
+
+        return json(200, 'true', 'success', 'User berhasil ditambahkan!', []);
+    } catch (\Exception $e) {
+        DB::rollback();
+        logger("Gagal tambah user: " . $e->getMessage());
+        return json(500, 'false', 'error', 'Gagal tambah user!', []);
+    }
+}
+
 public function update(Request $request, $id)
 {
     DB::beginTransaction();
@@ -376,6 +466,4 @@ public function getProfile()
         ]
     ]);
 }
-
-
 }

@@ -15,6 +15,7 @@ use Illuminate\Validation\Rules\Password;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\UserToken; //aktifkan jika dibutuhkan
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
 
 
 class AuthController extends Controller
@@ -173,43 +174,54 @@ class AuthController extends Controller
             }
         }
 
-      public function changePassword(Request $request)
+   public function changePassword(Request $request)
 {
     try {
         $user = JWTAuth::parseToken()->authenticate();
 
-        if (!$user) {
-            return json(401, 'false', 'unauthorized', 'Token tidak valid', []);
-        }
-
-        $array_validation = [
-            'old_password' => ['required', 'string'],
-            'new_password' => [
-                'required',
-                'string',
-                Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
-            ],
-            'confirm_password' => ['required', 'same:new_password']
+        $rules = [
+            'old_password' => 'required',
+            'new_password' => 'required|min:6',
+            'confirm_password' => 'required|same:new_password',
         ];
 
-        $validate = check_validation($request->all(), $array_validation);
-        if ($validate[0] != 0) {
-            return $validate[1];
+        // Validasi pakai helper tetap
+        $validate = check_validation($request->all(), $rules);
+        if ($validate[0]) {
+            return $validate[1]; // Sudah berupa response()->json()
         }
 
         // Cek password lama
         if (!Hash::check($request->old_password, $user->password)) {
-            return json(400, 'false', 'wrong_password', 'Password lama salah', []);
+            return response()->json([
+                'code' => 400,
+                'status' => 'error_validation',
+                'message' => 'error validation. [400 - bad request]',
+                'data' => [
+                    'old_password' => ['Password lama salah.']
+                ]
+            ], 200);
         }
 
-        // Update password
+        // Simpan password baru
         $user->password = bcrypt($request->new_password);
         $user->save();
 
-        return json(200, 'true', 'success', 'Password berhasil diubah', []);
-
+        return json(
+            200,
+            'true',
+            'success',
+            'Password berhasil diubah.',
+            []
+        );
     } catch (\Throwable $th) {
-        return json(500, 'false', 'error', 'Terjadi kesalahan sistem: ' . $th->getMessage(), []);
+        return json(
+            500,
+            'error',
+            'Terjadi kesalahan sistem',
+            $th->getMessage(),
+            []
+        );
     }
 }
 

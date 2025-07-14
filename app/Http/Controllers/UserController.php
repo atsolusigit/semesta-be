@@ -12,97 +12,82 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Helpers\check_validation;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-
-
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-   public function index()
+
+  public function index()
 {
-    $users = User::with(['role:id,name', 'departments:id,name'])
-        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+    $users = User::with(['role:id,name', 'department:id,name'])
+        ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
         ->orderBy('id', 'asc')
         ->get();
 
     $result = [];
 
     foreach ($users as $user) {
-        // Dekripsi email
-        try {
-            $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
-            if (!mb_check_encoding($decryptedEmail, 'UTF-8')) {
-                \Log::warning("Email hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
-                $decryptedEmail = null;
-            }
-        } catch (\Throwable $e) {
-            \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
-            $decryptedEmail = null;
-        }
-
-        $firstDepartment = $user->departments->first();
-
         $result[] = [
             'id' => $user->id,
             'name' => $user->name,
             'username' => $user->username,
-            'email' => $decryptedEmail,
+            'email' => encrypt_decrypt_db('dec', $user->email, $user->id),
             'role_id' => $user->role_id,
-            'department_id' => optional($firstDepartment)->id,
+            'department_id' => $user->department_id,
             'status' => $user->status,
-            'role_name' => optional($user->role)->name ?? '-',
-            'department_name' => optional($firstDepartment)->name ?? '-',
+            'role_name' => $user->role?->name,
+            'department_name' => $user->department?->name,
         ];
     }
 
-    return json(200, 'success', 'Success', 'Berhasil menampilkan semua data user', $result);
+    return response()->json([
+        'status' => true,
+        'message' => 'List data user.',
+        'data' => $result
+    ]);
 }
-
 
 
 public function show(Request $request, $id)
 {
+    // Validasi ID
     $check = check_validation(['id' => $id], [
         'id' => 'required|numeric|exists:users,id'
     ]);
     if ($check[0] === 1) return $check[1];
 
-    $user = User::with(['role', 'departments:id,name'])
-        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+    // Ambil data user dengan relasi
+    $user = User::with(['role:id,name', 'department:id,name'])
+        ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
         ->find($id);
 
     if (!$user) {
         return json(404, 'error', 'Not Found', 'User tidak ditemukan', null);
     }
 
-    // Decrypt email
+    // Dekripsi email
     try {
-        $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
-        if (!mb_check_encoding($decryptedEmail, 'UTF-8')) {
-            \Log::warning("Email hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
-            $decryptedEmail = null;
-        }
-        $user->email = $decryptedEmail;
+        $user->email = encrypt_decrypt_db('dec', $user->email, $user->id);
     } catch (\Throwable $e) {
         \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
         $user->email = null;
     }
 
-    $firstDepartment = $user->departments->first();
-
-    // Susun data custom
+    // Susun response
     $data = [
         'id' => $user->id,
         'name' => $user->name,
         'username' => $user->username,
         'email' => $user->email,
         'role_id' => $user->role_id,
-        'department_id' => optional($firstDepartment)->id,
+        'department_id' => $user->department_id,
         'status' => $user->status,
         'role_name' => optional($user->role)->name ?? '-',
-        'department_name' => optional($firstDepartment)->name ?? '-',
+        'department_name' => optional($user->department)->name ?? '-',
     ];
 
-    return json(200, 'success', 'Success', 'Berhasil menampilkan semua data user', [$data]);
+    return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', [$data]);
 }
 
 public function store(Request $request)
@@ -110,22 +95,18 @@ public function store(Request $request)
     DB::beginTransaction();
 
     $array_validation = [
-        'name' => 'required|string|min:2|max:255',
-        'email' => 'required|string|email:rfc,dns|max:255|unique:users',
+        'name' => 'required|string|max:255',
         'username' => 'required|string|max:100|unique:users',
+        'email' => 'required|email|unique:users,email',
         'password' => [
             'required',
             'string',
             Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
         ],
-        'profile_img' => 'nullable|string|max:255',
-        'role_id' => 'required|integer|exists:mst_role,id',
-        'jtkn' => 'nullable|string|max:500',
-        'fbtk' => 'nullable|string|max:500',
-        'department_id' => 'required|integer|exists:mst_department,id',
-        'status' => 'required',
-        // Jika ingin isi multiple department
-        // 'access_departments' => 'array',
+        'role_id' => 'required|exists:mst_role,id',
+        'department_id' => 'required|exists:mst_department,id',
+        'status' => ['required', Rule::in(['aktif', 'pasif'])],
+        'profile_img' => 'required|string|url',
     ];
 
     $validation = check_validation($request->all(), $array_validation);
@@ -134,88 +115,59 @@ public function store(Request $request)
     }
 
     try {
+        $status = $request->status === 'aktif' ? 1 : 0;
+        $fbtk = 'FBTK-' . strtoupper(Str::random(10));
+
         $user = User::create([
             'name' => $request->name,
-            'email' => $request->email,
             'username' => $request->username,
+            'email' => $request->email, // akan dienkripsi setelahnya
             'password' => bcrypt($request->password),
-            'profile_img' => $request->profile_img ?? '',
             'role_id' => $request->role_id,
+            'department_id' => $request->department_id,
+            'status' => $status,
+            'profile_img' => $request->profile_img,
             'jtkn' => '',
-            'fbtk' => $request->fbtk ?? 'FBTK-' . strtoupper(Str::random(10)),
-            'department_id' => $request->department_id,
-            'status' => $request->status === 'aktif' || $request->status == 1 ? 1 : 0,
+            'fbtk' => $fbtk,
         ]);
 
-        // Enkripsi email setelah dapat ID
+        // Enkripsi email sesuai user ID
         User::where('id', $user->id)->update([
-            'email' => DB::raw(encrypt_decrypt_db('enc', $request->email, $user->id))
-        ]);
-
-        // Token JWT
-        $token = JWTAuth::fromUser($user);
-        $user->jtkn = $token;
-        $user->save();
-
-        // Simpan akses halaman
-        if (!empty($request->access_pages)) {
-            $pivotPages = [];
-            foreach ($request->access_pages as $pageId) {
-                $pivotPages[] = [
-                    'user_id' => $user->id,
-                    'mst_page_id' => $pageId,
-                    'created_by' => auth()->id(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-            DB::table('user_page')->insert($pivotPages);
-        }
-
-        // Tambahkan akses ke department (pivot table)
-        DB::table('tr_user_department')->insert([
-            'user_id' => $user->id,
-            'department_id' => $request->department_id,
-            'created_by' => auth()->id(),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'email' => DB::raw(encrypt_decrypt_db('enc', $request['email'], $user->id))
         ]);
 
         DB::commit();
 
-        return json(200, 'true', 'success', 'User berhasil ditambahkan!', []);
+        return response()->json([
+    'status' => true,
+    'message' => 'User berhasil ditambahkan.'
+], 200);
+
     } catch (\Exception $e) {
         DB::rollback();
-        logger("Gagal tambah user: " . $e->getMessage());
-        return json(500, 'false', 'error', 'Gagal tambah user!', []);
+        return json(500, false, 'store_failed', 'Terjadi kesalahan saat menyimpan user.', $e->getMessage());
     }
 }
+
 
 public function update(Request $request, $id)
 {
-    DB::beginTransaction();
+    $user = User::find($id);
+    if (!$user) {
+        return response()->json([
+            'status' => false,
+            'message' => 'User tidak ditemukan.'
+        ], 404);
+    }
 
     $array_validation = [
-        'name' => 'required|string|min:2|max:255',
-        'email' => [
-            'required',
-            'string',
-            'email:rfc,dns',
-            'max:255',
-            Rule::unique('users')->ignore($id),
-        ],
-        'username' => [
-            'required',
-            'string',
-            'max:100',
-            Rule::unique('users')->ignore($id),
-        ],
-        'profile_img' => 'nullable|string|max:255',
-        'role_id' => 'required|integer|exists:mst_role,id',
-        'jtkn' => 'nullable|string|max:500',
-        'fbtk' => 'nullable|string|max:500',
-        'department_id' => 'required|integer|exists:mst_department,id',
-        'status' => 'required',
+        'name' => 'required|string|max:255',
+        'username' => 'required|string|max:100|unique:users,username,' . $id,
+        'email' => 'required|email|unique:users,email,' . $id,
+        'role_id' => 'required|exists:mst_role,id',
+        'department_id' => 'required|exists:mst_department,id',
+        'status' => ['required', Rule::in(['aktif', 'pasif'])],
+        'profile_img' => 'required|string|url',
     ];
 
     $validation = check_validation($request->all(), $array_validation);
@@ -224,61 +176,40 @@ public function update(Request $request, $id)
     }
 
     try {
-        $user = User::find($id);
-        if (!$user) {
-            return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
-        }
+        $status = $request->status === 'aktif' ? 1 : 0;
 
-        // Update field-field utama
         $user->name = $request->name;
         $user->username = $request->username;
-        $user->profile_img = $request->profile_img ?? '';
         $user->role_id = $request->role_id;
-        $user->jtkn = $request->jtkn ?? $user->jtkn;
-        $user->fbtk = $request->fbtk ?? $user->fbtk;
         $user->department_id = $request->department_id;
-        $user->status = $request->status === 'aktif' || $request->status == 1 ? 1 : 0;
+        $user->status = $status;
+        $user->profile_img = $request->profile_img;
 
-        // Enkripsi email sebelum simpan
-        $user->email = encrypt_decrypt_db('enc', $request->email, $user->id);
-        $user->save();
-
-        // Hapus dan simpan ulang akses halaman (jika dikirim)
-        if (!empty($request->access_pages)) {
-            DB::table('user_page')->where('user_id', $user->id)->delete();
-            $pivotPages = [];
-            foreach ($request->access_pages as $pageId) {
-                $pivotPages[] = [
-                    'user_id' => $user->id,
-                    'mst_page_id' => $pageId,
-                    'created_by' => auth()->id(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-            DB::table('user_page')->insert($pivotPages);
-        }
-
-        // Update akses department (pivot)
-        DB::table('tr_user_department')->where('user_id', $user->id)->delete();
-        DB::table('tr_user_department')->insert([
-            'user_id' => $user->id,
-            'department_id' => $request->department_id,
-            'created_by' => auth()->id(),
-            'created_at' => now(),
-            'updated_at' => now(),
+        // Enkripsi email berdasarkan ID user
+         // Enkripsi email sesuai user ID
+        User::where('id', $user->id)->update([
+            'email' => DB::raw(encrypt_decrypt_db('enc', $request['email'], $user->id))
         ]);
 
-        DB::commit();
+        // Update password jika dikirim
+        if (!empty($request->password)) {
+            $user->password = bcrypt($request->password);
+        }
 
-        return json(200, 'true', 'success', 'User berhasil diupdate.', []);
+        $user->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'User berhasil diperbarui.'
+        ]);
     } catch (\Exception $e) {
-        DB::rollback();
-        logger("Gagal update user: " . $e->getMessage());
-        return json(500, 'false', 'error', 'Terjadi kesalahan saat update user.', []);
+        return response()->json([
+            'status' => false,
+            'message' => 'Terjadi kesalahan saat memperbarui user.',
+            'error' => $e->getMessage()
+        ], 500);
     }
 }
-
 
     public function destroy(Request $request, $id)
     {

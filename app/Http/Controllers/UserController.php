@@ -106,7 +106,6 @@ public function store(Request $request)
         'role_id' => 'required|exists:mst_role,id',
         'department_id' => 'required|exists:mst_department,id',
         'status' => ['required', Rule::in(['aktif', 'pasif'])],
-        'profile_img' => 'required|string|url',
     ];
 
     $validation = check_validation($request->all(), $array_validation);
@@ -126,7 +125,6 @@ public function store(Request $request)
             'role_id' => $request->role_id,
             'department_id' => $request->department_id,
             'status' => $status,
-            'profile_img' => $request->profile_img,
             'jtkn' => '',
             'fbtk' => $fbtk,
         ]);
@@ -149,7 +147,6 @@ public function store(Request $request)
     }
 }
 
-
 public function update(Request $request, $id)
 {
     $user = User::find($id);
@@ -167,7 +164,6 @@ public function update(Request $request, $id)
         'role_id' => 'required|exists:mst_role,id',
         'department_id' => 'required|exists:mst_department,id',
         'status' => ['required', Rule::in(['aktif', 'pasif'])],
-        'profile_img' => 'required|string|url',
     ];
 
     $validation = check_validation($request->all(), $array_validation);
@@ -183,9 +179,7 @@ public function update(Request $request, $id)
         $user->role_id = $request->role_id;
         $user->department_id = $request->department_id;
         $user->status = $status;
-        $user->profile_img = $request->profile_img;
 
-        // Enkripsi email berdasarkan ID user
          // Enkripsi email sesuai user ID
         User::where('id', $user->id)->update([
             'email' => DB::raw(encrypt_decrypt_db('enc', $request['email'], $user->id))

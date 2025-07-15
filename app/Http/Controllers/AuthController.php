@@ -94,7 +94,7 @@ class AuthController extends Controller
 
    public function login(Request $request)
 {
-    // Validasi input loginc
+    // Validasi input logic
     $array_validation = [
         'username' => 'required|string', // Bisa username atau email terenkripsi
         'password' => 'required',
@@ -104,59 +104,145 @@ class AuthController extends Controller
         return check_validation($request->all(), $array_validation)[1];
     }
 
-    // Ambil user berdasarkan username ATAU email terenkripsi
-    $userQuery = User::where('username', $request->username)
-        ->orWhereRaw("AES_DECRYPT(email, CONCAT('SM', id)) = ?", [$request->username])
-        ->first();
+    try {
+        // Ambil user berdasarkan username ATAU email terenkripsi
+        $userQuery = User::where('username', $request->username)->first();
 
-    if (!$userQuery) {
-        return json(200, 'false', 'Login Gagal', 'Username/email tidak ditemukan.', []);
-    }
+        // Jika tidak ditemukan by username, coba cari by email
+        if (!$userQuery) {
+            // Cari semua user dan dekripsi email satu per satu
+            $allUsers = User::all();
+            foreach ($allUsers as $user) {
+                try {
+                    $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
+                    if ($decryptedEmail && $decryptedEmail === $request->username) {
+                        $userQuery = $user;
+                        break;
+                    }
+                } catch (\Exception $e) {
+                    // Skip user jika dekripsi gagal
+                    continue;
+                }
+            }
+        }
 
-    //  Cek status user (pending / ditolak)
-    if ($userQuery->status == 0) {
-        return json(200, 'false', 'Login Ditolak', 'Akun Anda belum disetujui oleh superadmin.', []);
-    }
+        if (!$userQuery) {
+            return json(200, 'false', 'Login Gagal', 'Username/email tidak ditemukan.', []);
+        }
 
-    if ($userQuery->status == 2) {
-        return json(200, 'false', 'Login Ditolak', 'Pendaftaran Akun Anda ditolak.', []);
-    }
+        //  Cek status user (pending / ditolak)
+        if ($userQuery->status == 0) {
+            return json(200, 'false', 'Login Ditolak', 'Akun Anda belum disetujui oleh superadmin.', []);
+        }
 
-    //  Autentikasi password
-    $token = JWTAuth::attempt([
-        'username' => $userQuery->username, // JWTAuth tidak bisa pakai email terenkripsi
-        'password' => $request->password
-    ]);
+        if ($userQuery->status == 2) {
+            return json(200, 'false', 'Login Ditolak', 'Pendaftaran Akun Anda ditolak.', []);
+        }
 
-    if ($token) {
-        //  Ambil user aktif dari token
-        $user = JWTAuth::user();
-
-        //  Simpan token ke kolom jtkn
-        $user->jtkn = $token;
-        $user->save();
-
-        //  Dekripsi email
-        $user['email'] = encrypt_decrypt_db('dec', $user['email'], $user['id']);
-
-        //  Tambahkan nama role
-        $user['role_name'] = optional($user->role)->name;
-
-        //  Kembalikan token dan data user
-        return json(200, 'true', 'Login Berhasil', 'Selamat datang!', [
-            'user' => $user,
-            'access_token' => [
-                'token' => $token,
-                'type' => 'Bearer',
-                'expires_in' => JWTAuth::factory()->getTTL() * 60,
-            ],
-            'jtkn' => $user->jtkn,
-            'fbtk' => $user->fbtk,
+        //  Autentikasi password
+        $token = JWTAuth::attempt([
+            'username' => $userQuery->username, // JWTAuth tidak bisa pakai email terenkripsi
+            'password' => $request->password
         ]);
-    }
 
-    //  Gagal login
-    return json(200, 'false', 'Login Gagal', 'Username/ email atau password salah.', []);
+        if ($token) {
+            //  Ambil user aktif dari token
+            $user = JWTAuth::user();
+
+            //  Simpan token ke kolom jtkn
+            $user->jtkn = $token;
+            $user->save();
+
+            //  Dekripsi email dengan error handling
+            $decryptedEmail = null;
+            try {
+                $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
+
+                // Validasi hasil dekripsi
+                if (!$decryptedEmail || !filter_var($decryptedEmail, FILTER_VALIDATE_EMAIL)) {
+                    logger("Email decryption failed or invalid for user {$user->id}");
+                    $decryptedEmail = null;
+                }
+            } catch (\Exception $e) {
+                logger("Email decryption error for user {$user->id}: " . $e->getMessage());
+                $decryptedEmail = null;
+            }
+
+            // Dekripsi NIP dengan error handling
+            $decryptedNip = null;
+            try {
+                if ($user->nip) {
+                    $decryptedNip = encrypt_decrypt_db('dec', $user->nip, $user->id);
+                }
+            } catch (\Exception $e) {
+                logger("NIP decryption error for user {$user->id}: " . $e->getMessage());
+                $decryptedNip = null;
+            }
+
+            // Dekripsi phone_number dengan error handling
+            $decryptedPhone = null;
+            try {
+                if ($user->phone_number) {
+                    $decryptedPhone = encrypt_decrypt_db('dec', $user->phone_number, $user->id);
+                }
+            } catch (\Exception $e) {
+                logger("Phone decryption error for user {$user->id}: " . $e->getMessage());
+                $decryptedPhone = null;
+            }
+
+            // Load relasi role untuk mendapatkan data role lengkap
+            $user->load('role');
+
+            // Siapkan data user untuk response dengan struktur lama
+            $userData = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $decryptedEmail,
+                'username' => $user->username,
+                'email_verified_at' => $user->email_verified_at,
+                'status' => $user->status,
+                'profile_img' => $user->profile_img ?? "",
+                'department_id' => $user->department_id,
+                'jtkn' => $user->jtkn,
+                'fbtk' => $user->fbtk,
+                'role_id' => $user->role_id,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+                'nip' => $decryptedNip,
+                'phone_number' => $decryptedPhone,
+                'gender' => $user->gender,
+                'photo' => $user->photo,
+                'role_name' => optional($user->role)->name,
+                'role' => $user->role ? [
+                    'id' => $user->role->id,
+                    'name' => $user->role->name,
+                    'status' => $user->role->status,
+                    'created_by' => $user->role->created_by,
+                    'created_at' => $user->role->created_at,
+                    'updated_at' => $user->role->updated_at
+                ] : null
+            ];
+
+            //  Kembalikan token dan data user dengan struktur lama
+            return json(200, 'true', 'Login Berhasil', 'Selamat datang!', [
+                'user' => $userData,
+                'access_token' => [
+                    'token' => $token,
+                    'type' => 'Bearer',
+                    'expires_in' => JWTAuth::factory()->getTTL() * 60,
+                ],
+                'jtkn' => $user->jtkn,
+                'fbtk' => $user->fbtk,
+            ]);
+        }
+
+        //  Gagal login
+        return json(200, 'false', 'Login Gagal', 'Username/ email atau password salah.', []);
+
+    } catch (\Exception $e) {
+        logger("Login error: " . $e->getMessage());
+        return json(500, 'false', 'Login Error', 'Terjadi kesalahan saat login.', []);
+    }
 }
 
         public function logout(Request $request)

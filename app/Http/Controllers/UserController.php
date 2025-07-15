@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -292,7 +293,7 @@ public function getPendingUsers()
 }
 
 
-public function updateProfile(Request $request)
+ public function updateProfile(Request $request)
 {
     $user = auth()->user();
 
@@ -311,10 +312,9 @@ public function updateProfile(Request $request)
     try {
         DB::beginTransaction();
 
+        // Update data biasa (tidak terenkripsi)
         $user->name = $request->name;
         $user->username = $request->username;
-        $user->nip = $request->nip;
-        $user->phone_number = $request->phone_number;
         $user->gender = $request->gender;
 
         if ($request->filled('profile_img')) {
@@ -323,26 +323,114 @@ public function updateProfile(Request $request)
 
         $user->save();
 
-        // Update email terenkripsi jika diisi
+        // Update field terenkripsi dengan error handling
         if ($request->filled('email')) {
-            User::where('id', $user->id)->update([
-                'email' => DB::raw(encrypt_decrypt_db('enc', $request->email, $user->id))
-            ]);
+            try {
+                $encryptedEmail = encrypt_decrypt_db('enc', $request->email, $user->id);
+                if ($encryptedEmail) {
+                    User::where('id', $user->id)->update([
+                        'email' => DB::raw($encryptedEmail)
+                    ]);
+                } else {
+                    logger("Email encryption failed for user {$user->id}");
+                }
+            } catch (\Exception $e) {
+                logger("Email encryption error: " . $e->getMessage());
+            }
+        }
+
+        if ($request->filled('nip')) {
+            try {
+                $encryptedNip = encrypt_decrypt_db('enc', $request->nip, $user->id);
+                if ($encryptedNip) {
+                    User::where('id', $user->id)->update([
+                        'nip' => DB::raw($encryptedNip)
+                    ]);
+                } else {
+                    logger("NIP encryption failed for user {$user->id}");
+                }
+            } catch (\Exception $e) {
+                logger("NIP encryption error: " . $e->getMessage());
+            }
+        }
+
+        if ($request->filled('phone_number')) {
+            try {
+                logger("Original phone_number: " . $request->phone_number);
+                $encryptedPhone = encrypt_decrypt_db('enc', $request->phone_number, $user->id);
+                logger("Encrypted phone_number: " . ($encryptedPhone ?? 'NULL'));
+
+                if ($encryptedPhone) {
+                    User::where('id', $user->id)->update([
+                        'phone_number' => DB::raw($encryptedPhone)
+                    ]);
+                    logger("Phone number updated successfully for user {$user->id}");
+                } else {
+                    logger("Phone number encryption failed for user {$user->id}");
+                }
+            } catch (\Exception $e) {
+                logger("Phone number encryption error: " . $e->getMessage());
+            }
         }
 
         DB::commit();
 
         // Ambil ulang data user setelah update
         $updatedUser = User::with(['role', 'departments'])->find($user->id);
-        $emailDecrypted = encrypt_decrypt_db('dec', $updatedUser->email, $updatedUser->id);
+
+        // Decrypt semua data yang terenkripsi dengan error handling
+        $emailDecrypted = null;
+        $nipDecrypted = null;
+        $phoneDecrypted = null;
+
+        if ($updatedUser->email) {
+            try {
+                $emailDecrypted = encrypt_decrypt_db('dec', $updatedUser->email, $updatedUser->id);
+            } catch (\Exception $e) {
+                logger("Email decryption error: " . $e->getMessage());
+            }
+        }
+
+        if ($updatedUser->nip) {
+            try {
+                $nipDecrypted = encrypt_decrypt_db('dec', $updatedUser->nip, $updatedUser->id);
+            } catch (\Exception $e) {
+                logger("NIP decryption error: " . $e->getMessage());
+            }
+        }
+
+        if ($updatedUser->phone_number) {
+            try {
+                logger("Encrypted phone from DB: " . $updatedUser->phone_number);
+                $phoneDecrypted = encrypt_decrypt_db('dec', $updatedUser->phone_number, $updatedUser->id);
+                logger("Decrypted phone result: " . ($phoneDecrypted ?? 'NULL'));
+
+                // Jika dekripsi gagal, coba beberapa alternatif
+                if (!$phoneDecrypted) {
+                    logger("First decryption failed, trying alternative methods...");
+
+                    // Coba dekripsi dengan cara lain atau fallback
+                    // Misalnya jika ada issue dengan format data
+                    $phoneDecrypted = trim($phoneDecrypted);
+                    if (empty($phoneDecrypted)) {
+                        logger("Phone decryption completely failed, setting to null");
+                        $phoneDecrypted = null;
+                    }
+                }
+            } catch (\Exception $e) {
+                logger("Phone number decryption error: " . $e->getMessage());
+                logger("Stack trace: " . $e->getTraceAsString());
+                $phoneDecrypted = null;
+            }
+        }
 
         $result = [
             'id' => $updatedUser->id,
             'name' => $updatedUser->name,
             'username' => $updatedUser->username,
             'email' => $emailDecrypted,
-            'nip' => $updatedUser->nip,
-            'phone_number' => $updatedUser->phone_number,
+            'nip' => $nipDecrypted,
+            'phone_number' => $phoneDecrypted,
             'gender' => $updatedUser->gender,
             'profile_img' => $updatedUser->profile_img,
             'role_id' => $updatedUser->role?->id,
@@ -359,32 +447,82 @@ public function updateProfile(Request $request)
 
 public function getProfile()
 {
-    $user = auth()->user();
-    $user = User::with('role', 'department')->find($user->id); // relasi yang dipakai adalah singular
+    try {
+        $user = auth()->user();
+        $user = User::with('role', 'department')->find($user->id);
 
-    return response()->json([
-        'code' => 200,
-        'status' => true,
-        'title' => 'get_profile_success',
-        'message' => 'Data profil berhasil diambil.',
-        'data' => [
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'username' => $user->username,
-                'email' => encrypt_decrypt_db('dec', $user->email, $user->id),
-                'nip' => $user->nip,
-                'phone_number' => $user->phone_number,
-                'gender' => $user->gender,
-                'department_id' => $user->department_id,
-                'department_name' => optional($user->department)->name,
-                'role_id' => $user->role_id,
-                'role_name' => optional($user->role)->name,
-                'status' => $user->status,
-                'profile_img' => $user->profile_img,
+        // Decrypt data dengan error handling
+        $emailDecrypted = null;
+        $nipDecrypted = null;
+        $phoneDecrypted = null;
+
+        if ($user->email) {
+            try {
+                $emailDecrypted = encrypt_decrypt_db('dec', $user->email, $user->id);
+            } catch (\Exception $e) {
+                logger("Email decryption error in getProfile: " . $e->getMessage());
+            }
+        }
+
+        if ($user->nip) {
+            try {
+                $nipDecrypted = encrypt_decrypt_db('dec', $user->nip, $user->id);
+            } catch (\Exception $e) {
+                logger("NIP decryption error in getProfile: " . $e->getMessage());
+            }
+        }
+
+        if ($user->phone_number) {
+    try {
+        logger("Getting phone from DB: " . $user->phone_number);
+        $phoneDecrypted = encrypt_decrypt_db('dec', $user->phone_number, $user->id);
+
+        if (empty($phoneDecrypted)) {
+            logger("Phone decryption returned empty result, setting to null");
+            $phoneDecrypted = null;
+        } else {
+            logger("Decrypted phone in getProfile: " . $phoneDecrypted);
+        }
+    } catch (\Exception $e) {
+        logger("Phone number decryption error in getProfile: " . $e->getMessage());
+        logger("Stack trace: " . $e->getTraceAsString());
+        $phoneDecrypted = null;
+    }
+}
+
+        return response()->json([
+            'code' => 200,
+            'status' => true,
+            'title' => 'get_profile_success',
+            'message' => 'Data profil berhasil diambil.',
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'email' => $emailDecrypted,
+                    'nip' => $nipDecrypted,
+                    'phone_number' => $phoneDecrypted,
+                    'gender' => $user->gender,
+                    'department_id' => $user->department_id,
+                    'department_name' => optional($user->department)->name,
+                    'role_id' => $user->role_id,
+                    'role_name' => optional($user->role)->name,
+                    'status' => $user->status,
+                    'profile_img' => $user->profile_img,
+                ]
             ]
-        ]
-    ]);
+        ]);
+    } catch (\Exception $e) {
+        logger("Error in getProfile: " . $e->getMessage());
+        return response()->json([
+            'code' => 500,
+            'status' => false,
+            'title' => 'get_profile_failed',
+            'message' => 'Terjadi kesalahan saat mengambil data profil.',
+            'data' => null
+        ], 500);
+    }
 }
 
 }

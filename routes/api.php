@@ -11,9 +11,16 @@ use App\Http\Middleware\RoleAccessMiddleware;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\RolePageController;
 use App\Http\Controllers\PageController;
-use App\Models\MstRole;
-use App\Http\Controllers\RiskHeaderController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\HeatmapLabelController;
+use App\Http\Controllers\HeatmapRiskRangeController;
+use App\Http\Controllers\MstHeatmapController;
+use App\Http\Controllers\MstRiskCodeController;
+use App\Http\Controllers\MstOptionController;
+use App\Http\Controllers\TrRiskHeaderController;
+use App\Http\Controllers\TrRiskMonthlyController;
+use App\Http\Controllers\TrMitigationMonthlyController;
+use App\Http\Controllers\TrRiskMonthlyUploadController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -162,3 +169,67 @@ Route::prefix('/upload')->group(function () {
     Route::post('/single', [UploadController::class, 'singleUpload']);
     Route::post('/multiple', [UploadController::class, 'multipleUpload']);
 });
+
+// ===================== HEAT LABEL =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/HeatLabel', [HeatmapLabelController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/HeatLabel', [HeatmapLabelController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/HeatLabel/{type}/{id}', [HeatmapLabelController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/HeatLabel/{type}/{id}', [HeatmapLabelController::class, 'destroy']);
+
+// ===================== HEATMAP RISK RANGE =====================
+Route::prefix('heatmap-risk-range')->group(function () {
+    Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/', [HeatmapRiskRangeController::class, 'index']);
+    Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/', [HeatmapRiskRangeController::class, 'store']);
+    Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/{id}', [HeatmapRiskRangeController::class, 'update']);
+    Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/{id}', [HeatmapRiskRangeController::class, 'destroy']);
+});
+
+// ===================== HEATMAP =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/heatmap', [MstHeatmapController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/heatmap', [MstHeatmapController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/heatmap/{id}', [MstHeatmapController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/heatmap/{id}', [MstHeatmapController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/heatmap/{id}', [MstHeatmapController::class, 'destroy']);
+
+// ===================== RISK CODE =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-code', [MstRiskCodeController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/risk-code', [MstRiskCodeController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-code/{id}', [MstRiskCodeController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-code/{id}', [MstRiskCodeController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-code/{id}', [MstRiskCodeController::class, 'destroy']);
+
+// ===================== OPTION =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/option', [MstOptionController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/option', [MstOptionController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/option/{id}', [MstOptionController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/option/{id}', [MstOptionController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/option/{id}', [MstOptionController::class, 'destroy']);
+
+// ===================== RISK HEADER =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header', [TrRiskHeaderController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/risk-header', [TrRiskHeaderController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header/{id}', [TrRiskHeaderController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);
+
+// ===================== RISK MONTHLY =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly', [TrRiskMonthlyController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/risk-monthly', [TrRiskMonthlyController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'destroy']);
+
+// ===================== MITIGATION MONTHLY =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/mitigation-monthly', [TrMitigationMonthlyController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/mitigation-monthly', [TrMitigationMonthlyController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/mitigation-monthly/{id}', [TrMitigationMonthlyController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/mitigation-monthly/{id}', [TrMitigationMonthlyController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/mitigation-monthly/{id}', [TrMitigationMonthlyController::class, 'destroy']);
+
+// ===================== MONTHLY UPLOAD =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly-upload', [TrRiskMonthlyUploadController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/risk-monthly-upload', [TrRiskMonthlyUploadController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly-upload/{id}', [TrRiskMonthlyUploadController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-upload/{id}', [TrRiskMonthlyUploadController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-monthly-upload/{id}', [TrRiskMonthlyUploadController::class, 'destroy']);
+

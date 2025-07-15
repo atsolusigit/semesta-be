@@ -14,8 +14,7 @@ class HeatmapLabelController extends Controller
         $dampak = MstHeatmapDampak::orderBy('dampak','asc')->get();
         $kemungkinan = MstHeatmapKemungkinan::orderBy('kemungkinan','asc')->get();
 
-        return response()->json([
-            'status' => true,
+        return json(200, true, 'Berhasil', 'Data label berhasil diambil', [
             'dampak' => $dampak,
             'kemungkinan' => $kemungkinan
         ]);
@@ -30,10 +29,7 @@ class HeatmapLabelController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'errors' => $validator->errors()
-            ], 422);
+            return json(422, false, 'Validasi Gagal', 'Terdapat kesalahan input', $validator->errors());
         }
 
         if ($request->type === 'dampak') {
@@ -48,10 +44,7 @@ class HeatmapLabelController extends Controller
             ]);
         }
 
-        return response()->json([
-            'status' => true,
-            'data' => $data
-        ]);
+        return json(200, true, 'Berhasil', 'Label berhasil disimpan', $data);
     }
 
     public function update(Request $request, $type, $id)
@@ -62,19 +55,13 @@ class HeatmapLabelController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'errors' => $validator->errors()
-            ], 422);
+            return json(422, false, 'Validasi Gagal', 'Terdapat kesalahan input', $validator->errors());
         }
 
         if ($type === 'dampak') {
             $data = MstHeatmapDampak::find($id);
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data dampak tidak ditemukan'
-                ], 404);
+                return json(404, false, 'Tidak Ditemukan', 'Data dampak tidak ditemukan', null);
             }
 
             $data->dampak = $request->skala;
@@ -84,10 +71,7 @@ class HeatmapLabelController extends Controller
         } elseif ($type === 'kemungkinan') {
             $data = MstHeatmapKemungkinan::find($id);
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data kemungkinan tidak ditemukan'
-                ], 404);
+                return json(404, false, 'Tidak Ditemukan', 'Data kemungkinan tidak ditemukan', null);
             }
 
             $data->kemungkinan = $request->skala;
@@ -95,14 +79,10 @@ class HeatmapLabelController extends Controller
             $data->save();
 
         } else {
-            return response()->json(['status' => false, 'message' => 'Tipe tidak valid'], 400);
+            return json(400, false, 'Tipe Tidak Valid', 'Tipe hanya boleh dampak atau kemungkinan', null);
         }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Label berhasil diperbarui',
-            'data' => $data
-        ]);
+        return json(200, true, 'Berhasil', 'Label berhasil diperbarui', $data);
     }
 
     public function destroy($type, $id)
@@ -110,31 +90,19 @@ class HeatmapLabelController extends Controller
         if ($type === 'dampak') {
             $data = MstHeatmapDampak::find($id);
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data dampak tidak ditemukan'
-                ], 404);
+                return json(404, false, 'Tidak Ditemukan', 'Data dampak tidak ditemukan', null);
             }
         } elseif ($type === 'kemungkinan') {
             $data = MstHeatmapKemungkinan::find($id);
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data kemungkinan tidak ditemukan'
-                ], 404);
+                return json(404, false, 'Tidak Ditemukan', 'Data kemungkinan tidak ditemukan', null);
             }
         } else {
-            return response()->json([
-                'status' => false,
-                'message' => 'Tipe tidak valid'
-            ], 400);
+            return json(400, false, 'Tipe Tidak Valid', 'Tipe hanya boleh dampak atau kemungkinan', null);
         }
 
         $data->delete();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Label berhasil dihapus'
-        ]);
+        return json(200, true, 'Berhasil', 'Label berhasil dihapus', null);
     }
 }

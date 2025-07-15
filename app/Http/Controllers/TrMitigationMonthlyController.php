@@ -8,15 +8,14 @@ use Illuminate\Support\Facades\Validator;
 
 class TrMitigationMonthlyController extends Controller
 {
-   public function index()
-{
-    $data = TrMitigationMonthly::with(['riskHeader', 'riskMonthly'])
-        ->orderBy('id', 'asc')
-        ->get();
+    public function index()
+    {
+        $data = TrMitigationMonthly::with(['riskHeader', 'riskMonthly'])
+            ->orderBy('id', 'asc')
+            ->get();
 
-    return response()->json(['status' => true, 'data' => $data]);
-}
-
+        return json(200, true, 'Berhasil', 'Data mitigation monthly berhasil diambil.', $data);
+    }
 
     public function store(Request $request)
     {
@@ -28,7 +27,7 @@ class TrMitigationMonthlyController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => false, 'message' => 'Validasi gagal.', 'data' => $validator->errors()]);
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
         $data = TrMitigationMonthly::create([
@@ -39,64 +38,58 @@ class TrMitigationMonthlyController extends Controller
             'timestamp' => now()
         ]);
 
-        return response()->json(['status' => true, 'data' => $data]);
+        return json(200, true, 'Berhasil', 'Data mitigation monthly berhasil disimpan.', $data);
     }
 
     public function update(Request $request, $id)
-{
-    $data = TrMitigationMonthly::find($id);
+    {
+        $data = TrMitigationMonthly::find($id);
 
-    if (!$data) {
-        return response()->json(['status' => false, 'message' => 'Data tidak ditemukan.'], 404);
+        if (!$data) {
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'header_id' => 'required|exists:tr_risk_header,id',
+            'risk_monthly_id' => 'required|exists:tr_risk_monthly,id',
+            'detail_id' => 'nullable|integer',
+            'notes' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        }
+
+        $data->update([
+            'header_id' => $request->header_id,
+            'detail_id' => $request->detail_id,
+            'notes' => $request->notes,
+            'risk_monthly_id' => $request->risk_monthly_id,
+            'timestamp' => now()
+        ]);
+
+        return json(200, true, 'Berhasil', 'Data mitigation monthly berhasil diperbarui.', $data);
     }
-
-    $validator = Validator::make($request->all(), [
-        'header_id' => 'required|exists:tr_risk_header,id',
-        'risk_monthly_id' => 'required|exists:tr_risk_monthly,id',
-        'detail_id' => 'nullable|integer',
-        'notes' => 'nullable|string'
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json(['status' => false, 'message' => 'Validasi gagal.', 'data' => $validator->errors()]);
-    }
-
-    $data->update([
-        'header_id' => $request->header_id,
-        'detail_id' => $request->detail_id,
-        'notes' => $request->notes,
-        'risk_monthly_id' => $request->risk_monthly_id,
-        'timestamp' => now()
-    ]);
-
-    return response()->json(['status' => true, 'message' => 'Data berhasil diperbarui.', 'data' => $data]);
-}
 
     public function show($id)
-{
-    $data = TrMitigationMonthly::with(['riskHeader', 'riskMonthly'])->find($id);
+    {
+        $data = TrMitigationMonthly::with(['riskHeader', 'riskMonthly'])->find($id);
 
-    if (!$data) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Data tidak ditemukan.'
-        ], 404);
+        if (!$data) {
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
+        }
+
+        return json(200, true, 'Berhasil', 'Detail mitigation monthly berhasil diambil.', $data);
     }
-
-    return response()->json([
-        'status' => true,
-        'data' => $data
-    ]);
-}
 
     public function destroy($id)
     {
         $data = TrMitigationMonthly::find($id);
         if (!$data) {
-            return response()->json(['status' => false, 'message' => 'Data tidak ditemukan.'], 404);
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $data->delete();
-        return response()->json(['status' => true, 'message' => 'Data berhasil dihapus.']);
+        return json(200, true, 'Berhasil', 'Data mitigation monthly berhasil dihapus.', null);
     }
 }

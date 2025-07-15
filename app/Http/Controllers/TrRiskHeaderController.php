@@ -11,9 +11,6 @@ use App\Models\MstRiskCode;
 use App\Models\MstHeatmapDampak;
 use App\Models\MstHeatmapKemungkinan;
 
-use Illuminate\Validation\Rule;
-
-
 class TrRiskHeaderController extends Controller
 {
     public function index()
@@ -29,203 +26,161 @@ class TrRiskHeaderController extends Controller
             'optionWaktuSelesaiPosition:id,name,position',
         ])->orderBy('id', 'asc')->get();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Data risk header berhasil diambil.',
-            'data' => $data
-        ]);
+        return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $data);
     }
 
     public function store(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'risk_code' => 'required|exists:mst_risk_code,id',
-        'process_code' => 'required|string',
-        'prefix_risiko' => 'required|string',
-        'sasaran' => 'required|string',
-        'permasalahan_risiko' => 'required|string',
-        'dampak' => 'required|string',
-        'dampak_risiko' => 'required|string',
+    {
+        $validator = Validator::make($request->all(), [
+            'risk_code' => 'required|exists:mst_risk_code,id',
+            'process_code' => 'required|string',
+            'prefix_risiko' => 'required|string',
+            'sasaran' => 'required|string',
+            'permasalahan_risiko' => 'required|string',
+            'dampak' => 'required|string',
+            'dampak_risiko' => 'required|string',
 
-        'ir_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
-        'ir_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
-        'rr_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
-        'rr_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+            'ir_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+            'ir_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+            'rr_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+            'rr_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
 
-        'internal_control' => 'required|string',
-        'target_waktu_selesai' => 'nullable|date',
-        'target_waktu_selesai_option' => 'nullable|string|exists:mst_option,name',
-        'target_waktu_selesai_other' => 'nullable|string',
-        'target_waktu_selesai_notes' => 'nullable|string',
-        'target_waktu_selesai_position' => 'nullable|string|exists:mst_option,position',
-        'biaya_pertolongan_risiko' => 'nullable|numeric',
-        'department_id' => 'required|exists:mst_department,id',
-        'year' => 'required|integer',
-    ]);
+            'internal_control' => 'required|string',
+            'target_waktu_selesai' => 'nullable|date',
+            'target_waktu_selesai_option' => 'nullable|string|exists:mst_option,name',
+            'target_waktu_selesai_other' => 'nullable|string',
+            'target_waktu_selesai_notes' => 'nullable|string',
+            'target_waktu_selesai_position' => 'nullable|string|exists:mst_option,position',
+            'biaya_pertolongan_risiko' => 'nullable|numeric',
+            'department_id' => 'required|exists:mst_department,id',
+            'year' => 'required|integer',
+        ]);
 
-    if ($validator->fails()) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Validasi gagal',
-            'errors' => $validator->errors(),
-        ], 422);
+        if ($validator->fails()) {
+            return json(422, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        }
+
+        $data = $request->all();
+
+        $irHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $data['ir_level_dampak'])
+            ->where('kemungkinan', $data['ir_level_kemungkinan'])
+            ->first();
+
+        if (!$irHeatmap) {
+            return json(422, false, 'IR Tidak Ditemukan', 'Kombinasi IR level dampak dan kemungkinan tidak ditemukan di heatmap.', null);
+        }
+
+        $data['ir_posisi_risiko'] = $irHeatmap->result;
+        $data['ir_level_risiko'] = $irHeatmap->riskRange->name ?? null;
+
+        $rrHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $data['rr_level_dampak'])
+            ->where('kemungkinan', $data['rr_level_kemungkinan'])
+            ->first();
+
+        if (!$rrHeatmap) {
+            return json(422, false, 'RR Tidak Ditemukan', 'Kombinasi RR level dampak dan kemungkinan tidak ditemukan di heatmap.', null);
+        }
+
+        $data['rr_posisi_risiko'] = $rrHeatmap->result;
+        $data['rr_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
+
+        $riskHeader = TrRiskHeader::create($data);
+
+        return json(201, true, 'Berhasil Disimpan', 'Risk header berhasil disimpan.', $riskHeader);
     }
 
-    $data = $request->all();
+    public function update(Request $request, $id)
+    {
+        $risk = TrRiskHeader::find($id);
 
-    // Hitung IR (Inherent Risk)
-    $irHeatmap = MstHeatmap::with('riskRange')
-        ->where('dampak', $data['ir_level_dampak'])
-        ->where('kemungkinan', $data['ir_level_kemungkinan'])
-        ->first();
+        if (!$risk) {
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
+        }
 
-    if (!$irHeatmap) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Kombinasi IR level dampak dan kemungkinan tidak ditemukan di heatmap.',
-        ], 422);
-    }
-
-    $data['ir_posisi_risiko'] = $irHeatmap->result;
-    $data['ir_level_risiko'] = $irHeatmap->riskRange->name ?? null;
-
-    // Hitung RR (Residual Risk)
-    $rrHeatmap = MstHeatmap::with('riskRange')
-        ->where('dampak', $data['rr_level_dampak'])
-        ->where('kemungkinan', $data['rr_level_kemungkinan'])
-        ->first();
-
-    if (!$rrHeatmap) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Kombinasi RR level dampak dan kemungkinan tidak ditemukan di heatmap.',
-        ], 422);
-    }
-
-    $data['rr_posisi_risiko'] = $rrHeatmap->result;
-    $data['rr_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
-
-    $riskHeader = TrRiskHeader::create($data);
-
-    return response()->json([
-        'status' => true,
-        'message' => 'Risk header berhasil disimpan.',
-        'data' => $riskHeader,
-    ]);
-}
-
-
-public function update(Request $request, $id)
-{
-    $risk = TrRiskHeader::find($id);
-
-    if (!$risk) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Data tidak ditemukan.'
-        ], 404);
-    }
-
-    $rules = [
-        'process_code' => 'required|string',
-        'prefix_risiko' => 'required|string',
-        'sasaran' => 'required|string',
-        'permasalahan_risiko' => 'required|string',
-        'dampak' => 'required|string',
-        'dampak_risiko' => 'required|string',
-        'ir_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
-        'ir_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
-        'internal_control' => 'required|string',
-        'target_waktu_selesai' => 'required|date',
-        'target_waktu_selesai_option' => 'nullable|exists:mst_option,name',
-        'target_waktu_selesai_other' => 'nullable|string',
-        'target_waktu_selesai_notes' => 'nullable|string',
-        'target_waktu_selesai_position' => 'nullable|exists:mst_option,position',
-        'biaya_pertolongan_risiko' => 'required|numeric',
-        'rr_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
-        'rr_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
-        'department_id' => 'required|integer',
-        'year' => 'required|integer',
-    ];
-
-    if ($request->has('risk_code') && $risk->risk_code != $request->risk_code) {
-        $rules['risk_code'] = [
-            'required',
-            'exists:mst_risk_code,id',
-            'unique:tr_risk_header,risk_code,' . $risk->id . ',id',
+        $rules = [
+            'process_code' => 'required|string',
+            'prefix_risiko' => 'required|string',
+            'sasaran' => 'required|string',
+            'permasalahan_risiko' => 'required|string',
+            'dampak' => 'required|string',
+            'dampak_risiko' => 'required|string',
+            'ir_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+            'ir_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+            'internal_control' => 'required|string',
+            'target_waktu_selesai' => 'required|date',
+            'target_waktu_selesai_option' => 'nullable|exists:mst_option,name',
+            'target_waktu_selesai_other' => 'nullable|string',
+            'target_waktu_selesai_notes' => 'nullable|string',
+            'target_waktu_selesai_position' => 'nullable|exists:mst_option,position',
+            'biaya_pertolongan_risiko' => 'required|numeric',
+            'rr_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+            'rr_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+            'department_id' => 'required|integer',
+            'year' => 'required|integer',
         ];
-    } elseif ($request->has('risk_code')) {
-        $rules['risk_code'] = [
-            'required',
-            'exists:mst_risk_code,id'
-        ];
+
+        if ($request->has('risk_code') && $risk->risk_code != $request->risk_code) {
+            $rules['risk_code'] = [
+                'required',
+                'exists:mst_risk_code,id',
+                'unique:tr_risk_header,risk_code,' . $risk->id . ',id',
+            ];
+        } elseif ($request->has('risk_code')) {
+            $rules['risk_code'] = [
+                'required',
+                'exists:mst_risk_code,id'
+            ];
+        }
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return json(422, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        }
+
+        $updateData = $request->only([
+            'process_code', 'prefix_risiko', 'sasaran', 'permasalahan_risiko',
+            'dampak', 'dampak_risiko', 'ir_level_dampak', 'ir_level_kemungkinan',
+            'internal_control', 'target_waktu_selesai', 'target_waktu_selesai_option',
+            'target_waktu_selesai_other', 'target_waktu_selesai_notes',
+            'target_waktu_selesai_position', 'biaya_pertolongan_risiko',
+            'rr_level_dampak', 'rr_level_kemungkinan', 'department_id', 'year'
+        ]);
+
+        if ($request->has('risk_code')) {
+            $updateData['risk_code'] = (string) $request->risk_code;
+        }
+
+        $irHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $request->ir_level_dampak)
+            ->where('kemungkinan', $request->ir_level_kemungkinan)
+            ->first();
+
+        if (!$irHeatmap) {
+            return json(422, false, 'IR Tidak Ditemukan', 'Kombinasi IR (Inherent Risk) antara dampak dan kemungkinan tidak tersedia dalam heatmap.', null);
+        }
+
+        $updateData['ir_posisi_risiko'] = $irHeatmap->result;
+        $updateData['ir_level_risiko'] = $irHeatmap->riskRange->name ?? null;
+
+        $rrHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $request->rr_level_dampak)
+            ->where('kemungkinan', $request->rr_level_kemungkinan)
+            ->first();
+
+        if (!$rrHeatmap) {
+            return json(422, false, 'RR Tidak Ditemukan', 'Kombinasi RR (Residual Risk) antara dampak dan kemungkinan tidak tersedia dalam heatmap.', null);
+        }
+
+        $updateData['rr_posisi_risiko'] = $rrHeatmap->result;
+        $updateData['rr_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
+
+        $risk->update($updateData);
+
+        return json(200, true, 'Berhasil Diperbarui', 'Risk header berhasil diupdate.', $risk->fresh());
     }
-
-    $validator = Validator::make($request->all(), $rules);
-
-    if ($validator->fails()) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Validasi gagal.',
-            'errors' => $validator->errors()
-        ], 422);
-    }
-
-    $updateData = $request->only([
-        'process_code', 'prefix_risiko', 'sasaran', 'permasalahan_risiko',
-        'dampak', 'dampak_risiko', 'ir_level_dampak', 'ir_level_kemungkinan',
-        'internal_control', 'target_waktu_selesai', 'target_waktu_selesai_option',
-        'target_waktu_selesai_other', 'target_waktu_selesai_notes',
-        'target_waktu_selesai_position', 'biaya_pertolongan_risiko',
-        'rr_level_dampak', 'rr_level_kemungkinan', 'department_id', 'year'
-    ]);
-
-    if ($request->has('risk_code')) {
-        $updateData['risk_code'] = (string) $request->risk_code;
-    }
-
-    // 🔍 Cek kombinasi IR
-    $irHeatmap = MstHeatmap::with('riskRange')
-        ->where('dampak', $request->ir_level_dampak)
-        ->where('kemungkinan', $request->ir_level_kemungkinan)
-        ->first();
-
-    if (!$irHeatmap) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Kombinasi IR (Inherent Risk) antara dampak dan kemungkinan tidak tersedia dalam heatmap.'
-        ], 422);
-    }
-
-    $updateData['ir_posisi_risiko'] = $irHeatmap->result;
-    $updateData['ir_level_risiko'] = $irHeatmap->riskRange->name ?? null;
-
-    // 🔍 Cek kombinasi RR
-    $rrHeatmap = MstHeatmap::with('riskRange')
-        ->where('dampak', $request->rr_level_dampak)
-        ->where('kemungkinan', $request->rr_level_kemungkinan)
-        ->first();
-
-    if (!$rrHeatmap) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Kombinasi RR (Residual Risk) antara dampak dan kemungkinan tidak tersedia dalam heatmap.'
-        ], 422);
-    }
-
-    $updateData['rr_posisi_risiko'] = $rrHeatmap->result;
-    $updateData['rr_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
-
-    // Update database
-    $risk->update($updateData);
-
-    return response()->json([
-        'status' => true,
-        'message' => 'Risk header berhasil diupdate.',
-        'data' => $risk->fresh()
-    ]);
-}
-
 
     public function show($id)
     {
@@ -241,17 +196,10 @@ public function update(Request $request, $id)
         ])->find($id);
 
         if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Detail risk header berhasil diambil.',
-            'data' => $data
-        ]);
+        return json(200, true, 'Detail Ditemukan', 'Detail risk header berhasil diambil.', $data);
     }
 
     public function destroy($id)
@@ -259,25 +207,14 @@ public function update(Request $request, $id)
         $risk = TrRiskHeader::find($id);
 
         if (!$risk) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         try {
             $risk->delete();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Risk header berhasil dihapus.'
-            ]);
+            return json(200, true, 'Berhasil Dihapus', 'Risk header berhasil dihapus.', null);
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Gagal menghapus risk header.',
-                'error' => $e->getMessage()
-            ], 500);
+            return json(500, false, 'Gagal Dihapus', 'Gagal menghapus risk header.', $e->getMessage());
         }
     }
 }

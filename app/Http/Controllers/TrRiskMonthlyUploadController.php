@@ -15,7 +15,7 @@ class TrRiskMonthlyUploadController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
-        return response()->json(['status' => true, 'data' => $data]);
+        return json(200, true, 'Data Ditemukan', 'Berhasil ambil data.', $data);
     }
 
     public function show($id)
@@ -23,107 +23,91 @@ class TrRiskMonthlyUploadController extends Controller
         $data = TrRiskMonthlyUpload::with(['header', 'riskMonthly'])->find($id);
 
         if (!$data) {
-            return response()->json(['status' => false, 'message' => 'Data tidak ditemukan.'], 404);
+            return json(404, false, 'Data Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
-        return response()->json(['status' => true, 'data' => $data]);
+        return json(200, true, 'Detail Ditemukan', 'Detail data berhasil diambil.', $data);
     }
 
     public function store(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'header_id' => 'required|exists:tr_risk_header,id',
-        'risk_monthly_id' => 'required|exists:tr_risk_monthly,id',
-        'filepath' => 'required|url', // URL dari UploadController
-        'domain' => 'nullable|string|max:255',
-    ]);
+    {
+        $validator = Validator::make($request->all(), [
+            'header_id' => 'required|exists:tr_risk_header,id',
+            'risk_monthly_id' => 'required|exists:tr_risk_monthly,id',
+            'filepath' => 'required|url', // URL dari UploadController
+            'domain' => 'nullable|string|max:255',
+        ]);
 
-    if ($validator->fails()) {
-        return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
+        if ($validator->fails()) {
+            return json(422, false, 'Validasi Gagal', 'Validasi input gagal.', $validator->errors());
+        }
+
+        $data = TrRiskMonthlyUpload::create([
+            'header_id' => $request->header_id,
+            'risk_monthly_id' => $request->risk_monthly_id,
+            'filepath' => $request->filepath,
+            'domain' => $request->domain,
+        ]);
+
+        return json(201, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
     }
 
-    $data = TrRiskMonthlyUpload::create([
-        'header_id' => $request->header_id,
-        'risk_monthly_id' => $request->risk_monthly_id,
-        'filepath' => $request->filepath,
-        'domain' => $request->domain,
-    ]);
+    public function update(Request $request, $id)
+    {
+        $data = TrRiskMonthlyUpload::find($id);
 
-    return response()->json(['status' => true, 'message' => 'Data berhasil disimpan.', 'data' => $data]);
-}
+        if (!$data) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Data tidak ditemukan.', null);
+        }
 
+        $validator = Validator::make($request->all(), [
+            'header_id' => 'required|exists:tr_risk_header,id',
+            'risk_monthly_id' => 'required|exists:tr_risk_monthly,id',
+            'filepath' => 'required|url',
+            'domain' => 'nullable|string|max:255',
+        ]);
 
-  public function update(Request $request, $id)
-{
-    $data = TrRiskMonthlyUpload::find($id);
+        if ($validator->fails()) {
+            return json(422, false, 'Validasi Gagal', 'Validasi input gagal.', $validator->errors());
+        }
 
-    if (!$data) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Data tidak ditemukan.'
-        ], 404);
+        $data->update([
+            'header_id' => $request->header_id,
+            'risk_monthly_id' => $request->risk_monthly_id,
+            'filepath' => $request->filepath,
+            'domain' => $request->domain,
+        ]);
+
+        return json(200, true, 'Berhasil Diperbarui', 'Data berhasil diperbarui.', $data);
     }
 
-    $validator = Validator::make($request->all(), [
-        'header_id' => 'required|exists:tr_risk_header,id',
-        'risk_monthly_id' => 'required|exists:tr_risk_monthly,id',
-        'filepath' => 'required|url',
-        'domain' => 'nullable|string|max:255',
-    ]);
+    public function destroy($id)
+    {
+        $data = TrRiskMonthlyUpload::find($id);
 
-    if ($validator->fails()) {
-        return response()->json([
-            'status' => false,
-            'errors' => $validator->errors()
-        ], 422);
+        if (!$data) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Data tidak ditemukan.', null);
+        }
+
+        $filePath = $data->filepath;
+
+        if (filter_var($filePath, FILTER_VALIDATE_URL)) {
+            $parsedPath = parse_url($filePath, PHP_URL_PATH);
+            $cleanPath = ltrim($parsedPath, '/');
+        } else {
+            $cleanPath = $filePath;
+        }
+
+        // Hapus dari S3
+        try {
+            Storage::disk('s3')->delete($cleanPath);
+        } catch (\Exception $e) {
+            return json(500, false, 'Gagal Menghapus File', 'Gagal menghapus file: ' . $e->getMessage(), null);
+        }
+
+        // Hapus data dari DB
+        $data->delete();
+
+        return json(200, true, 'Berhasil Dihapus', 'Data berhasil dihapus.', null);
     }
-
-    $data->update([
-        'header_id' => $request->header_id,
-        'risk_monthly_id' => $request->risk_monthly_id,
-        'filepath' => $request->filepath,
-        'domain' => $request->domain,
-    ]);
-
-    return response()->json([
-        'status' => true,
-        'message' => 'Data berhasil diperbarui.',
-        'data' => $data
-    ]);
-}
-
-
-  public function destroy($id)
-{
-    $data = TrRiskMonthlyUpload::find($id);
-
-    if (!$data) {
-        return response()->json(['status' => false, 'message' => 'Data tidak ditemukan.'], 404);
-    }
-
-    $filePath = $data->filepath;
-
-    if (filter_var($filePath, FILTER_VALIDATE_URL)) {
-        $parsedPath = parse_url($filePath, PHP_URL_PATH);
-        $cleanPath = ltrim($parsedPath, '/');
-    } else {
-        $cleanPath = $filePath;
-    }
-
-    // Hapus dari S3
-    try {
-        Storage::disk('s3')->delete($cleanPath);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Gagal menghapus file : ' . $e->getMessage()
-        ], 500);
-    }
-
-    // Hapus data dari DB
-    $data->delete();
-
-    return response()->json(['status' => true, 'message' => 'Data berhasil dihapus.']);
-}
-
 }

@@ -9,16 +9,10 @@ use Illuminate\Support\Facades\Validator;
 class MstOptionController extends Controller
 {
     public function index()
-{
-    $data = MstOption::orderBy('id', 'asc')->get();
-
-    return response()->json([
-        'status' => true,
-        'message' => 'Data berhasil diambil.',
-        'data' => $data
-    ]);
-}
-
+    {
+        $data = MstOption::orderBy('id', 'asc')->get();
+        return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $data);
+    }
 
     public function store(Request $request)
     {
@@ -28,47 +22,29 @@ class MstOptionController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Validasi gagal.',
-                'data' => $validator->errors()
-            ], 400);
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
         $data = MstOption::create($request->only('name', 'position'));
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Data berhasil disimpan.',
-            'data' => $data
-        ]);
+        return json(201, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
     }
 
     public function show($id)
     {
         $data = MstOption::find($id);
         if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Detail data berhasil diambil.',
-            'data' => $data
-        ]);
+        return json(200, true, 'Detail Ditemukan', 'Detail data berhasil diambil.', $data);
     }
 
     public function update(Request $request, $id)
     {
         $data = MstOption::find($id);
         if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $validator = Validator::make($request->all(), [
@@ -77,37 +53,23 @@ class MstOptionController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Validasi gagal.',
-                'data' => $validator->errors()
-            ], 400);
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
         $data->update($request->only('name', 'position'));
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Data berhasil diperbarui.',
-            'data' => $data
-        ]);
+        return json(200, true, 'Berhasil Diperbarui', 'Data berhasil diperbarui.', $data);
     }
 
     public function destroy($id)
     {
         $data = MstOption::find($id);
         if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
+            return json(404, true, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $data->delete();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Data berhasil dihapus.'
-        ]);
+        return json(200, true, 'Berhasil Dihapus', 'Data berhasil dihapus.', null);
     }
 }

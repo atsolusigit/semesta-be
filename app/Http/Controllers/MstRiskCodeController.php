@@ -8,18 +8,14 @@ use Illuminate\Support\Facades\Validator;
 
 class MstRiskCodeController extends Controller
 {
-    //  Ambil semua data jenis risiko
+    // Ambil semua data jenis risiko
     public function index()
     {
         $data = MstRiskCode::orderBy('id', 'asc')->get();
-        return response()->json([
-            'status' => true,
-            'message' => 'Data jenis risiko berhasil diambil.',
-            'data' => $data
-        ]);
+        return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $data);
     }
 
-    //  Tambah data jenis risiko
+    // Tambah data jenis risiko
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -28,11 +24,7 @@ class MstRiskCodeController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Validasi gagal.',
-                'data' => $validator->errors(),
-            ], 400);
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
         $data = MstRiskCode::create([
@@ -40,40 +32,26 @@ class MstRiskCodeController extends Controller
             'name' => $request->name,
         ]);
 
-        return response()->json([
-            'status' => false,
-            'message' => 'Jenis risiko berhasil ditambahkan.',
-            'data' => $data
-        ]);
+        return json(201, true, 'Berhasil Ditambahkan', 'Jenis risiko berhasil ditambahkan.', $data);
     }
 
-    //  Detail satu jenis risiko
+    // Detail satu jenis risiko
     public function show($id)
     {
         $data = MstRiskCode::find($id);
         if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data jenis risiko tidak ditemukan.'
-            ], 404);
+            return json(404, false, 'Tidak Ditemukan', 'Data jenis risiko tidak ditemukan.', null);
         }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Detail jenis risiko berhasil diambil.',
-            'data' => $data
-        ]);
+        return json(200, true, 'Detail Ditemukan', 'Detail jenis risiko berhasil diambil.', $data);
     }
 
-    //  Update jenis risiko
+    // Update jenis risiko
     public function update(Request $request, $id)
     {
         $data = MstRiskCode::find($id);
         if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $validator = Validator::make($request->all(), [
@@ -82,11 +60,7 @@ class MstRiskCodeController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Validasi gagal.',
-                'data' => $validator->errors(),
-            ], 400);
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
         $data->update([
@@ -94,29 +68,19 @@ class MstRiskCodeController extends Controller
             'name' => $request->name,
         ]);
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Jenis risiko berhasil diperbarui.',
-            'data' => $data
-        ]);
+        return json(200, true, 'Berhasil Diperbarui', 'Jenis risiko berhasil diperbarui.', $data);
     }
 
-    //  Hapus jenis risiko
+    // Hapus jenis risiko
     public function destroy($id)
     {
         $data = MstRiskCode::find($id);
         if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $data->delete();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Jenis risiko berhasil dihapus.'
-        ]);
+        return json(200, true, 'Berhasil Dihapus', 'Jenis risiko berhasil dihapus.', null);
     }
 }

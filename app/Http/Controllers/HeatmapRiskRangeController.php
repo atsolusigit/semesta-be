@@ -10,118 +10,80 @@ use Exception;
 class HeatmapRiskRangeController extends Controller
 {
     public function index()
-{
-    try {
-        $data = MstHeatmapRiskRange::orderBy('start', 'asc')->get();
-        return response()->json([
-            'status' => true,
-            'data' => $data,
-        ]);
-    } catch (Exception $e) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Gagal mengambil data.',
-        ], 500);
+    {
+        try {
+            $data = MstHeatmapRiskRange::orderBy('start', 'asc')->get();
+            return json(200, true, 'Berhasil', 'Data risk range berhasil diambil', $data);
+        } catch (Exception $e) {
+            return json(500, false, 'Gagal', 'Gagal mengambil data risk range', null);
+        }
     }
-}
-
 
     public function store(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:100',
-        'start' => 'required|integer',
-        'end' => 'required|integer',
-        'color' => 'required|string|max:7',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Validasi gagal.',
-            'errors' => $validator->errors()
-        ], 400);
-    }
-
-    // Validasi: end tidak boleh lebih kecil dari start
-    if ($request->end < $request->start) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Validasi gagal.',
-            'errors' => [
-                'end' => ['End harus lebih besar atau sama dengan Start.']
-            ]
-        ], 400);
-    }
-
-    try {
-        $range = new MstHeatmapRiskRange();
-        $range->name = $request->name;
-        $range->start = $request->start;
-        $range->end = $request->end;
-        $range->color = $request->color;
-        $range->save();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Risk range berhasil dibuat.'
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:100',
+            'start' => 'required|integer',
+            'end' => 'required|integer',
+            'color' => 'required|string|max:7',
         ]);
-    } catch (Exception $e) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Gagal menyimpan risk range.',
-        ], 500);
-    }
-}
 
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Terdapat kesalahan input', $validator->errors());
+        }
 
-   public function update(Request $request, $id)
-{
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:100',
-        'start' => 'required|integer',
-        'end' => 'required|integer',
-        'color' => 'required|string|max:7',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Validasi gagal.',
-            'errors' => $validator->errors()
-        ], 400);
-    }
-
-    if ($request->end < $request->start) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Validasi gagal.',
-            'errors' => [
+        if ($request->end < $request->start) {
+            return json(400, false, 'Validasi Gagal', 'End harus lebih besar atau sama dengan Start', [
                 'end' => ['End harus lebih besar atau sama dengan Start.']
-            ]
-        ], 400);
+            ]);
+        }
+
+        try {
+            $range = new MstHeatmapRiskRange();
+            $range->name = $request->name;
+            $range->start = $request->start;
+            $range->end = $request->end;
+            $range->color = $request->color;
+            $range->save();
+
+            return json(200, true, 'Berhasil', 'Risk range berhasil dibuat', $range);
+        } catch (Exception $e) {
+            return json(500, false, 'Gagal', 'Gagal menyimpan risk range', null);
+        }
     }
 
-    try {
-        $range = MstHeatmapRiskRange::findOrFail($id);
-        $range->name = $request->name;
-        $range->start = $request->start;
-        $range->end = $request->end;
-        $range->color = $request->color;
-        $range->save();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Risk range berhasil diperbarui.'
+    public function update(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:100',
+            'start' => 'required|integer',
+            'end' => 'required|integer',
+            'color' => 'required|string|max:7',
         ]);
-    } catch (Exception $e) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Gagal memperbarui risk range.',
-        ], 500);
-    }
-}
 
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Terdapat kesalahan input', $validator->errors());
+        }
+
+        if ($request->end < $request->start) {
+            return json(400, false, 'Validasi Gagal', 'End harus lebih besar atau sama dengan Start', [
+                'end' => ['End harus lebih besar atau sama dengan Start.']
+            ]);
+        }
+
+        try {
+            $range = MstHeatmapRiskRange::findOrFail($id);
+            $range->name = $request->name;
+            $range->start = $request->start;
+            $range->end = $request->end;
+            $range->color = $request->color;
+            $range->save();
+
+            return json(200, true, 'Berhasil', 'Risk range berhasil diperbarui', $range);
+        } catch (Exception $e) {
+            return json(500, false, 'Gagal', 'Gagal memperbarui risk range', null);
+        }
+    }
 
     public function destroy($id)
     {
@@ -129,15 +91,9 @@ class HeatmapRiskRangeController extends Controller
             $range = MstHeatmapRiskRange::findOrFail($id);
             $range->delete();
 
-            return response()->json([
-                'status' => true,
-                'message' => 'Risk range berhasil dihapus.'
-            ]);
+            return json(200, true, 'Berhasil', 'Risk range berhasil dihapus', null);
         } catch (Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Gagal menghapus, data tidak tersedia.',
-            ], 500);
+            return json(500, false, 'Gagal', 'Gagal menghapus, data tidak tersedia', null);
         }
     }
 }

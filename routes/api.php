@@ -47,6 +47,9 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+// Cek token yang masih aktif
+Route::middleware(['auth:api'])->get('/check-token', [AuthController::class, 'checkToken']);
+
 
 // ============================
 //  Super Admin Only (role_id = 1)

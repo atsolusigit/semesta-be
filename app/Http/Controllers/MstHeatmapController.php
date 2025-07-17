@@ -48,7 +48,7 @@ class MstHeatmapController extends Controller
         return json(200, true, 'Berhasil', 'Detail data heatmap', $data);
     }
 
-    public function store(Request $request)
+     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'dampak' => 'required|exists:mst_heatmap_dampak,id',
@@ -65,7 +65,7 @@ class MstHeatmapController extends Controller
             ->first();
 
         if ($exist) {
-            return json(409, false, 'Gagal', 'Data sudah ada dengan kombinasi dampak & kemungkinan ini');
+            return json(409, false, 'Gagal', 'Data sudah ada dengan kombinasi dampak & kemungkinan ini', null);
         }
 
         $data = MstHeatmap::create($request->only(['dampak', 'kemungkinan', 'result', 'name']));

@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('username')->unique();
             $table->timestamp('email_verified_at')->nullable();
+            $table->binary('nip')->nullable();
+            $table->binary('phone_number')->nullable();
             $table->string('password');
             $table->integer('status')->default(1);
             $table->longText('profile_img');

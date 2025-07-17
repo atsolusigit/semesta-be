@@ -123,6 +123,23 @@ if (!function_exists('encrypt_decrypt_db')) {
 
 }
 
+function encrypt_decrypt_md5($action, $string, $salt='') {
+	$output = "";
+	$encrypt_method = "AES-256-CBC";
+	$secret_key = $salt.'SEMESTA-asfyasiuyfiy238sadfh';
+	$secret_iv = $salt.'SEMESTA-asfyasiuyfiy238sadfh';
+	// hash
+	$key = hash('sha256', $secret_key);
+	$iv = substr(hash('sha256', $secret_iv), 0, 16);
+	if ( $action == 'enc' ) {
+		$output = openssl_encrypt($string, $encrypt_method, $key, 0, $iv);
+		$output = base64_encode($output);
+	} else if( $action == 'dec' && $string != "" ) {
+		$output = openssl_decrypt(base64_decode($string), $encrypt_method, $key, 0, $iv);
+	}
+	return $output;
+}
+
 if (!function_exists('map_access_array')) {
     /**
      * Konversi array akses ke struktur boolean

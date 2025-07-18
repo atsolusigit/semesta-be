@@ -25,11 +25,11 @@ return new class extends Migration {
 
             $table->text('internal_control')->nullable();
 
-            $table->date('target_waktu_selesai')->nullable();
-            $table->string('target_waktu_selesai_option')->nullable();
-            $table->text('target_waktu_selesai_other')->nullable();
-            $table->text('target_waktu_selesai_notes')->nullable();
-            $table->string('target_waktu_selesai_position')->nullable();
+            $table->date('target_satu_tahun')->nullable();
+            $table->string('target_satu_tahun_option')->nullable();
+            $table->text('target_satu_tahun_other')->nullable();
+            $table->text('target_satu_tahun_notes')->nullable();
+            $table->string('target_satu_tahun_position')->nullable();
 
             $table->double('biaya_pertolongan_risiko', 15, 2)->nullable();
 

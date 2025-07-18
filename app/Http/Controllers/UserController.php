@@ -345,62 +345,63 @@ class UserController extends Controller
     }
 
     public function getPendingUsers()
-    {
-        $users = User::with('role:id,name')
-            ->select('id', 'name', 'username', 'email', 'role_id', 'status')
-            ->where('status', 0)
-            ->latest('id')
-            ->get();
+{
+    $users = User::with('role:id,name')
+        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+        ->where('status', 0)
+        ->latest('id')
+        ->get();
 
-        $result = [];
+    $result = [];
 
-        foreach ($users as $user) {
-            try {
-                $name = encrypt_decrypt_db('dec', $user->name, $user->id);
-                if (!mb_check_encoding($name, 'UTF-8')) {
-                    \Log::warning("Name hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
-                    $name = null;
-                }
-            } catch (\Throwable $e) {
-                \Log::warning("Gagal decrypt name user ID {$user->id}: {$e->getMessage()}");
+    foreach ($users as $user) {
+        try {
+            $name = encrypt_decrypt_db('dec', $user->name, $user->id);
+            if (!mb_check_encoding($name, 'UTF-8')) {
+                \Log::warning("Name bukan UTF-8 valid untuk user ID {$user->id}");
                 $name = null;
             }
-
-            try {
-                $username = encrypt_decrypt_db('dec', $user->username, $user->id);
-                if (!mb_check_encoding($username, 'UTF-8')) {
-                    \Log::warning("Username hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
-                    $username = null;
-                }
-            } catch (\Throwable $e) {
-                \Log::warning("Gagal decrypt username user ID {$user->id}: {$e->getMessage()}");
-                $username = null;
-            }
-
-            try {
-                $email = encrypt_decrypt_db('dec', $user->email, $user->id);
-                if (!mb_check_encoding($email, 'UTF-8')) {
-                    \Log::warning("Email hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
-                    $email = null;
-                }
-            } catch (\Throwable $e) {
-                \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
-                $email = null;
-            }
-
-            $result[] = [
-                'id' => encrypt_decrypt_md5('enc', $user->id), // Enkripsi ID menggunakan MD5
-                'name' => $name,
-                'username' => $username,
-                'email' => $email,
-                'role_id' => $user->role_id,
-                'status' => $user->status,
-                'role_name' => $user->role->name ?? '-',
-            ];
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt name user ID {$user->id}: {$e->getMessage()}");
+            $name = null;
         }
 
-        return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $result);
+        try {
+            $username = encrypt_decrypt_db('dec', $user->username, $user->id);
+            if (!mb_check_encoding($username, 'UTF-8')) {
+                \Log::warning("Username bukan UTF-8 valid untuk user ID {$user->id}");
+                $username = null;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt username user ID {$user->id}: {$e->getMessage()}");
+            $username = null;
+        }
+
+        try {
+            $email = encrypt_decrypt_db('dec', $user->email, $user->id);
+            if (!mb_check_encoding($email, 'UTF-8')) {
+                \Log::warning("Email bukan UTF-8 valid untuk user ID {$user->id}");
+                $email = null;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+            $email = null;
+        }
+
+        $result[] = [
+            'id' => encrypt_decrypt_md5('enc', $user->id),
+            'name' => $name,
+            'username' => $username,
+            'email' => $email,
+            'role_id' => $user->role_id,
+            'status' => $user->status,
+            'role_name' => $user->role->name ?? '-',
+        ];
     }
+
+    return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $result);
+}
+
 
     public function updateProfile(Request $request)
 {

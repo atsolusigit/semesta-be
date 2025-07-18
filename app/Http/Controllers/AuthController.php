@@ -46,6 +46,7 @@ class AuthController extends Controller
             ], 400);
         }
 
+
         $array_validation = [
             'email' => 'required|string|email:rfc,dns|max:255|unique:users',
             'username' => 'required|string|max:100',
@@ -109,99 +110,101 @@ class AuthController extends Controller
     }
 
     public function login(Request $request)
-    {
-        $array_validation = [
-            'username' => 'required|string',
-            'password' => 'required',
-        ];
+{
+    $array_validation = [
+        'username' => 'required|string',
+        'password' => 'required',
+    ];
 
         if (check_validation($request->all(), $array_validation)[0] != 0) {
             return check_validation($request->all(), $array_validation)[1];
         }
+      
+    try {
+        // Ambil user ID berdasarkan pencocokan username/email terenkripsi langsung dari database
+        $input = $request->username;
 
-        try {
-            $user = User::all()->first(function ($user) use ($request) {
-                try {
-                    $decryptedUsername = encrypt_decrypt_db('dec', $user->username, $user->id);
-                    $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
+        $user = DB::table('users')
+            ->whereRaw("AES_DECRYPT(username, CONCAT('SM', id)) = ?", [$input])
+            ->orWhereRaw("AES_DECRYPT(email, CONCAT('SM', id)) = ?", [$input])
+            ->first();
 
-                    return $decryptedUsername === $request->username || $decryptedEmail === $request->username;
-                } catch (\Exception $e) {
-                    return false;
-                }
-            });
+        if (!$user) {
+            return json(200, 'false', 'Login Gagal', 'Username/email tidak ditemukan.', []);
+        }
 
-            if (!$user) {
-                return json(200, 'false', 'Login Gagal', 'Username/email tidak ditemukan.', []);
-            }
+        $user = User::find($user->id); // Ambil model aslinya agar bisa pakai relasi dll
 
-            if ($user->status == 0) {
-                return json(200, 'false', 'Login Ditolak', 'Akun Anda belum disetujui oleh superadmin.', []);
-            }
+        // Status user
+        if ($user->status == 0) {
+            return json(200, 'false', 'Login Ditolak', 'Akun Anda belum disetujui oleh superadmin.', []);
+        }
 
-            if ($user->status == 2) {
-                return json(200, 'false', 'Login Ditolak', 'Pendaftaran Akun Anda ditolak.', []);
-            }
+        if ($user->status == 2) {
+            return json(200, 'false', 'Login Ditolak', 'Pendaftaran Akun Anda ditolak.', []);
+        }
 
-            if (!Hash::check($request->password, $user->password)) {
-                return json(200, 'false', 'Login Gagal', 'Username/email atau password salah.', []);
-            }
+        // Cek password
+        if (!Hash::check($request->password, $user->password)) {
+            return json(200, 'false', 'Login Gagal', 'Username/email atau password salah.', []);
+        }
 
-            $token = JWTAuth::fromUser($user);
+        // Generate token
+        $token = JWTAuth::fromUser($user);
+        $user->jtkn = $token;
+        $user->save();
 
-            $user->jtkn = $token;
-            $user->save();
+        // Dekripsi data user
+        $decryptedName = encrypt_decrypt_db('dec', $user->name, $user->id);
+        $decryptedUsername = encrypt_decrypt_db('dec', $user->username, $user->id);
+        $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
+        $decryptedNip = $user->nip ? encrypt_decrypt_db('dec', $user->nip, $user->id) : null;
+        $decryptedPhone = $user->phone_number ? encrypt_decrypt_db('dec', $user->phone_number, $user->id) : null;
 
-            $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
-            $decryptedNip = $user->nip ? encrypt_decrypt_db('dec', $user->nip, $user->id) : null;
-            $decryptedPhone = $user->phone_number ? encrypt_decrypt_db('dec', $user->phone_number, $user->id) : null;
+        $user->load('role');
 
-            $user->load('role');
-
-            return json(200, 'true', 'Login Berhasil', 'Selamat datang!', [
-                'user' => [
-                    'id' => encrypt_decrypt_md5('enc', $user->id),
-                    'name' => encrypt_decrypt_db('dec', $user->name, $user->id),
-                    'email' => $decryptedEmail,
-                    'username' => encrypt_decrypt_db('dec', $user->username, $user->id),
-                    'email_verified_at' => $user->email_verified_at,
-                    'status' => $user->status,
-                    'profile_img' => $user->profile_img ?? "",
-                    'department_id' => $user->department_id,
-                    'jtkn' => $user->jtkn,
-                    'fbtk' => $user->fbtk,
-                    'role_id' => $user->role_id,
-                    'created_at' => $user->created_at,
-                    'updated_at' => $user->updated_at,
-                    'nip' => $decryptedNip,
-                    'phone_number' => $decryptedPhone,
-                    'gender' => $user->gender ,
-                    'photo' => $user->photo ,
-                    'role_name' => optional($user->role)->name,
-                    'role' => $user->role ? [
-                        'id' => $user->role->id,
-                        'name' => $user->role->name,
-                        'status' => $user->role->status,
-                        'created_by' => $user->role->created_by,
-                        'created_at' => $user->role->created_at,
-                        'updated_at' => $user->role->updated_at
-                    ] : null
-                ],
-                'access_token' => [
-                    'token' => $token,
-                    'type' => 'Bearer',
-                    'expires_in' => JWTAuth::factory()->getTTL() * 60,
-                ],
+        return json(200, 'true', 'Login Berhasil', 'Selamat datang!', [
+            'user' => [
+                'id' => encrypt_decrypt_md5('enc', $user->id),
+                'name' => $decryptedName,
+                'username' => $decryptedUsername,
+                'email' => $decryptedEmail,
+                'email_verified_at' => $user->email_verified_at,
+                'status' => $user->status,
+                'profile_img' => $user->profile_img ?? "",
+                'department_id' => $user->department_id,
                 'jtkn' => $user->jtkn,
                 'fbtk' => $user->fbtk,
-            ]);
+                'role_id' => $user->role_id,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+                'nip' => $decryptedNip,
+                'phone_number' => $decryptedPhone,
+                'gender' => $user->gender,
+                'photo' => $user->photo,
+                'role_name' => optional($user->role)->name,
+                'role' => $user->role ? [
+                    'id' => $user->role->id,
+                    'name' => $user->role->name,
+                    'status' => $user->role->status,
+                    'created_by' => $user->role->created_by,
+                    'created_at' => $user->role->created_at,
+                    'updated_at' => $user->role->updated_at,
+                ] : null,
+            ],
+            'access_token' => [
+                'token' => $token,
+                'type' => 'Bearer',
+                'expires_in' => JWTAuth::factory()->getTTL() * 60,
+            ],
+            'jtkn' => $user->jtkn,
+            'fbtk' => $user->fbtk,
+        ]);
 
-        } catch (\Exception $e) {
-            logger("Login error: " . $e->getMessage());
-            return json(500, 'false', 'Login Error', 'Terjadi kesalahan saat login.', []);
-        }
+    } catch (\Exception $e) {
+        Log::error("Login error: " . $e->getMessage());
+        return json(500, 'false', 'Login Error', 'Terjadi kesalahan saat login.', []);
     }
-
 
     public function logout(Request $request)
     {
@@ -254,30 +257,43 @@ class AuthController extends Controller
         }
     }
 
-    public function checkToken(Request $request)
+   public function checkToken(Request $request)
 {
-    $token = JWTAuth::getToken();
-    $array_validation = ['asdp' => 'required'];
-
-    if (check_validation($request->header(), $array_validation)[0] != 0) {
-        return check_validation($request->all(), $array_validation)[1];
-    }
-
-    $asdp = $request->header('asdp');
-
-    if (check_security($asdp, $token) == 0) {
-        return json(404, 'false', 'Invalid Token', 'your token is invalid! ' . $asdp . ' - ' . $token, []);
-    }
-
     try {
-        $user = auth()->user();
-        if (!$user) {
-            return json(401, false, 'unauthorized', 'Token tidak valid / kadaluwarsa', []);
+        // Cek apakah token ada di Bearer header
+        $token = JWTAuth::getToken();
+        if (!$token) {
+            return json(401, false, 'token_absent', 'Token tidak ditemukan di Bearer header', []);
         }
 
+        // Validasi header asdp secara langsung
+        if (!$request->header('asdp')) {
+            return json(200, true, 'success_validation', 'Token sudah terisi dengan benar dan masih aktif', []);
+        }
+    }
+     
+        // Ambil header asdp
+        $asdp = $request->header('asdp');
+
+        // Validasi security token
+        if (check_security($asdp, $token) == 0) {
+            return json(401, false, 'invalid_token', 'Token tidak valid', [
+                'message' => 'Token yang diberikan tidak valid atau telah kadaluwarsa'
+            ]);
+        }
+
+        // Validasi user dari token
+        $user = auth()->user();
+        if (!$user) {
+            return json(401, false, 'unauthorized', 'Token tidak valid atau kadaluwarsa', []);
+        }
+
+        // Load relasi yang diperlukan
         $user->load(['role.pages', 'departments']);
 
-        return json(200, true, 'success', 'Token masih aktif', [
+        // Return response sukses dengan data user
+        return json(200, true, 'success', 'Token sudah terisi dengan benar dan masih aktif', [
+          
             'user' => [
                 'id' => encrypt_decrypt_md5('enc', $user->id),
                 'name' => encrypt_decrypt_db('dec', $user->name, $user->id),
@@ -295,17 +311,30 @@ class AuthController extends Controller
                         'name' => $page->name,
                         'head_url' => $page->head_url,
                     ];
-                }),
+                }) ?? [],
                 'departments' => $user->departments->map(function ($dept) {
                     return [
                         'id' => $dept->id,
                         'name' => $dept->name,
                     ];
-                }),
+                }) ?? [],
+            ],
+            'token_info' => [
+                'status' => 'valid',
+                'checked_at' => now()->toDateTimeString()
             ]
         ]);
+
+    } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+        return json(401, false, 'token_expired', 'Token telah kadaluwarsa', []);
+    } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+        return json(401, false, 'token_invalid', 'Token tidak valid', []);
+    } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+        return json(401, false, 'token_absent', 'Token tidak ditemukan', []);
     } catch (\Exception $e) {
-        return json(500, false, 'server_error', 'Terjadi kesalahan sistem', []);
+        return json(500, false, 'server_error', 'Terjadi kesalahan sistem', [
+            'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
+        ]);
     }
 }
 

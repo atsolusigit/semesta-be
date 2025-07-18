@@ -27,7 +27,7 @@ class MstOptionController extends Controller
 
         $data = MstOption::create($request->only('name', 'position'));
 
-        return json(201, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
+        return json(200, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
     }
 
     public function show($id)

@@ -12,22 +12,23 @@ use App\Models\MstHeatmapRiskRange;
 class MstHeatmapController extends Controller
 {
     public function index()
-    {
-        $data = MstHeatmap::orderBy('dampak', 'asc')
-            ->orderBy('kemungkinan', 'asc')
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'dampak' => $item->dampak,
-                    'kemungkinan' => $item->kemungkinan,
-                    'result' => $item->result,
-                    'name' => $item->risk_range?->name ?? null,
-                    'color' => $item->risk_range?->color ?? null,
-                ];
-            });
+{
+    $data = MstHeatmap::orderBy('dampak', 'asc')
+        ->orderBy('kemungkinan', 'asc')
+        ->get()
+        ->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'dampak' => $item->dampak,
+                'kemungkinan' => $item->kemungkinan,
+                'result' => $item->result,
+                'name' => $item->risk_range?->name ?? null,
+                'color' => $item->risk_range?->color ?? null,
+            ];
+        });
 
-        return json(200, true, 'Berhasil', 'List data heatmap', $data);
-    }
+    return json(200, true, 'Berhasil', 'List data heatmap', $data);
+}
 
     public function show($id)
     {

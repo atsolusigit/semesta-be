@@ -49,7 +49,7 @@ class TrRiskMonthlyUploadController extends Controller
             'domain' => $request->domain,
         ]);
 
-        return json(201, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
+        return json(200, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
     }
 
     public function update(Request $request, $id)

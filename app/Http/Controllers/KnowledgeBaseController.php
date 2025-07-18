@@ -242,7 +242,7 @@ class KnowledgeBaseController extends Controller
                 'id_knowledge' => $id
             ]);
 
-            return json(201, true, 'reader_tracked', 'Pembacaan berhasil dicatat', null);
+            return json(200, true, 'reader_tracked', 'Pembacaan berhasil dicatat', null);
 
         } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
             return json(401, false, 'unauthenticated', 'Token tidak valid atau kedaluwarsa', null);

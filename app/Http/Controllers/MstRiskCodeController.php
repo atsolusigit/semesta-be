@@ -32,7 +32,7 @@ class MstRiskCodeController extends Controller
             'name' => $request->name,
         ]);
 
-        return json(201, true, 'Berhasil Ditambahkan', 'Jenis risiko berhasil ditambahkan.', $data);
+        return json(200, true, 'Berhasil Ditambahkan', 'Jenis risiko berhasil ditambahkan.', $data);
     }
 
     // Detail satu jenis risiko

@@ -80,7 +80,7 @@ class MstDepartmentController extends Controller
         // Enkripsi created_by untuk response JSON
         $department->created_by = encrypt_decrypt_md5('enc', $department->created_by);
 
-        return json(201, 'success', 'Success', 'Departemen berhasil ditambahkan dan user diassign.', $department);
+        return json(200, 'success', 'Success', 'Departemen berhasil ditambahkan dan user diassign.', $department);
     }
 
     public function update(Request $request, $id)
@@ -109,12 +109,15 @@ class MstDepartmentController extends Controller
         'updated_by' => $user->id, // Simpan plain
     ]);
 
+    // Refresh department dari database setelah update
+    $department->refresh();
+
     // Enkripsi created_by untuk response JSON (bukan disimpan)
+    $department = MstDepartment::find($id); // Ambil ulang dari database
     $department->created_by = encrypt_decrypt_md5('enc', $department->created_by);
 
     return json(200, 'success', 'Success', 'Departemen berhasil diperbarui.', $department);
 }
-
 
     public function destroy($id)
     {

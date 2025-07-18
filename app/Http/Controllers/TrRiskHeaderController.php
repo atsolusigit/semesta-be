@@ -88,7 +88,7 @@ class TrRiskHeaderController extends Controller
 
         $riskHeader = TrRiskHeader::create($data);
 
-        return json(201, true, 'Berhasil Disimpan', 'Risk header berhasil disimpan.', $riskHeader);
+        return json(200, true, 'Berhasil Disimpan', 'Risk header berhasil disimpan.', $riskHeader);
     }
 
     public function update(Request $request, $id)

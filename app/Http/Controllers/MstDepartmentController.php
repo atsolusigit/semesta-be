@@ -80,7 +80,7 @@ class MstDepartmentController extends Controller
         // Enkripsi created_by untuk response JSON
         $department->created_by = encrypt_decrypt_md5('enc', $department->created_by);
 
-        return json(201, 'success', 'Success', 'Departemen berhasil ditambahkan dan user diassign.', $department);
+        return json(200, 'success', 'Success', 'Departemen berhasil ditambahkan dan user diassign.', $department);
     }
 
     public function update(Request $request, $id)

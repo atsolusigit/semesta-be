@@ -206,8 +206,6 @@ class AuthController extends Controller
     }
 }
 
-
-
     public function logout(Request $request)
     {
         $token = JWTAuth::getToken();

@@ -180,7 +180,8 @@ class UserController extends Controller
                 'fbtk' => $fbtk,
             ]);
 
-            // Enkripsi data menggunakan encrypt_decrypt_db setelah user dibuat
+
+            // Enkripsi data menggunakan encrypt_decrypt_db setelah user di buat
             User::where('id', $user->id)->update([
                 'name' => DB::raw(encrypt_decrypt_db('enc', $request->name, $user->id)),
                 'username' => DB::raw(encrypt_decrypt_db('enc', $request->username, $user->id)),

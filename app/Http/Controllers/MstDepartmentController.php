@@ -69,6 +69,7 @@ class MstDepartmentController extends Controller
             ->where('department_id', $department->id)
             ->exists();
 
+        // Jika belum di-assign, tambahkan relasi UserDepartment
         if (!$alreadyAssigned) {
             UserDepartment::insert([
                 'user_id' => $userIdToAssign,

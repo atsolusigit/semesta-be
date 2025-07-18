@@ -18,196 +18,268 @@ use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
+    public function index()
+    {
+        $users = User::with(['role:id,name', 'department:id,name'])
+            ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
+            ->orderBy('id', 'asc')
+            ->get();
 
-  public function index()
-{
-    $users = User::with(['role:id,name', 'department:id,name'])
-        ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
-        ->orderBy('id', 'asc')
-        ->get();
+        $result = [];
 
-    $result = [];
+        foreach ($users as $user) {
+            try {
+                $name = encrypt_decrypt_db('dec', $user->name, $user->id);
+            } catch (\Throwable $e) {
+                \Log::warning("Gagal decrypt name user ID {$user->id}: {$e->getMessage()}");
+                $name = null;
+            }
 
-    foreach ($users as $user) {
-        $result[] = [
-            'id' => $user->id,
-            'name' => $user->name,
-            'username' => $user->username,
-            'email' => encrypt_decrypt_db('dec', $user->email, $user->id),
-            'role_id' => $user->role_id,
-            'department_id' => $user->department_id,
-            'status' => $user->status,
-            'role_name' => $user->role?->name,
-            'department_name' => $user->department?->name,
-        ];
-    }
+            try {
+                $username = encrypt_decrypt_db('dec', $user->username, $user->id);
+            } catch (\Throwable $e) {
+                \Log::warning("Gagal decrypt username user ID {$user->id}: {$e->getMessage()}");
+                $username = null;
+            }
 
-    return response()->json([
-        'status' => true,
-        'message' => 'List data user.',
-        'data' => $result
-    ]);
-}
+            try {
+                $email = encrypt_decrypt_db('dec', $user->email, $user->id);
+            } catch (\Throwable $e) {
+                \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+                $email = null;
+            }
 
-
-public function show(Request $request, $id)
-{
-    // Validasi ID
-    $check = check_validation(['id' => $id], [
-        'id' => 'required|numeric|exists:users,id'
-    ]);
-    if ($check[0] === 1) return $check[1];
-
-    // Ambil data user dengan relasi
-    $user = User::with(['role:id,name', 'department:id,name'])
-        ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
-        ->find($id);
-
-    if (!$user) {
-        return json(404, 'error', 'Not Found', 'User tidak ditemukan', null);
-    }
-
-    // Dekripsi email
-    try {
-        $user->email = encrypt_decrypt_db('dec', $user->email, $user->id);
-    } catch (\Throwable $e) {
-        \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
-        $user->email = null;
-    }
-
-    // Susun response
-    $data = [
-        'id' => $user->id,
-        'name' => $user->name,
-        'username' => $user->username,
-        'email' => $user->email,
-        'role_id' => $user->role_id,
-        'department_id' => $user->department_id,
-        'status' => $user->status,
-        'role_name' => optional($user->role)->name ?? '-',
-        'department_name' => optional($user->department)->name ?? '-',
-    ];
-
-    return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', [$data]);
-}
-
-public function store(Request $request)
-{
-    DB::beginTransaction();
-
-    $array_validation = [
-        'name' => 'required|string|max:255',
-        'username' => 'required|string|max:100|unique:users',
-        'email' => 'required|email|unique:users,email',
-        'password' => [
-            'required',
-            'string',
-            Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
-        ],
-        'role_id' => 'required|exists:mst_role,id',
-        'department_id' => 'required|exists:mst_department,id',
-        'status' => ['required', Rule::in(['aktif', 'pasif'])],
-    ];
-
-    $validation = check_validation($request->all(), $array_validation);
-    if ($validation[0] != 0) {
-        return $validation[1];
-    }
-
-    try {
-        $status = $request->status === 'aktif' ? 1 : 0;
-        $fbtk = 'FBTK-' . strtoupper(Str::random(10));
-
-        $user = User::create([
-            'name' => $request->name,
-            'username' => $request->username,
-            'email' => $request->email, // akan dienkripsi setelahnya
-            'password' => bcrypt($request->password),
-            'role_id' => $request->role_id,
-            'department_id' => $request->department_id,
-            'status' => $status,
-            'jtkn' => '',
-            'fbtk' => $fbtk,
-        ]);
-
-        // Enkripsi email sesuai user ID
-        User::where('id', $user->id)->update([
-            'email' => DB::raw(encrypt_decrypt_db('enc', $request['email'], $user->id))
-        ]);
-
-        DB::commit();
-
-        return response()->json([
-    'status' => true,
-    'message' => 'User berhasil ditambahkan.'
-], 200);
-
-    } catch (\Exception $e) {
-        DB::rollback();
-        return json(500, false, 'store_failed', 'Terjadi kesalahan saat menyimpan user.', $e->getMessage());
-    }
-}
-
-public function update(Request $request, $id)
-{
-    $user = User::find($id);
-    if (!$user) {
-        return response()->json([
-            'status' => false,
-            'message' => 'User tidak ditemukan.'
-        ], 404);
-    }
-
-    $array_validation = [
-        'name' => 'required|string|max:255',
-        'username' => 'required|string|max:100|unique:users,username,' . $id,
-        'email' => 'required|email|unique:users,email,' . $id,
-        'role_id' => 'required|exists:mst_role,id',
-        'department_id' => 'required|exists:mst_department,id',
-        'status' => ['required', Rule::in(['aktif', 'pasif'])],
-    ];
-
-    $validation = check_validation($request->all(), $array_validation);
-    if ($validation[0] != 0) {
-        return $validation[1];
-    }
-
-    try {
-        $status = $request->status === 'aktif' ? 1 : 0;
-
-        $user->name = $request->name;
-        $user->username = $request->username;
-        $user->role_id = $request->role_id;
-        $user->department_id = $request->department_id;
-        $user->status = $status;
-
-         // Enkripsi email sesuai user ID
-        User::where('id', $user->id)->update([
-            'email' => DB::raw(encrypt_decrypt_db('enc', $request['email'], $user->id))
-        ]);
-
-        // Update password jika dikirim
-        if (!empty($request->password)) {
-            $user->password = bcrypt($request->password);
+            $result[] = [
+                'id' => encrypt_decrypt_md5('enc', $user->id), // Enkripsi ID menggunakan MD5
+                'name' => $name,
+                'username' => $username,
+                'email' => $email,
+                'role_id' => $user->role_id,
+                'department_id' => $user->department_id,
+                'status' => $user->status,
+                'role_name' => $user->role?->name,
+                'department_name' => $user->department?->name,
+            ];
         }
-
-        $user->save();
 
         return response()->json([
             'status' => true,
-            'message' => 'User berhasil diperbarui.'
+            'message' => 'List data user.',
+            'data' => $result
         ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Terjadi kesalahan saat memperbarui user.',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
+
+    public function show(Request $request, $id)
+    {
+        try {
+            $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
+        } catch (\Throwable $e) {
+            return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
+        }
+
+        // Validasi ID
+        $check = check_validation(['id' => $id], [
+            'id' => 'required|numeric|exists:users,id'
+        ]);
+        if ($check[0] === 1) return $check[1];
+
+        // Ambil data user dengan relasi
+        $user = User::with(['role:id,name', 'department:id,name'])
+            ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
+            ->find($id);
+
+        if (!$user) {
+            return json(404, 'error', 'Not Found', 'User tidak ditemukan', null);
+        }
+
+        // Dekripsi semua field yang dienkripsi menggunakan encrypt_decrypt_db
+        try {
+            $name = encrypt_decrypt_db('dec', $user->name, $user->id);
+            if (!mb_check_encoding($name, 'UTF-8')) {
+                \Log::warning("Name bukan UTF-8 valid untuk user ID {$user->id}");
+                $name = null;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt name user ID {$user->id}: {$e->getMessage()}");
+            $name = null;
+        }
+
+        try {
+            $username = encrypt_decrypt_db('dec', $user->username, $user->id);
+            if (!mb_check_encoding($username, 'UTF-8')) {
+                \Log::warning("Username bukan UTF-8 valid untuk user ID {$user->id}");
+                $username = null;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt username user ID {$user->id}: {$e->getMessage()}");
+            $username = null;
+        }
+
+        try {
+            $email = encrypt_decrypt_db('dec', $user->email, $user->id);
+            if (!mb_check_encoding($email, 'UTF-8')) {
+                \Log::warning("Email bukan UTF-8 valid untuk user ID {$user->id}");
+                $email = null;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+            $email = null;
+        }
+
+        $data = [
+            'id' => encrypt_decrypt_md5('enc', $user->id), // Enkripsi ID untuk response
+            'name' => $name,
+            'username' => $username,
+            'email' => $email,
+            'role_id' => $user->role_id,
+            'department_id' => $user->department_id,
+            'status' => $user->status,
+            'role_name' => optional($user->role)->name ?? '-',
+            'department_name' => optional($user->department)->name ?? '-',
+        ];
+
+        return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', [$data]);
+    }
+
+    public function store(Request $request)
+    {
+        DB::beginTransaction();
+
+        $array_validation = [
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:100|unique:users',
+            'email' => 'required|email|unique:users,email',
+            'password' => [
+                'required',
+                'string',
+                Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
+            ],
+            'role_id' => 'required|exists:mst_role,id',
+            'department_id' => 'required|exists:mst_department,id',
+            'status' => ['required', Rule::in(['aktif', 'pasif'])],
+        ];
+
+        $validation = check_validation($request->all(), $array_validation);
+        if ($validation[0] != 0) {
+            return $validation[1];
+        }
+
+        try {
+            $status = $request->status === 'aktif' ? 1 : 0;
+            $fbtk = 'FBTK-' . strtoupper(Str::random(10));
+
+            $user = User::create([
+                'name' => $request->name,
+                'username' => $request->username,
+                'email' => $request->email,
+                'password' => bcrypt($request->password),
+                'role_id' => $request->role_id,
+                'department_id' => $request->department_id,
+                'status' => $status,
+                'jtkn' => '',
+                'fbtk' => $fbtk,
+            ]);
+
+            // Enkripsi data menggunakan encrypt_decrypt_db setelah user dibuat
+            User::where('id', $user->id)->update([
+                'name' => DB::raw(encrypt_decrypt_db('enc', $request->name, $user->id)),
+                'username' => DB::raw(encrypt_decrypt_db('enc', $request->username, $user->id)),
+                'email' => DB::raw(encrypt_decrypt_db('enc', $request->email, $user->id))
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User berhasil ditambahkan.'
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return json(500, false, 'store_failed', 'Terjadi kesalahan saat menyimpan user.', $e->getMessage());
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
+        } catch (\Throwable $e) {
+            return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
+        }
+
+        $user = User::find($id);
+        if (!$user) {
+            return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
+        }
+
+        $array_validation = [
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:100|unique:users,username,' . $id,
+            'email' => 'required|email|unique:users,email,' . $id,
+            'role_id' => 'required|exists:mst_role,id',
+            'department_id' => 'required|exists:mst_department,id',
+            'status' => ['required', Rule::in(['aktif', 'pasif'])],
+            'password' => 'nullable|string|min:6',
+        ];
+
+        $validation = check_validation($request->all(), $array_validation);
+        if ($validation[0] != 0) {
+            return $validation[1];
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $user->role_id = $request->role_id;
+            $user->department_id = $request->department_id;
+            $user->status = $request->status === 'aktif' ? 1 : 0;
+
+            // Update password jika dikirim
+            if (!empty($request->password)) {
+                $user->password = bcrypt($request->password);
+            }
+
+            $user->save();
+
+            // Enkripsi dan update data yang terenkripsi menggunakan encrypt_decrypt_db
+            try {
+                $encryptedName = encrypt_decrypt_db('enc', $request->name, $user->id);
+                $encryptedUsername = encrypt_decrypt_db('enc', $request->username, $user->id);
+                $encryptedEmail = encrypt_decrypt_db('enc', $request->email, $user->id);
+
+                DB::table('users')->where('id', $user->id)->update([
+                    'name' => DB::raw($encryptedName),
+                    'username' => DB::raw($encryptedUsername),
+                    'email' => DB::raw($encryptedEmail)
+                ]);
+            } catch (\Throwable $e) {
+                Log::error("Gagal enkripsi data user ID {$user->id}: {$e->getMessage()}");
+                DB::rollback();
+                return json(500, 'false', 'encrypt_error', 'Gagal mengenkripsi data.', []);
+            }
+
+            DB::commit();
+
+            return json(200, 'true', 'success', 'User berhasil diperbarui.', []);
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error("Update user gagal ID {$user->id}: {$e->getMessage()}");
+
+            return json(500, 'false', 'server_error', 'Terjadi kesalahan saat memperbarui user.', [
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
 
     public function destroy(Request $request, $id)
     {
+        try {
+            $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
+        } catch (\Throwable $e) {
+            return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
+        }
+
         $check = check_validation(['id' => $id], [
             'id' => 'required|numeric|exists:users,id'
         ]);
@@ -224,76 +296,114 @@ public function update(Request $request, $id)
     }
 
     public function dropdownData()
-{
-    $roles = \App\Models\MstRole::select('id', 'name')->get();
-    $departments = \App\Models\MstDepartment::select('id', 'name')->get();
+    {
+        $roles = \App\Models\MstRole::select('id', 'name')->get();
+        $departments = \App\Models\MstDepartment::select('id', 'name')->get();
 
-    return json(200, 'success', 'Success', 'Dropdown data berhasil dimuat', [
-        'roles' => $roles,
-        'departments' => $departments,
-    ]);
-}
-
-
-    // Approve user
-public function approveUser($id)
-{
-    $user = User::find($id);
-    if (!$user) {
-        return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
+        return json(200, 'success', 'Success', 'Dropdown data berhasil dimuat', [
+            'roles' => $roles,
+            'departments' => $departments,
+        ]);
     }
 
-    $user->status = 1; // aktifkan
-    $user->save();
+    public function approveUser($id)
+    {
+        try {
+            $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
+        } catch (\Throwable $e) {
+            return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
+        }
 
-    return json(200, 'true', 'success', 'User berhasil diaktifkan.', []);
-}
+        $user = User::find($id);
+        if (!$user) {
+            return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
+        }
 
-// Reject user
-public function rejectUser($id)
-{
-    $user = User::find($id);
-    if (!$user) {
-        return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
+        $user->status = 1;
+        $user->save();
+
+        return json(200, 'true', 'success', 'User berhasil diaktifkan.', []);
     }
 
-    $user->status = 2; // tolak
-    $user->save();
+    public function rejectUser($id)
+    {
+        try {
+            $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
+        } catch (\Throwable $e) {
+            return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
+        }
 
-    return json(200, 'true', 'success', 'User berhasil ditolak.', []);
-}
+        $user = User::find($id);
+        if (!$user) {
+            return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
+        }
 
-public function getPendingUsers()
+        $user->status = 2;
+        $user->save();
+
+        return json(200, 'true', 'success', 'User berhasil ditolak.', []);
+    }
+
+    public function getPendingUsers()
 {
     $users = User::with('role:id,name')
-        ->select('id','name','username','email','role_id','status')
-        ->where('status', 0) // hanya user pending
+        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+        ->where('status', 0)
         ->latest('id')
         ->get();
 
+    $result = [];
+
     foreach ($users as $user) {
         try {
-            $decryptedEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
-
-            if (!mb_check_encoding($decryptedEmail, 'UTF-8')) {
-                \Log::warning("Email hasil dekripsi bukan UTF-8 valid untuk user ID {$user->id}");
-                $decryptedEmail = null;
+            $name = encrypt_decrypt_db('dec', $user->name, $user->id);
+            if (!mb_check_encoding($name, 'UTF-8')) {
+                \Log::warning("Name bukan UTF-8 valid untuk user ID {$user->id}");
+                $name = null;
             }
-
-            $user->email = $decryptedEmail;
         } catch (\Throwable $e) {
-            \Log::warning("Gagal decrypt email #{$user->id}: {$e->getMessage()}");
-            $user->email = null;
+            \Log::warning("Gagal decrypt name user ID {$user->id}: {$e->getMessage()}");
+            $name = null;
         }
 
-        $user->role_name = $user->role->name ?? '-';
+        try {
+            $username = encrypt_decrypt_db('dec', $user->username, $user->id);
+            if (!mb_check_encoding($username, 'UTF-8')) {
+                \Log::warning("Username bukan UTF-8 valid untuk user ID {$user->id}");
+                $username = null;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt username user ID {$user->id}: {$e->getMessage()}");
+            $username = null;
+        }
+
+        try {
+            $email = encrypt_decrypt_db('dec', $user->email, $user->id);
+            if (!mb_check_encoding($email, 'UTF-8')) {
+                \Log::warning("Email bukan UTF-8 valid untuk user ID {$user->id}");
+                $email = null;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+            $email = null;
+        }
+
+        $result[] = [
+            'id' => encrypt_decrypt_md5('enc', $user->id),
+            'name' => $name,
+            'username' => $username,
+            'email' => $email,
+            'role_id' => $user->role_id,
+            'status' => $user->status,
+            'role_name' => $user->role->name ?? '-',
+        ];
     }
 
-    return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $users);
+    return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $result);
 }
 
 
- public function updateProfile(Request $request)
+    public function updateProfile(Request $request)
 {
     $user = auth()->user();
 
@@ -307,14 +417,12 @@ public function getPendingUsers()
         'profile_img' => 'nullable|url',
     ]);
 
-    if ($validation[0] !== 0) return $validation;
+    if ($validation[0] !== 0) return $validation[1];
 
     try {
         DB::beginTransaction();
 
         // Update data biasa (tidak terenkripsi)
-        $user->name = $request->name;
-        $user->username = $request->username;
         $user->gender = $request->gender;
 
         if ($request->filled('profile_img')) {
@@ -323,7 +431,37 @@ public function getPendingUsers()
 
         $user->save();
 
-        // Update field terenkripsi dengan error handling
+        // Update field terenkripsi dengan encrypt_decrypt_db
+        if ($request->filled('name')) {
+            try {
+                $encryptedName = encrypt_decrypt_db('enc', $request->name, $user->id);
+                if ($encryptedName) {
+                    User::where('id', $user->id)->update([
+                        'name' => DB::raw($encryptedName)
+                    ]);
+                } else {
+                    logger("Name encryption failed for user {$user->id}");
+                }
+            } catch (\Exception $e) {
+                logger("Name encryption error: " . $e->getMessage());
+            }
+        }
+
+        if ($request->filled('username')) {
+            try {
+                $encryptedUsername = encrypt_decrypt_db('enc', $request->username, $user->id);
+                if ($encryptedUsername) {
+                    User::where('id', $user->id)->update([
+                        'username' => DB::raw($encryptedUsername)
+                    ]);
+                } else {
+                    logger("Username encryption failed for user {$user->id}");
+                }
+            } catch (\Exception $e) {
+                logger("Username encryption error: " . $e->getMessage());
+            }
+        }
+
         if ($request->filled('email')) {
             try {
                 $encryptedEmail = encrypt_decrypt_db('enc', $request->email, $user->id);
@@ -340,12 +478,30 @@ public function getPendingUsers()
         }
 
         if ($request->filled('nip')) {
+            $inputNip = $request->nip;
+
+            // Cek duplikasi NIP
+            $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputNip) {
+                try {
+                    $decryptedNip = encrypt_decrypt_db('dec', $otherUser->nip, $otherUser->id);
+                    return $decryptedNip === $inputNip;
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            });
+
+            if ($duplicate) {
+                return json(400, 'false', 'duplicate_nip', 'NIP sudah digunakan oleh pengguna lain.', null);
+            }
+
+            // Enkripsi dan update NIP jika tidak ada duplikasi
             try {
-                $encryptedNip = encrypt_decrypt_db('enc', $request->nip, $user->id);
+                $encryptedNip = encrypt_decrypt_db('enc', $inputNip, $user->id);
                 if ($encryptedNip) {
                     User::where('id', $user->id)->update([
                         'nip' => DB::raw($encryptedNip)
                     ]);
+                    logger("NIP updated successfully for user {$user->id}");
                 } else {
                     logger("NIP encryption failed for user {$user->id}");
                 }
@@ -376,12 +532,30 @@ public function getPendingUsers()
         DB::commit();
 
         // Ambil ulang data user setelah update
-        $updatedUser = User::with(['role', 'departments'])->find($user->id);
+        $updatedUser = User::with(['role', 'department'])->find($user->id);
 
         // Decrypt semua data yang terenkripsi dengan error handling
+        $nameDecrypted = null;
+        $usernameDecrypted = null;
         $emailDecrypted = null;
         $nipDecrypted = null;
         $phoneDecrypted = null;
+
+        if ($updatedUser->name) {
+            try {
+                $nameDecrypted = encrypt_decrypt_db('dec', $updatedUser->name, $updatedUser->id);
+            } catch (\Exception $e) {
+                logger("Name decryption error: " . $e->getMessage());
+            }
+        }
+
+        if ($updatedUser->username) {
+            try {
+                $usernameDecrypted = encrypt_decrypt_db('dec', $updatedUser->username, $updatedUser->id);
+            } catch (\Exception $e) {
+                logger("Username decryption error: " . $e->getMessage());
+            }
+        }
 
         if ($updatedUser->email) {
             try {
@@ -394,6 +568,7 @@ public function getPendingUsers()
         if ($updatedUser->nip) {
             try {
                 $nipDecrypted = encrypt_decrypt_db('dec', $updatedUser->nip, $updatedUser->id);
+                logger("NIP decryption result: " . ($nipDecrypted ?? 'NULL'));
             } catch (\Exception $e) {
                 logger("NIP decryption error: " . $e->getMessage());
             }
@@ -405,12 +580,8 @@ public function getPendingUsers()
                 $phoneDecrypted = encrypt_decrypt_db('dec', $updatedUser->phone_number, $updatedUser->id);
                 logger("Decrypted phone result: " . ($phoneDecrypted ?? 'NULL'));
 
-                // Jika dekripsi gagal, coba beberapa alternatif
                 if (!$phoneDecrypted) {
                     logger("First decryption failed, trying alternative methods...");
-
-                    // Coba dekripsi dengan cara lain atau fallback
-                    // Misalnya jika ada issue dengan format data
                     $phoneDecrypted = trim($phoneDecrypted);
                     if (empty($phoneDecrypted)) {
                         logger("Phone decryption completely failed, setting to null");
@@ -425,9 +596,9 @@ public function getPendingUsers()
         }
 
         $result = [
-            'id' => $updatedUser->id,
-            'name' => $updatedUser->name,
-            'username' => $updatedUser->username,
+            'id' => encrypt_decrypt_md5('enc', $updatedUser->id),
+            'name' => $nameDecrypted,
+            'username' => $usernameDecrypted,
             'email' => $emailDecrypted,
             'nip' => $nipDecrypted,
             'phone_number' => $phoneDecrypted,
@@ -445,16 +616,34 @@ public function getPendingUsers()
     }
 }
 
-public function getProfile()
+    public function getProfile()
 {
     try {
         $user = auth()->user();
         $user = User::with('role', 'department')->find($user->id);
 
-        // Decrypt data dengan error handling
+        // Decrypt data dengan error handling menggunakan encrypt_decrypt_db
+        $nameDecrypted = null;
+        $usernameDecrypted = null;
         $emailDecrypted = null;
         $nipDecrypted = null;
         $phoneDecrypted = null;
+
+        if ($user->name) {
+            try {
+                $nameDecrypted = encrypt_decrypt_db('dec', $user->name, $user->id);
+            } catch (\Exception $e) {
+                logger("Name decryption error in getProfile: " . $e->getMessage());
+            }
+        }
+
+        if ($user->username) {
+            try {
+                $usernameDecrypted = encrypt_decrypt_db('dec', $user->username, $user->id);
+            } catch (\Exception $e) {
+                logger("Username decryption error in getProfile: " . $e->getMessage());
+            }
+        }
 
         if ($user->email) {
             try {
@@ -473,22 +662,22 @@ public function getProfile()
         }
 
         if ($user->phone_number) {
-    try {
-        logger("Getting phone from DB: " . $user->phone_number);
-        $phoneDecrypted = encrypt_decrypt_db('dec', $user->phone_number, $user->id);
+            try {
+                logger("Getting phone from DB: " . $user->phone_number);
+                $phoneDecrypted = encrypt_decrypt_db('dec', $user->phone_number, $user->id);
 
-        if (empty($phoneDecrypted)) {
-            logger("Phone decryption returned empty result, setting to null");
-            $phoneDecrypted = null;
-        } else {
-            logger("Decrypted phone in getProfile: " . $phoneDecrypted);
+                if (empty($phoneDecrypted)) {
+                    logger("Phone decryption returned empty result, setting to null");
+                    $phoneDecrypted = null;
+                } else {
+                    logger("Decrypted phone in getProfile: " . $phoneDecrypted);
+                }
+            } catch (\Exception $e) {
+                logger("Phone number decryption error in getProfile: " . $e->getMessage());
+                logger("Stack trace: " . $e->getTraceAsString());
+                $phoneDecrypted = null;
+            }
         }
-    } catch (\Exception $e) {
-        logger("Phone number decryption error in getProfile: " . $e->getMessage());
-        logger("Stack trace: " . $e->getTraceAsString());
-        $phoneDecrypted = null;
-    }
-}
 
         return response()->json([
             'code' => 200,
@@ -497,9 +686,9 @@ public function getProfile()
             'message' => 'Data profil berhasil diambil.',
             'data' => [
                 'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'username' => $user->username,
+                    'id' => encrypt_decrypt_md5('enc', $user->id), //  dienkripsi
+                    'name' => $nameDecrypted,
+                    'username' => $usernameDecrypted,
                     'email' => $emailDecrypted,
                     'nip' => $nipDecrypted,
                     'phone_number' => $phoneDecrypted,

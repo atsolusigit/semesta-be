@@ -20,40 +20,54 @@ class KnowledgeBaseController extends Controller
         }
 
         $data = $query->latest()->paginate(10);
+
+        // Enkripsi creator_id saja, ID knowledge base tetap plain
+        $data->getCollection()->transform(function ($item) {
+            $item->creator_id = encrypt_decrypt_md5('enc', $item->creator_id);
+            return $item;
+        });
+
         return json(200, true, 'success', 'Data berhasil diambil', $data);
     }
 
     public function show($id)
-{
-    $data = Knowledgebase::with('creator')->find($id);
-    if (!$data) {
-        return json(404, false, 'not_found', 'Data tidak ditemukan', null);
-    }
-
-    try {
-        if ($data->creator) {
-            // Dekripsi email jika ada
-            if ($data->creator->email) {
-                $data->creator->email = encrypt_decrypt_db('decrypt', $data->creator->email, $data->creator->id);
-            }
-            unset(
-                $data->creator->jtkn,
-                $data->creator->fbtk,
-                $data->creator->nip,
-                $data->creator->phone_number,
-                $data->creator->gender,
-                $data->creator->photo,
-                $data->creator->email_verified_at
-            );
+    {
+        // Langsung gunakan ID tanpa dekripsi
+        $data = Knowledgebase::with('creator')->find($id);
+        if (!$data) {
+            return json(404, false, 'not_found', 'Data tidak ditemukan', null);
         }
-    } catch (\Exception $e) {
-        $data->creator->email = null;
+
+        try {
+            if ($data->creator) {
+                // Enkripsi ID creator
+                $data->creator->id = encrypt_decrypt_md5('enc', $data->creator->id);
+
+                if ($data->creator->email) {
+                    $data->creator->email = encrypt_decrypt_db('decrypt', $data->creator->email, $data->creator->id);
+                }
+
+                unset(
+                    $data->creator->jtkn,
+                    $data->creator->fbtk,
+                    $data->creator->nip,
+                    $data->creator->phone_number,
+                    $data->creator->gender,
+                    $data->creator->photo,
+                    $data->creator->email_verified_at
+                );
+            }
+        } catch (\Exception $e) {
+            if ($data->creator) {
+                $data->creator->email = null;
+            }
+        }
+
+        // Enkripsi creator_id saja, ID knowledge base tetap plain
+        $data->creator_id = encrypt_decrypt_md5('enc', $data->creator_id);
+
+        return json(200, true, 'success', 'Detail Data', $data);
     }
-
-    return json(200, true, 'success', 'Detail Data', $data);
-}
-
-
 
     public function store(Request $request)
     {
@@ -86,6 +100,9 @@ class KnowledgeBaseController extends Controller
 
             DB::commit();
 
+            // Enkripsi creator_id saja, ID knowledge base tetap plain
+            $Base->creator_id = encrypt_decrypt_md5('enc', $Base->creator_id);
+
             return json(200, true, 'success', 'Data berhasil disimpan', $Base);
         } catch (\Exception $e) {
             DB::rollback();
@@ -94,82 +111,90 @@ class KnowledgeBaseController extends Controller
     }
 
     public function update(Request $request, $id)
-{
-    $user = JWTAuth::parseToken()->authenticate();
-    if (!in_array($user->role_id, [1, 2, 6, 7])) {
-        return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk mengupdate data', null);
-    }
-
-    $Base = Knowledgebase::find($id);
-    if (!$Base) {
-        return json(404, false, 'not_found', 'Data tidak ditemukan', null);
-    }
-
-    $array_validation = [
-        'img_path' => 'nullable|string|max:255',
-        'description' => 'nullable|string|max:500',
-        'long_description' => 'nullable|string|max:1000',
-        'type' => 'nullable|in:1,2,3,4,5',
-    ];
-
-    $validate = check_validation($request->all(), $array_validation);
-    if ($validate[0] !== 0) {
-        return $validate[1];
-    }
-
-    DB::beginTransaction();
-
-    try {
-        if ($request->filled('img_path')) {
-            $Base->img_path = $request->img_path;
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+        if (!in_array($user->role_id, [1, 2, 6, 7])) {
+            return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk mengupdate data', null);
         }
 
-        if ($request->has('description')) {
-            $Base->description = $request->description;
+        // Langsung gunakan ID tanpa dekripsi
+        $Base = Knowledgebase::find($id);
+        if (!$Base) {
+            return json(404, false, 'not_found', 'Data tidak ditemukan', null);
         }
 
-        if ($request->has('long_description')) {
-            $Base->long_description = $request->long_description;
+        $array_validation = [
+            'img_path' => 'nullable|string|max:255',
+            'description' => 'nullable|string|max:500',
+            'long_description' => 'nullable|string|max:1000',
+            'type' => 'nullable|in:1,2,3,4,5',
+        ];
+
+        $validate = check_validation($request->all(), $array_validation);
+        if ($validate[0] !== 0) {
+            return $validate[1];
         }
 
-        if ($request->has('type')) {
-            $Base->type = $request->type;
-        }
-
-        $Base->save();
-
-        DB::commit();
-
-        $Base->load('creator');
+        DB::beginTransaction();
 
         try {
-            if ($Base->creator) {
-                if ($Base->creator->email) {
-                    $Base->creator->email = encrypt_decrypt_db('decrypt', $Base->creator->email, $Base->creator->id);
-                }
-
-                unset(
-                    $Base->creator->jtkn,
-                    $Base->creator->fbtk,
-                    $Base->creator->nip,
-                    $Base->creator->phone_number,
-                    $Base->creator->gender,
-                    $Base->creator->photo,
-                    $Base->creator->email_verified_at
-                );
+            if ($request->filled('img_path')) {
+                $Base->img_path = $request->img_path;
             }
+
+            if ($request->has('description')) {
+                $Base->description = $request->description;
+            }
+
+            if ($request->has('long_description')) {
+                $Base->long_description = $request->long_description;
+            }
+
+            if ($request->has('type')) {
+                $Base->type = $request->type;
+            }
+
+            $Base->save();
+
+            DB::commit();
+
+            $Base->load('creator');
+
+            try {
+                if ($Base->creator) {
+                    // Enkripsi ID creator
+                    $creatorId = $Base->creator->id;
+                    $Base->creator->id = encrypt_decrypt_md5('enc', $creatorId);
+
+                    if ($Base->creator->email) {
+                        $Base->creator->email = encrypt_decrypt_db('decrypt', $Base->creator->email, $creatorId);
+                    }
+
+                    unset(
+                        $Base->creator->jtkn,
+                        $Base->creator->fbtk,
+                        $Base->creator->nip,
+                        $Base->creator->phone_number,
+                        $Base->creator->gender,
+                        $Base->creator->photo,
+                        $Base->creator->email_verified_at
+                    );
+                }
+            } catch (\Exception $e) {
+                if ($Base->creator) {
+                    $Base->creator->email = null;
+                }
+            }
+
+            // Enkripsi creator_id saja, ID knowledge base tetap plain
+            $Base->creator_id = encrypt_decrypt_md5('enc', $Base->creator_id);
+
+            return json(200, true, 'success', 'Data berhasil diupdate', $Base);
         } catch (\Exception $e) {
-            $Base->creator->email = null;
+            DB::rollback();
+            return json(500, false, 'error', 'Gagal update data: ' . $e->getMessage(), null);
         }
-
-        return json(200, true, 'success', 'Data berhasil diupdate', $Base);
-    } catch (\Exception $e) {
-        DB::rollback();
-        return json(500, false, 'error', 'Gagal update data: ' . $e->getMessage(), null);
     }
-}
-
-
 
     public function destroy($id)
     {
@@ -178,6 +203,7 @@ class KnowledgeBaseController extends Controller
             return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk menghapus data', null);
         }
 
+        // Langsung gunakan ID tanpa dekripsi
         $Base = Knowledgebase::find($id);
         if (!$Base) {
             return json(404, false, 'not_found', 'Data tidak ditemukan', null);
@@ -197,6 +223,7 @@ class KnowledgeBaseController extends Controller
         try {
             $user = JWTAuth::parseToken()->authenticate();
 
+            // Langsung gunakan ID tanpa dekripsi
             $knowledge = Knowledgebase::find($id);
             if (!$knowledge) {
                 return json(404, false, 'not_found', 'Knowledge Base tidak ditemukan', null);

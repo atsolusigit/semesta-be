@@ -46,6 +46,7 @@ class AuthController extends Controller
             ], 400);
         }
 
+
         $array_validation = [
             'email' => 'required|string|email:rfc,dns|max:255|unique:users',
             'username' => 'required|string|max:100',
@@ -115,9 +116,9 @@ class AuthController extends Controller
         'password' => 'required',
     ];
 
-    if (check_validation($request->all(), $array_validation)[0] != 0) {
-        return check_validation($request->all(), $array_validation)[1];
-    }
+        if (check_validation($request->all(), $array_validation)[0] != 0) {
+            return check_validation($request->all(), $array_validation)[1];
+        }
 
     try {
         // Ambil user ID berdasarkan pencocokan username/email terenkripsi langsung dari database
@@ -204,8 +205,8 @@ class AuthController extends Controller
         Log::error("Login error: " . $e->getMessage());
         return json(500, 'false', 'Login Error', 'Terjadi kesalahan saat login.', []);
     }
-}
 
+}
     public function logout(Request $request)
     {
         $token = JWTAuth::getToken();
@@ -267,12 +268,12 @@ class AuthController extends Controller
         }
 
         // Validasi header asdp secara langsung
-        if (!$request->header('asdp')) {
-            return json(200, true, 'success_validation', 'Token sudah terisi dengan benar dan masih aktif', []);
-        }
+    if (!$request->header('asdp')) {
+        return json(200, true, 'success_validation', 'Token sudah terisi dengan benar dan masih aktif', []);
+    }
 
-        // Ambil header asdp
-        $asdp = $request->header('asdp');
+    // Ambil header asdp
+    $asdp = $request->header('asdp');
 
         // Validasi security token
         if (check_security($asdp, $token) == 0) {
@@ -292,6 +293,7 @@ class AuthController extends Controller
 
         // Return response sukses dengan data user
         return json(200, true, 'success', 'Token sudah terisi dengan benar dan masih aktif', [
+
             'user' => [
                 'id' => encrypt_decrypt_md5('enc', $user->id),
                 'name' => encrypt_decrypt_db('dec', $user->name, $user->id),
@@ -384,3 +386,4 @@ class AuthController extends Controller
 }
 
 }
+

@@ -1,82 +1,145 @@
 <?php
 
-    namespace App\Models;
+namespace App\Models;
 
-    use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-    class TrRiskHeader extends Model
+class TrRiskHeader extends Model
+{
+    protected $table = 'tr_risk_header';
+
+    protected $fillable = [
+        'risk_code',
+        'process_code',
+        'jenis_risiko',
+        'sasaran',
+        'peristiwa_risiko',
+        'penyebab_risiko',
+        'dampak_risiko',
+        'inherent_risk_level_dampak',
+        'inherent_risk_level_kemungkinan',
+        'inherent_risk_posisi_risiko',
+        'inherent_risk_level_risiko',
+        'internal_control',
+        'target_waktu_selesai',
+        'target_waktu_selesai_option',
+        'target_waktu_selesai_other',
+        'target_waktu_selesai_notes',
+        'target_waktu_selesai_position',
+        'biaya_perlakuan_risiko',
+        'residual_target_level_dampak',
+        'residual_target_level_kemungkinan',
+        'residual_target_posisi_risiko',
+        'residual_target_level_risiko',
+        'department_id',
+        'year',
+    ];
+
+    protected $casts = [
+        'target_waktu_selesai' => 'date',
+        'biaya_perlakuan_risiko' => 'decimal:2',
+    ];
+
+    // =====================================
+    // MONTHLY DATA RELATION
+    // =====================================
+
+    public function monthlyData(): HasMany
     {
-        protected $table = 'tr_risk_header';
-
-        protected $fillable = [
-            'risk_code',
-            'process_code',
-            'prefix_risiko',
-            'sasaran',
-            'permasalahan_risiko',
-            'dampak',
-            'dampak_risiko',
-            'ir_level_dampak',
-            'ir_level_kemungkinan',
-            'ir_posisi_risiko',
-            'ir_level_risiko',
-            'internal_control',
-            'target_satu_tahun',
-            'target_satu_tahun_option',
-            'target_satu_tahun_other',
-            'target_satu_tahun_notes',
-            'target_satu_tahun_position',
-            'biaya_pertolongan_risiko',
-            'rr_level_dampak',
-            'rr_level_kemungkinan',
-            'rr_posisi_risiko',
-            'rr_level_risiko',
-            'department_id',
-            'year',
-        ];
-
-        public function riskCode()
-        {
-            return $this->belongsTo(\App\Models\MstRiskCode::class, 'risk_code', 'id');
-        }
-
-        public function irDampak()
-        {
-            return $this->belongsTo(\App\Models\MstHeatmapDampak::class, 'ir_level_dampak');
-        }
-
-        public function irKemungkinan()
-        {
-            return $this->belongsTo(\App\Models\MstHeatmapKemungkinan::class, 'ir_level_kemungkinan');
-        }
-
-        public function rrDampak()
-        {
-            return $this->belongsTo(\App\Models\MstHeatmapDampak::class, 'rr_level_dampak');
-        }
-
-        public function rrKemungkinan()
-        {
-            return $this->belongsTo(\App\Models\MstHeatmapKemungkinan::class, 'rr_level_kemungkinan');
-        }
-
-        public function department()
-        {
-            return $this->belongsTo(\App\Models\MstDepartment::class, 'department_id');
-        }
-
-        public function optionWaktuSelesai()
-        {
-            return $this->belongsTo(\App\Models\MstOption::class, 'target_waktu_selesai_option', 'name');
-        }
-
-        public function optionWaktuSelesaiPosition()
-        {
-            return $this->belongsTo(\App\Models\MstOption::class, 'target_waktu_selesai_position', 'name');
-        }
-        public function riskRange()
-        {
-            return $this->belongsTo(MstHeatmapRiskRange::class, 'risk_range_id');
-        }
-
+        return $this->hasMany(TrRiskMonthly::class, 'header_id');
     }
+
+    public function monthly(): HasMany
+    {
+        return $this->monthlyData();
+    }
+
+    // =====================================
+    // RELATIONS (FIXED)
+    // =====================================
+
+    public function riskCode(): BelongsTo
+    {
+        return $this->belongsTo(MstRiskCode::class, 'risk_code', 'id');
+    }
+
+    public function irDampak(): BelongsTo
+    {
+        return $this->belongsTo(MstHeatmapDampak::class, 'inherent_risk_level_dampak');
+    }
+
+    public function irKemungkinan(): BelongsTo
+    {
+        return $this->belongsTo(MstHeatmapKemungkinan::class, 'inherent_risk_level_kemungkinan');
+    }
+
+    public function rrDampak(): BelongsTo
+    {
+        return $this->belongsTo(MstHeatmapDampak::class, 'residual_target_level_dampak');
+    }
+
+    public function rrKemungkinan(): BelongsTo
+    {
+        return $this->belongsTo(MstHeatmapKemungkinan::class, 'residual_target_level_kemungkinan');
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(MstDepartment::class, 'department_id');
+    }
+
+    public function optionWaktuSelesai(): BelongsTo
+    {
+        return $this->belongsTo(MstOption::class, 'target_waktu_selesai_option', 'name');
+    }
+
+    public function optionWaktuSelesaiPosition(): BelongsTo
+    {
+        return $this->belongsTo(MstOption::class, 'target_waktu_selesai_position', 'name');
+    }
+
+    public function riskRange(): BelongsTo
+    {
+        return $this->belongsTo(MstHeatmapRiskRange::class, 'risk_range_id');
+    }
+
+    // =====================================
+    // HELPER METHODS
+    // =====================================
+
+    public function getMonthlyData($month)
+    {
+        return $this->monthlyData()->where('month', $month)->first();
+    }
+
+    public function getOrderedMonthlyData()
+    {
+        return $this->monthlyData()->orderBy('month')->get();
+    }
+
+    public function hasMonthlyData($month)
+    {
+        return $this->monthlyData()->where('month', $month)->exists();
+    }
+
+    // =====================================
+    // SCOPES
+    // =====================================
+
+    public function scopeForYear($query, $year)
+    {
+        return $query->where('year', $year);
+    }
+
+    public function scopeForDepartment($query, $departmentId)
+    {
+        return $query->where('department_id', $departmentId);
+    }
+
+    public function scopeWithMonthly($query)
+    {
+        return $query->with('monthlyData');
+    }
+}

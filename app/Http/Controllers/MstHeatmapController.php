@@ -35,7 +35,7 @@ class MstHeatmapController extends Controller
         $item = MstHeatmap::with('riskRange')->find($id);
 
         if (!$item) {
-            return json(404, false, 'Tidak Ditemukan', 'Data heatmap tidak ditemukan');
+            return json(404, false, 'Tidak Ditemukan', 'Data heatmap tidak ditemukan',null);
         }
 
         $data = [
@@ -78,7 +78,7 @@ class MstHeatmapController extends Controller
     {
         $heatmap = MstHeatmap::find($id);
         if (!$heatmap) {
-            return json(404, false, 'Tidak Ditemukan', 'Data heatmap tidak ditemukan');
+            return json(404, false, 'Tidak Ditemukan', 'Data heatmap tidak ditemukan',null);
         }
 
         $validator = Validator::make($request->all(), [
@@ -101,11 +101,11 @@ class MstHeatmapController extends Controller
         $data = MstHeatmap::find($id);
 
         if (!$data) {
-            return json(404, false, 'Tidak Ditemukan', 'Data heatmap tidak ditemukan');
+            return json(404, false, 'Tidak Ditemukan', 'Data heatmap tidak ditemukan',null);
         }
 
         $data->delete();
 
-        return json(200, true, 'Berhasil', 'Data heatmap berhasil dihapus');
+        return json(200, true, 'Berhasil', 'Data heatmap berhasil dihapus',null);
     }
 }

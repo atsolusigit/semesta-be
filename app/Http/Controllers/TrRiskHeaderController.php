@@ -50,11 +50,13 @@ class TrRiskHeaderController extends Controller
             'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
             'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
             'internal_control' => 'required|string',
-            'target_waktu_selesai' => 'nullable|date',
-            'target_waktu_selesai_option' => 'nullable|string|exists:mst_option,name',
-            // 'target_waktu_selesai_other' => 'nullable|string',
-            'target_waktu_selesai_notes' => 'nullable|string',
-            'target_waktu_selesai_position' => 'nullable|string|exists:mst_option,position',
+            // CORRECTED: Field names sesuai dengan model/migration
+            // 'target_satu_tahun' => 'nullable|numeric',
+            'target_satu_tahun_option' => 'nullable|string|exists:mst_option,name',
+            // 'target_satu_tahun_other' => 'nullable|string',
+            'target_satu_tahun_notes' => 'nullable|string',
+            'target_satu_tahun_position' => 'nullable|string|exists:mst_option,position',
+            'target_quantitative_satu_tahun' => 'nullable|numeric',
             'biaya_perlakuan_risiko' => 'nullable|numeric',
             'department_id' => 'required|exists:mst_department,id',
             'year' => 'required|integer',
@@ -169,11 +171,12 @@ class TrRiskHeaderController extends Controller
             'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
             'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
             'internal_control' => 'required|string',
-            'target_waktu_selesai' => 'nullable|date',
-            'target_waktu_selesai_option' => 'nullable|string|exists:mst_option,name',
-            // 'target_waktu_selesai_other' => 'nullable|string',
-            'target_waktu_selesai_notes' => 'nullable|string',
-            'target_waktu_selesai_position' => 'nullable|string|exists:mst_option,position',
+            // 'target_satu_tahun' => 'nullable|numeric',
+            'target_satu_tahun_option' => 'nullable|string|exists:mst_option,name',
+            // 'target_satu_tahun_other' => 'nullable|string',
+            'target_satu_tahun_notes' => 'nullable|string',
+            'target_satu_tahun_position' => 'nullable|string|exists:mst_option,position',
+            'target_quantitative_satu_tahun' => 'nullable|numeric',
             'biaya_perlakuan_risiko' => 'nullable|numeric',
             'department_id' => 'required|exists:mst_department,id',
             'year' => 'required|integer',
@@ -279,5 +282,4 @@ class TrRiskHeaderController extends Controller
             return json(500, false, 'Gagal Dihapus', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
-
 }

@@ -23,11 +23,12 @@ class TrRiskHeader extends Model
         'inherent_risk_posisi_risiko',
         'inherent_risk_level_risiko',
         'internal_control',
-        'target_waktu_selesai',
-        'target_waktu_selesai_option',
-        'target_waktu_selesai_other',
-        'target_waktu_selesai_notes',
-        'target_waktu_selesai_position',
+        // 'target_satu_tahun',
+        // 'target_satu_tahun_other',
+        'target_satu_tahun_option',
+        'target_satu_tahun_notes',
+        'target_satu_tahun_position',
+        'target_quantitative_satu_tahun',
         'biaya_perlakuan_risiko',
         'residual_target_level_dampak',
         'residual_target_level_kemungkinan',
@@ -38,8 +39,10 @@ class TrRiskHeader extends Model
     ];
 
     protected $casts = [
-        'target_waktu_selesai' => 'date',
+        'target_satu_tahun' => 'decimal:2',                    // DOUBLE(15,2) field
         'biaya_perlakuan_risiko' => 'decimal:2',
+        'target_quantitative_satu_tahun' => 'decimal:2',
+        'residual_target_posisi_risiko' => 'integer',
     ];
 
     // =====================================
@@ -57,7 +60,7 @@ class TrRiskHeader extends Model
     }
 
     // =====================================
-    // RELATIONS (FIXED)
+    // RELATIONS (UPDATED)
     // =====================================
 
     public function riskCode(): BelongsTo
@@ -90,20 +93,24 @@ class TrRiskHeader extends Model
         return $this->belongsTo(MstDepartment::class, 'department_id');
     }
 
+    // UPDATED: sesuai dengan field yang ada di migration dan ERD
     public function optionWaktuSelesai(): BelongsTo
     {
-        return $this->belongsTo(MstOption::class, 'target_waktu_selesai_option', 'name');
+        return $this->belongsTo(MstOption::class, 'target_satu_tahun_option', 'name');
     }
 
+    // UPDATED: sesuai dengan field yang ada di migration
     public function optionWaktuSelesaiPosition(): BelongsTo
     {
-        return $this->belongsTo(MstOption::class, 'target_waktu_selesai_position', 'name');
+        return $this->belongsTo(MstOption::class, 'target_satu_tahun_position', 'name');
     }
 
-    public function riskRange(): BelongsTo
-    {
-        return $this->belongsTo(MstHeatmapRiskRange::class, 'risk_range_id');
-    }
+    // NOTE: Field 'risk_range_id' tidak ada di migration,
+    // jika masih dibutuhkan, tambahkan ke migration atau hapus relasi ini
+    // public function riskRange(): BelongsTo
+    // {
+    //     return $this->belongsTo(MstHeatmapRiskRange::class, 'risk_range_id');
+    // }
 
     // =====================================
     // HELPER METHODS

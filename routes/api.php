@@ -50,7 +50,6 @@ Route::get('/user', function (Request $request) {
 // Cek token yang masih aktif
 Route::middleware(['auth:api'])->get('/check-token', [AuthController::class, 'checkToken']);
 
-
 // ============================
 //  Super Admin Only (role_id = 1)
 // ============================
@@ -215,13 +214,6 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/r
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);
 
-// ===================== RISK MONTHLY =====================
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly', [TrRiskMonthlyController::class, 'index']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/risk-monthly', [TrRiskMonthlyController::class, 'store']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'show']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'update']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'destroy']);
-
 // ===================== MITIGATION MONTHLY =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/mitigation-monthly', [TrMitigationMonthlyController::class, 'index']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/mitigation-monthly', [TrMitigationMonthlyController::class, 'store']);
@@ -236,3 +228,26 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/r
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-upload/{id}', [TrRiskMonthlyUploadController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-monthly-upload/{id}', [TrRiskMonthlyUploadController::class, 'destroy']);
 
+// ===================== RISK MONTHLY =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly', [TrRiskMonthlyController::class, 'index']);
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'show']);
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'update']);
+    Route::middleware([RoleAccessMiddleware::class . ':1'])->delete('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'destroy']);
+
+    // ===================== ADDITIONAL ENDPOINTS YANG DIPERLUKAN =====================
+    // Endpoint untuk mengambil data monthly berdasarkan header
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/header/{headerId}', [TrRiskMonthlyController::class, 'getByHeader']);
+
+    // Endpoint untuk finalisasi data monthly
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->post('/risk-monthly/{id}/finalize', [TrRiskMonthlyController::class, 'finalize']);
+
+    // Endpoint untuk finalisasi semua data monthly dalam satu header
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->post('/risk-monthly/header/{headerId}/finalize-all', [TrRiskMonthlyController::class, 'finalizeAll']);
+
+    // Endpoint untuk cek status follow-up
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/header/{headerId}/follow-up-status', [TrRiskMonthlyController::class, 'checkFollowUpStatus']);
+
+    // Endpoint untuk statistik data monthly
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/header/{headerId}/statistics', [TrRiskMonthlyController::class, 'getStatistics']);
+});

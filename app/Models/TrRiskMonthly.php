@@ -14,6 +14,7 @@ class TrRiskMonthly extends Model
         'header_id',
         'month',
         'status_risiko',
+        'process_code',
         'start_date',
         'expired_date',
 
@@ -29,87 +30,122 @@ class TrRiskMonthly extends Model
         'target_notes',
         'target_option_position',
 
-        'rr_level_dampak',
-        'rr_level_kemungkinan',
-        'rr_posisi_risiko',
-        'rr_level_risiko',
+        'residual_risk_level_dampak',
+        'residual_risk_level_kemungkinan',
+        'residual_risk_posisi_risiko',
+        'residual_risk_level_risiko',
+
+        'residual_risk_satutahun_level_dampak',
+        'residual_risk_satutahun_level_kemungkinan',
+        'residual_risk_satutahun_posisi_risiko',
+        'residual_risk_satutahun_level_risiko',
+
+        'is_finalize',
+    ];
+
+    protected $casts = [
+        'start_date' => 'date',
+        'expired_date' => 'date',
+        'realization_quantitative' => 'decimal:2',
+        'target_quantitative' => 'decimal:2',
+        'is_finalize' => 'boolean',
     ];
 
     public $timestamps = true;
 
-    //  Relasi ke Header Risiko Bulanan
+    // =====================================
+    // MAIN RELATIONS
+    // =====================================
+
     public function header(): BelongsTo
     {
-        return $this->belongsTo(TrRiskHeader::class, 'risk_header_id');
+        return $this->belongsTo(TrRiskHeader::class, 'header_id');
     }
 
-    // Relasi ke Mitigasi Bulanan
     public function mitigations(): HasMany
     {
         return $this->hasMany(TrMitigationMonthly::class, 'risk_monthly_id');
     }
 
-    // Relasi ke Upload Dokumen
     public function uploads(): HasMany
     {
         return $this->hasMany(TrRiskMonthlyUpload::class, 'risk_monthly_id');
     }
 
-    //  Relasi ke mst_option
-    public function mitigationType(): BelongsTo
+    // =====================================
+    // HEATMAP RELATIONS (UPDATED)
+    // =====================================
+
+    // Residual bulanan
+    public function rrLevelDampak(): BelongsTo
     {
-        return $this->belongsTo(MstOption::class, 'mitigation_type')
-                    ->where('position', 'mitigation_type');
+        return $this->belongsTo(MstHeatmapDampak::class, 'residual_risk_level_dampak');
     }
 
-    // Relasi ke mst_option
-    public function mitigationStatus(): BelongsTo
+    public function rrLevelKemungkinan(): BelongsTo
     {
-        return $this->belongsTo(MstOption::class, 'mitigation_status')
-                    ->where('position', 'mitigation_status');
+        return $this->belongsTo(MstHeatmapKemungkinan::class, 'residual_risk_level_kemungkinan');
     }
 
-    // Relasi ke mst_option
-    public function statusPic(): BelongsTo
+    // Residual akhir tahun
+    public function rrYearLevelDampak(): BelongsTo
     {
-        return $this->belongsTo(MstOption::class, 'status_pic')
-                    ->where('position', 'status_pic');
+        return $this->belongsTo(MstHeatmapDampak::class, 'residual_risk_satutahun_level_dampak');
     }
 
-    //  Relasi ke mst_option
-    public function statusAnggaran(): BelongsTo
+    public function rrYearLevelKemungkinan(): BelongsTo
     {
-        return $this->belongsTo(MstOption::class, 'status_anggaran')
-                    ->where('position', 'status_anggaran');
+        return $this->belongsTo(MstHeatmapKemungkinan::class, 'residual_risk_satutahun_level_kemungkinan');
     }
 
-    // Relasi ke mst_option
-    public function statusWaktu(): BelongsTo
+    // =====================================
+    // OPTION RELATIONS (realization & target)
+    // =====================================
+
+    public function targetOption(): BelongsTo
     {
-        return $this->belongsTo(MstOption::class, 'status_waktu')
-                    ->where('position', 'status_waktu');
+        return $this->belongsTo(MstOption::class, 'target_option', 'name')
+                    ->where('position', 'target_option');
     }
 
-    // Target Option
-public function targetOption(): BelongsTo
-{
-    return $this->belongsTo(MstOption::class, 'target_option', 'name');
-}
+    public function targetOptionPosition(): BelongsTo
+    {
+        return $this->belongsTo(MstOption::class, 'target_option_position', 'position');
+    }
 
-public function targetOptionPosition(): BelongsTo
-{
-    return $this->belongsTo(MstOption::class, 'target_option_position', 'position');
-}
+    public function realizationOption(): BelongsTo
+    {
+        return $this->belongsTo(MstOption::class, 'realization_option', 'name')
+                    ->where('position', 'realization_option');
+    }
 
-// Realization Option
-public function realizationOption(): BelongsTo
-{
-    return $this->belongsTo(MstOption::class, 'realization_option', 'name');
-}
+    public function realizationOptionPosition(): BelongsTo
+    {
+        return $this->belongsTo(MstOption::class, 'realization_option_position', 'position');
+    }
 
-public function realizationOptionPosition(): BelongsTo
-{
-    return $this->belongsTo(MstOption::class, 'realization_option_position', 'position');
-}
+    // =====================================
+    // SCOPES & METHODS
+    // =====================================
 
+    public function scopeForMonth($query, $month)
+    {
+        return $query->where('month', $month);
+    }
+
+    public function scopeForHeader($query, $headerId)
+    {
+        return $query->where('header_id', $headerId);
+    }
+
+    public function getMonthNameAttribute()
+    {
+        $months = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+
+        return $months[$this->month] ?? '';
+    }
 }

@@ -23,8 +23,6 @@ class TrRiskHeader extends Model
         'inherent_risk_posisi_risiko',
         'inherent_risk_level_risiko',
         'internal_control',
-        // 'target_satu_tahun',
-        // 'target_satu_tahun_other',
         'target_satu_tahun_option',
         'target_satu_tahun_notes',
         'target_satu_tahun_position',
@@ -39,10 +37,8 @@ class TrRiskHeader extends Model
     ];
 
     protected $casts = [
-        'target_satu_tahun' => 'decimal:2',                    // DOUBLE(15,2) field
         'biaya_perlakuan_risiko' => 'decimal:2',
         'target_quantitative_satu_tahun' => 'decimal:2',
-        'residual_target_posisi_risiko' => 'integer',
     ];
 
     // =====================================
@@ -93,28 +89,22 @@ class TrRiskHeader extends Model
         return $this->belongsTo(MstDepartment::class, 'department_id');
     }
 
-    // UPDATED: sesuai dengan field yang ada di migration dan ERD
-    public function optionWaktuSelesai(): BelongsTo
+    public function optionTargetSatuTahun(): BelongsTo
     {
-        return $this->belongsTo(MstOption::class, 'target_satu_tahun_option', 'name');
+        return $this->belongsTo(MstOption::class, 'target_satu_tahun_option', 'id');
     }
 
-    // UPDATED: sesuai dengan field yang ada di migration
-    public function optionWaktuSelesaiPosition(): BelongsTo
+    // Accessor untuk mengubah target_satu_tahun_option menjadi name saat di-load dengan relationship
+    public function getTargetSatuTahunOptionAttribute($value)
     {
-        return $this->belongsTo(MstOption::class, 'target_satu_tahun_position', 'name');
+        // Jika relationship optionTargetSatuTahun sudah di-load dan ada data
+        if ($this->relationLoaded('optionTargetSatuTahun') && $this->optionTargetSatuTahun) {
+            return $this->optionTargetSatuTahun->name;
+        }
+
+        // Jika tidak, return ID asli
+        return $value;
     }
-
-    // NOTE: Field 'risk_range_id' tidak ada di migration,
-    // jika masih dibutuhkan, tambahkan ke migration atau hapus relasi ini
-    // public function riskRange(): BelongsTo
-    // {
-    //     return $this->belongsTo(MstHeatmapRiskRange::class, 'risk_range_id');
-    // }
-
-    // =====================================
-    // HELPER METHODS
-    // =====================================
 
     public function getMonthlyData($month)
     {
@@ -131,9 +121,10 @@ class TrRiskHeader extends Model
         return $this->monthlyData()->where('month', $month)->exists();
     }
 
-    // =====================================
-    // SCOPES
-    // =====================================
+    public function getTargetPositionAttribute()
+    {
+        return $this->target_satu_tahun_position;
+    }
 
     public function scopeForYear($query, $year)
     {

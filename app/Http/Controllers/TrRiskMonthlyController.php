@@ -17,6 +17,7 @@ class TrRiskMonthlyController extends Controller
 {
     $data = TrRiskMonthly::with([
         'header',
+        'riskCode:id,name',
         'rrLevelDampak',
         'rrLevelKemungkinan',
         'rrYearLevelDampak',
@@ -32,6 +33,7 @@ public function show($id)
 {
     $data = TrRiskMonthly::with([
         'header',
+        'riskCode:id,name',
         'rrLevelDampak',
         'rrLevelKemungkinan',
         'rrYearLevelDampak',
@@ -56,6 +58,7 @@ public function show($id)
 
     $data = TrRiskMonthly::with([
         'header',
+        'riskCode:id,name',
         'rrLevelDampak',
         'rrLevelKemungkinan',
         'rrYearLevelDampak',

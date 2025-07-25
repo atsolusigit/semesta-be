@@ -10,6 +10,7 @@ return new class extends Migration {
     $table->id();
     $table->unsignedBigInteger('header_id');
     $table->integer('month'); // 1–12
+    $table->unsignedBigInteger('risk_code')->nullable();
     $table->string('status_risiko', 50);
     $table->string('process_code')->default(1);
     $table->date('start_date');

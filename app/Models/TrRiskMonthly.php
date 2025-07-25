@@ -12,6 +12,7 @@ class TrRiskMonthly extends Model
 
     protected $fillable = [
         'header_id',
+        'risk_code',
         'month',
         'status_risiko',
         'process_code',
@@ -71,6 +72,12 @@ class TrRiskMonthly extends Model
     {
         return $this->hasMany(TrRiskMonthlyUpload::class, 'risk_monthly_id');
     }
+
+     public function riskCode(): BelongsTo
+    {
+        return $this->belongsTo(MstRiskCode::class, 'risk_code', 'id');
+    }
+
 
     // =====================================
     // HEATMAP RELATIONS (UPDATED)

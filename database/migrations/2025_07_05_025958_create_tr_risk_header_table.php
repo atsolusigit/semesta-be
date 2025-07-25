@@ -25,11 +25,12 @@ return new class extends Migration {
 
             $table->text('internal_control')->nullable();
 
-            $table->date('target_waktu_selesai')->nullable();
-            $table->string('target_waktu_selesai_option')->nullable();
-            // $table->text('target_waktu_selesai_other')->nullable();
-            $table->text('target_waktu_selesai_notes')->nullable();
-            $table->string('target_waktu_selesai_position')->nullable();
+            // $table->double('target_satu_tahun', 15, 2)->nullable();
+            $table->text('target_satu_tahun_option')->nullable();
+            // $table->text('target_satu_tahun_other')->nullable();
+            $table->text('target_satu_tahun_notes')->nullable();
+            $table->text('target_satu_tahun_position')->nullable();
+            $table->double('target_quantitative_satu_tahun', 15, 2)->nullable();
 
             $table->double('biaya_perlakuan_risiko', 15, 2)->nullable();
 
@@ -38,7 +39,7 @@ return new class extends Migration {
             $table->integer('residual_target_posisi_risiko')->nullable();
             $table->string('residual_target_level_risiko')->nullable();
 
-            $table->unsignedBigInteger('department_id')->nullable(); // ini dulu branch sekarang jadi department
+            $table->unsignedBigInteger('department_id')->nullable();
             $table->integer('year')->nullable();                 // contoh: 2024
 
             $table->timestamps();

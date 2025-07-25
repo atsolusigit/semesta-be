@@ -60,7 +60,7 @@ class TrRiskHeaderController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'risk_code' => 'required|exists:mst_risk_code,id',
-            'process_code' => 'required|string',
+            // 'process_code' => 'required|integer',
             'jenis_risiko' => 'required|string',
             'sasaran' => 'required|string',
             'peristiwa_risiko' => 'required|string',
@@ -162,7 +162,7 @@ class TrRiskHeaderController extends Controller
 
         $validator = Validator::make($request->all(), [
             'risk_code' => 'required|exists:mst_risk_code,id',
-            'process_code' => 'required|string',
+            // 'process_code' => 'required|integer',
             'jenis_risiko' => 'required|string',
             'sasaran' => 'required|string',
             'peristiwa_risiko' => 'required|string',

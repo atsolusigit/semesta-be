@@ -94,7 +94,7 @@ public function show($id)
         // Enhanced validation with better date rules
         $validator = Validator::make($request->all(), [
             'status_risiko' => 'required|in:open,close',
-            'process_code' => 'nullable|string',
+            // 'process_code' => 'required|integer',
             'start_date' => [
                 'required',
                 'date',

@@ -39,7 +39,51 @@ class TrRiskHeader extends Model
     protected $casts = [
         'biaya_perlakuan_risiko' => 'decimal:2',
         'target_quantitative_satu_tahun' => 'decimal:2',
+        'process_code' => 'integer', // Cast ke integer
     ];
+
+    // =====================================
+    // AUTO INCREMENT PROCESS CODE
+    // =====================================
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Auto generate process_code saat create
+        static::creating(function ($model) {
+            if (empty($model->process_code)) {
+                $model->process_code = static::getNextProcessCode(
+                    $model->year,
+                    $model->department_id
+                );
+            }
+        });
+    }
+
+
+    public static function getNextProcessCode($year = null, $departmentId = null)
+    {
+        $query = static::query();
+
+        if ($year) {
+            $query->where('year', $year);
+        }
+
+        if ($departmentId) {
+            $query->where('department_id', $departmentId);
+        }
+
+        $lastCode = $query->max('process_code') ?? 0;
+        return $lastCode + 1;
+    }
+
+
+    public function setNextProcessCode()
+    {
+        $this->process_code = static::getNextProcessCode($this->year, $this->department_id);
+        return $this;
+    }
 
     // =====================================
     // MONTHLY DATA RELATION
@@ -106,6 +150,12 @@ class TrRiskHeader extends Model
         return $value;
     }
 
+    public function getTargetPositionAttribute()
+    {
+        return $this->target_satu_tahun_position;
+    }
+
+
     public function getMonthlyData($month)
     {
         return $this->monthlyData()->where('month', $month)->first();
@@ -121,10 +171,9 @@ class TrRiskHeader extends Model
         return $this->monthlyData()->where('month', $month)->exists();
     }
 
-    public function getTargetPositionAttribute()
-    {
-        return $this->target_satu_tahun_position;
-    }
+    // =====================================
+    // SCOPES
+    // =====================================
 
     public function scopeForYear($query, $year)
     {
@@ -139,5 +188,15 @@ class TrRiskHeader extends Model
     public function scopeWithMonthly($query)
     {
         return $query->with('monthlyData');
+    }
+
+    public function scopeByProcessCode($query, $processCode)
+    {
+        return $query->where('process_code', $processCode);
+    }
+
+    public function scopeLatestProcessCode($query)
+    {
+        return $query->orderBy('process_code', 'desc');
     }
 }

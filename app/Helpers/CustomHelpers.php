@@ -341,6 +341,7 @@ if (!function_exists('check_if_follow_up_required')) {
             \App\Models\TrRiskMonthly::create([
                 'header_id' => $riskHeader->id,
                 'risk_code' => $riskHeader->risk_code,
+                'process_code' => $riskHeader->process_code,
                 'month' => $month,
                 'status_risiko' => $status,
                 'start_date' => $startDate->toDateString(),

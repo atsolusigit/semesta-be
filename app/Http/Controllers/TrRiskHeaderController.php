@@ -25,12 +25,33 @@ class TrRiskHeaderController extends Controller
             'rrDampak:id,label',
             'rrKemungkinan:id,label',
             'department:id,name',
-            'optionWaktuSelesai:id,name,position',
-            'optionWaktuSelesaiPosition:id,name,position',
+            'optionTargetSatuTahun:id,name,position', // Diperbaiki
             'monthlyData' => function($query) {
                 $query->orderBy('month', 'asc');
             }
         ])->orderBy('id', 'asc')->get();
+
+        return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $data);
+    }
+
+    public function show($id)
+    {
+        $data = TrRiskHeader::with([
+            'riskCode:id,name',
+            'irDampak:id,label',
+            'irKemungkinan:id,label',
+            'rrDampak:id,label',
+            'rrKemungkinan:id,label',
+            'department:id,name',
+            'optionTargetSatuTahun:id,name,position', // Diperbaiki
+            'monthlyData' => function($query) {
+                $query->orderBy('month', 'asc');
+            }
+        ])->find($id);
+
+        if (!$data) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
+        }
 
         return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $data);
     }
@@ -50,12 +71,8 @@ class TrRiskHeaderController extends Controller
             'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
             'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
             'internal_control' => 'required|string',
-            // CORRECTED: Field names sesuai dengan model/migration
-            // 'target_satu_tahun' => 'nullable|numeric',
-            'target_satu_tahun_option' => 'nullable|string|exists:mst_option,name',
-            // 'target_satu_tahun_other' => 'nullable|string',
+            'target_satu_tahun_option' => 'nullable|exists:mst_option,id',
             'target_satu_tahun_notes' => 'nullable|string',
-            'target_satu_tahun_position' => 'nullable|string|exists:mst_option,position',
             'target_quantitative_satu_tahun' => 'nullable|numeric',
             'biaya_perlakuan_risiko' => 'nullable|numeric',
             'department_id' => 'required|exists:mst_department,id',
@@ -69,6 +86,14 @@ class TrRiskHeaderController extends Controller
         try {
             DB::beginTransaction();
             $data = $request->all();
+
+            // Auto-fill position from mst_option if target_satu_tahun_option is provided
+            if (!empty($data['target_satu_tahun_option'])) {
+                $option = MstOption::find($data['target_satu_tahun_option']);
+                if ($option) {
+                    $data['target_satu_tahun_position'] = $option->position;
+                }
+            }
 
             $irHeatmap = MstHeatmap::with('riskRange')
                 ->where('dampak', $data['inherent_risk_level_dampak'])
@@ -97,6 +122,7 @@ class TrRiskHeaderController extends Controller
             $riskHeader = TrRiskHeader::create($data);
             generate_monthly_data($riskHeader);
             DB::commit();
+
             $riskHeader->load([
                 'riskCode:id,name',
                 'irDampak:id,label',
@@ -104,8 +130,7 @@ class TrRiskHeaderController extends Controller
                 'rrDampak:id,label',
                 'rrKemungkinan:id,label',
                 'department:id,name',
-                'optionWaktuSelesai:id,name,position',
-                'optionWaktuSelesaiPosition:id,name,position',
+                'optionTargetSatuTahun:id,name,position',
                 'monthlyData' => function($query) {
                     $query->orderBy('month', 'asc');
                 }
@@ -116,29 +141,6 @@ class TrRiskHeaderController extends Controller
             DB::rollBack();
             return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
-    }
-
-    public function show($id)
-    {
-        $data = TrRiskHeader::with([
-            'riskCode:id,name',
-            'irDampak:id,label',
-            'irKemungkinan:id,label',
-            'rrDampak:id,label',
-            'rrKemungkinan:id,label',
-            'department:id,name',
-            'optionWaktuSelesai:id,name,position',
-            'optionWaktuSelesaiPosition:id,name,position',
-            'monthlyData' => function($query) {
-                $query->orderBy('month', 'asc');
-            }
-        ])->find($id);
-
-        if (!$data) {
-            return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
-        }
-
-        return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $data);
     }
 
     public function update(Request $request, $id)
@@ -171,11 +173,8 @@ class TrRiskHeaderController extends Controller
             'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
             'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
             'internal_control' => 'required|string',
-            // 'target_satu_tahun' => 'nullable|numeric',
-            'target_satu_tahun_option' => 'nullable|string|exists:mst_option,name',
-            // 'target_satu_tahun_other' => 'nullable|string',
+            'target_satu_tahun_option' => 'nullable|exists:mst_option,id',
             'target_satu_tahun_notes' => 'nullable|string',
-            'target_satu_tahun_position' => 'nullable|string|exists:mst_option,position',
             'target_quantitative_satu_tahun' => 'nullable|numeric',
             'biaya_perlakuan_risiko' => 'nullable|numeric',
             'department_id' => 'required|exists:mst_department,id',
@@ -190,7 +189,18 @@ class TrRiskHeaderController extends Controller
             DB::beginTransaction();
             $updateData = $request->all();
 
-            // Recalculate IR heatmap if dampak/kemungkinan changed
+            // Auto-fill position from mst_option if target_satu_tahun_option is provided
+            if (!empty($updateData['target_satu_tahun_option'])) {
+                $option = MstOption::find($updateData['target_satu_tahun_option']);
+                if ($option) {
+                    $updateData['target_satu_tahun_position'] = $option->position;
+                }
+            } else {
+
+                $updateData['target_satu_tahun_position'] = null;
+            }
+
+
             if ($request->inherent_risk_level_dampak != $data->inherent_risk_level_dampak ||
                 $request->inherent_risk_level_kemungkinan != $data->inherent_risk_level_kemungkinan) {
 
@@ -207,7 +217,7 @@ class TrRiskHeaderController extends Controller
                 $updateData['inherent_risk_level_risiko'] = $irHeatmap->riskRange->name ?? null;
             }
 
-            // Recalculate RR heatmap if dampak/kemungkinan changed
+
             if ($request->residual_target_level_dampak != $data->residual_target_level_dampak ||
                 $request->residual_target_level_kemungkinan != $data->residual_target_level_kemungkinan) {
 
@@ -223,7 +233,7 @@ class TrRiskHeaderController extends Controller
                 $updateData['residual_target_posisi_risiko'] = $rrHeatmap->result;
                 $updateData['residual_target_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
 
-                // Update all unfinalised monthly data with new RR values
+
                 TrRiskMonthly::where('header_id', $id)
                     ->where('is_finalize', false)
                     ->update([
@@ -244,8 +254,7 @@ class TrRiskHeaderController extends Controller
                 'rrDampak:id,label',
                 'rrKemungkinan:id,label',
                 'department:id,name',
-                'optionWaktuSelesai:id,name,position',
-                'optionWaktuSelesaiPosition:id,name,position',
+                'optionTargetSatuTahun:id,name,position',
                 'monthlyData' => function($query) {
                     $query->orderBy('month', 'asc');
                 }
@@ -266,7 +275,7 @@ class TrRiskHeaderController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
         }
 
-        // Check if any monthly data is finalized
+
         $finalizedMonthly = TrRiskMonthly::where('header_id', $id)
             ->where('is_finalize', true)
             ->exists();

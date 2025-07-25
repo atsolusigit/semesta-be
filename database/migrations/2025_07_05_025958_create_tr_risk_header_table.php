@@ -10,7 +10,7 @@ return new class extends Migration {
         Schema::create('tr_risk_header', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('risk_code')->nullable(); // FK ke mst_risk_code
-            $table->string('process_code')->default(1);
+            $table->string('process_code')->nullable();
 
             $table->text('jenis_risiko')->nullable();
             $table->text('sasaran')->nullable();
@@ -25,11 +25,9 @@ return new class extends Migration {
 
             $table->text('internal_control')->nullable();
 
-            // $table->double('target_satu_tahun', 15, 2)->nullable();
-            $table->text('target_satu_tahun_option')->nullable();
-            // $table->text('target_satu_tahun_other')->nullable();
+            $table->unsignedBigInteger('target_satu_tahun_option')->nullable();
             $table->text('target_satu_tahun_notes')->nullable();
-            $table->text('target_satu_tahun_position')->nullable();
+            $table->string('target_satu_tahun_position')->nullable();
             $table->double('target_quantitative_satu_tahun', 15, 2)->nullable();
 
             $table->double('biaya_perlakuan_risiko', 15, 2)->nullable();

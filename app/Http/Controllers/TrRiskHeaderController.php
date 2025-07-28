@@ -16,45 +16,130 @@ use App\Models\MstHeatmapKemungkinan;
 
 class TrRiskHeaderController extends Controller
 {
-    public function index()
-    {
-        $data = TrRiskHeader::with([
-            'riskCode:id,name',
-            'irDampak:id,label',
-            'irKemungkinan:id,label',
-            'rrDampak:id,label',
-            'rrKemungkinan:id,label',
-            'department:id,name',
-            'optionTargetSatuTahun:id,name,position', // Diperbaiki
-            'monthlyData' => function($query) {
-                $query->orderBy('month', 'asc');
-            }
-        ])->orderBy('id', 'asc')->get();
-
-        return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $data);
-    }
-
-    public function show($id)
-    {
-        $data = TrRiskHeader::with([
-            'riskCode:id,name',
-            'irDampak:id,label',
-            'irKemungkinan:id,label',
-            'rrDampak:id,label',
-            'rrKemungkinan:id,label',
-            'department:id,name',
-            'optionTargetSatuTahun:id,name,position', // Diperbaiki
-            'monthlyData' => function($query) {
-                $query->orderBy('month', 'asc');
-            }
-        ])->find($id);
-
-        if (!$data) {
-            return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
+   public function index()
+{
+    $data = TrRiskHeader::with([
+        'riskCode:id,name',
+        'irDampak:id,label',
+        'irKemungkinan:id,label',
+        'rrDampak:id,label',
+        'rrKemungkinan:id,label',
+        'department:id,name',
+        'optionTargetSatuTahun:id,name,position',
+        'monthlyData' => function($query) {
+            $query->orderBy('month', 'asc');
         }
+    ])->orderBy('id', 'asc')->get();
 
-        return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $data);
+    // Transform setiap item
+    $orderedData = $data->map(function ($item) {
+        return [
+            'id' => $item->id,
+            'risk_code' => $item->riskCode,
+            'process_code' => $item->process_code,
+            'jenis_risiko' => $item->jenis_risiko,
+            'sasaran' => $item->sasaran,
+            'peristiwa_risiko' => $item->peristiwa_risiko,
+            'penyebab_risiko' => $item->penyebab_risiko,
+            'dampak_risiko' => $item->dampak_risiko,
+            'inherent_risk_level_dampak' => $item->inherent_risk_level_dampak,
+            'inherent_risk_level_kemungkinan' => $item->inherent_risk_level_kemungkinan,
+            'inherent_risk_posisi_risiko' => $item->inherent_risk_posisi_risiko,
+            'inherent_risk_level_risiko' => $item->inherent_risk_level_risiko,
+            'internal_control' => $item->internal_control,
+
+            // Grup target satu tahun
+            'target_satu_tahun_option' => $item->target_satu_tahun_option,
+            'target_satu_tahun_option_name' => $item->target_satu_tahun_option_name,
+            'target_satu_tahun_notes' => $item->target_satu_tahun_notes,
+            'target_satu_tahun_position' => $item->target_satu_tahun_position,
+            'target_quantitative_satu_tahun' => $item->target_quantitative_satu_tahun,
+
+            'biaya_perlakuan_risiko' => $item->biaya_perlakuan_risiko,
+            'residual_target_level_dampak' => $item->residual_target_level_dampak,
+            'residual_target_level_kemungkinan' => $item->residual_target_level_kemungkinan,
+            'residual_target_posisi_risiko' => $item->residual_target_posisi_risiko,
+            'residual_target_level_risiko' => $item->residual_target_level_risiko,
+            'department_id' => $item->department_id,
+            'year' => $item->year,
+            'created_at' => $item->created_at,
+            'updated_at' => $item->updated_at,
+
+            // Relationships
+            'ir_dampak' => $item->irDampak,
+            'ir_kemungkinan' => $item->irKemungkinan,
+            'rr_dampak' => $item->rrDampak,
+            'rr_kemungkinan' => $item->rrKemungkinan,
+            'department' => $item->department,
+            'monthly_data' => $item->monthlyData,
+        ];
+    });
+
+    return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $orderedData);
+}
+    public function show($id)
+{
+    $data = TrRiskHeader::with([
+        'riskCode:id,name',
+        'irDampak:id,label',
+        'irKemungkinan:id,label',
+        'rrDampak:id,label',
+        'rrKemungkinan:id,label',
+        'department:id,name',
+        'optionTargetSatuTahun:id,name,position',
+        'monthlyData' => function($query) {
+            $query->orderBy('month', 'asc');
+        }
+    ])->find($id);
+
+    if (!$data) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
     }
+
+    // Transform untuk mengatur urutan field
+    $orderedData = [
+        'id' => $data->id,
+        'risk_code' => $data->riskCode,
+        'process_code' => $data->process_code,
+        'jenis_risiko' => $data->jenis_risiko,
+        'sasaran' => $data->sasaran,
+        'peristiwa_risiko' => $data->peristiwa_risiko,
+        'penyebab_risiko' => $data->penyebab_risiko,
+        'dampak_risiko' => $data->dampak_risiko,
+        'inherent_risk_level_dampak' => $data->inherent_risk_level_dampak,
+        'inherent_risk_level_kemungkinan' => $data->inherent_risk_level_kemungkinan,
+        'inherent_risk_posisi_risiko' => $data->inherent_risk_posisi_risiko,
+        'inherent_risk_level_risiko' => $data->inherent_risk_level_risiko,
+        'internal_control' => $data->internal_control,
+
+        // Grup target satu tahun
+        'target_satu_tahun_option' => $data->target_satu_tahun_option,
+        'target_satu_tahun_option_name' => $data->target_satu_tahun_option_name,
+        'target_satu_tahun_notes' => $data->target_satu_tahun_notes,
+        'target_satu_tahun_position' => $data->target_satu_tahun_position,
+        'target_quantitative_satu_tahun' => $data->target_quantitative_satu_tahun,
+
+        'biaya_perlakuan_risiko' => $data->biaya_perlakuan_risiko,
+        'residual_target_level_dampak' => $data->residual_target_level_dampak,
+        'residual_target_level_kemungkinan' => $data->residual_target_level_kemungkinan,
+        'residual_target_posisi_risiko' => $data->residual_target_posisi_risiko,
+        'residual_target_level_risiko' => $data->residual_target_level_risiko,
+        'department_id' => $data->department_id,
+        'year' => $data->year,
+        'created_at' => $data->created_at,
+        'updated_at' => $data->updated_at,
+
+        // Relationships
+        'ir_dampak' => $data->irDampak,
+        'ir_kemungkinan' => $data->irKemungkinan,
+        'rr_dampak' => $data->rrDampak,
+        'rr_kemungkinan' => $data->rrKemungkinan,
+        'department' => $data->department,
+        'monthly_data' => $data->monthlyData,
+    ];
+
+    return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $orderedData);
+}
 
     public function store(Request $request)
     {

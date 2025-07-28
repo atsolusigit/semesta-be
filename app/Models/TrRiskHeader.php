@@ -39,7 +39,11 @@ class TrRiskHeader extends Model
     protected $casts = [
         'biaya_perlakuan_risiko' => 'decimal:2',
         'target_quantitative_satu_tahun' => 'decimal:2',
-        'process_code' => 'integer', // Cast ke integer
+        'process_code' => 'integer',
+    ];
+
+    protected $appends = [
+        'target_satu_tahun_option_name'
     ];
 
     // =====================================
@@ -50,7 +54,6 @@ class TrRiskHeader extends Model
     {
         parent::boot();
 
-        // Auto generate process_code saat create
         static::creating(function ($model) {
             if (empty($model->process_code)) {
                 $model->process_code = static::getNextProcessCode(
@@ -60,7 +63,6 @@ class TrRiskHeader extends Model
             }
         });
     }
-
 
     public static function getNextProcessCode($year = null, $departmentId = null)
     {
@@ -77,7 +79,6 @@ class TrRiskHeader extends Model
         $lastCode = $query->max('process_code') ?? 0;
         return $lastCode + 1;
     }
-
 
     public function setNextProcessCode()
     {
@@ -100,7 +101,7 @@ class TrRiskHeader extends Model
     }
 
     // =====================================
-    // RELATIONS (UPDATED)
+    // RELATIONS
     // =====================================
 
     public function riskCode(): BelongsTo
@@ -138,23 +139,35 @@ class TrRiskHeader extends Model
         return $this->belongsTo(MstOption::class, 'target_satu_tahun_option', 'id');
     }
 
-    // Accessor untuk mengubah target_satu_tahun_option menjadi name saat di-load dengan relationship
-    public function getTargetSatuTahunOptionAttribute($value)
+    // =====================================
+    // ACCESSORS
+    // =====================================
+
+    public function getTargetSatuTahunOptionNameAttribute()
     {
-        // Jika relationship optionTargetSatuTahun sudah di-load dan ada data
+        // Jika target_satu_tahun_option kosong/null
+        if (!$this->target_satu_tahun_option) {
+            return null;
+        }
+
+        // Jika relationship optionTargetSatuTahun sudah di-load
         if ($this->relationLoaded('optionTargetSatuTahun') && $this->optionTargetSatuTahun) {
             return $this->optionTargetSatuTahun->name;
         }
 
-        // Jika tidak, return ID asli
-        return $value;
+        try {
+            $option = MstOption::find($this->target_satu_tahun_option);
+            return $option ? $option->name : null;
+        } catch (\Exception $e) {
+            \Log::error('Error loading MstOption: ' . $e->getMessage());
+            return null;
+        }
     }
 
     public function getTargetPositionAttribute()
     {
         return $this->target_satu_tahun_position;
     }
-
 
     public function getMonthlyData($month)
     {

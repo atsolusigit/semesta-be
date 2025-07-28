@@ -109,11 +109,10 @@ class TrRiskMonthly extends Model
     // OPTION RELATIONS (realization & target)
     // =====================================
 
-    public function targetOption(): BelongsTo
-    {
-        return $this->belongsTo(MstOption::class, 'target_option', 'name')
-                    ->where('position', 'target_option');
-    }
+   public function targetOption(): BelongsTo
+{
+    return $this->belongsTo(MstOption::class, 'target_option');
+}
 
     public function targetOptionPosition(): BelongsTo
     {
@@ -121,10 +120,9 @@ class TrRiskMonthly extends Model
     }
 
     public function realizationOption(): BelongsTo
-    {
-        return $this->belongsTo(MstOption::class, 'realization_option', 'name')
-                    ->where('position', 'realization_option');
-    }
+{
+    return $this->belongsTo(MstOption::class, 'realization_option');
+}
 
     public function realizationOptionPosition(): BelongsTo
     {

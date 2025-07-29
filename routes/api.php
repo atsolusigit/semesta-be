@@ -241,6 +241,8 @@ Route::middleware(['auth:api'])->group(function () {
     // Endpoint untuk mengambil data monthly berdasarkan header
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/header/{headerId}', [TrRiskMonthlyController::class, 'getByHeader']);
 
+    // Endpoint untuk bulk update quantitative data
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->put('/risk-monthly/bulk-quantitative/{headerId}', [TrRiskMonthlyController::class, 'bulkUpdateQuantitative']);
     // Endpoint untuk finalisasi data monthly
     Route::middleware([RoleAccessMiddleware::class . ':1,2'])->post('/risk-monthly/{id}/finalize', [TrRiskMonthlyController::class, 'finalize']);
 

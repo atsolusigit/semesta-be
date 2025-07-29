@@ -257,7 +257,8 @@ if (!function_exists('get_follow_up_info')) {
         $followUpDetails = [];
 
         if ($header->year < $currentYear) {
-            if ($decemberData && $decemberData->status_risiko == 'open' && $decemberData->is_finalize) {
+            // $decemberData is array, so use array access
+            if ($decemberData && $decemberData['status_risiko'] == 'open' && $decemberData['is_finalize']) {
                 $isFollowUpRequired = true;
                 $message = "Risiko di bulan Desember {$header->year} masih open dan sudah difinalisasi. Ini menjadi tindak lanjut di tahun {$currentYear}.";
                 $followUpDetails = [
@@ -265,14 +266,14 @@ if (!function_exists('get_follow_up_info')) {
                     'original_year' => $header->year,
                     'december_status' => 'open_finalized'
                 ];
-            } elseif ($decemberData && $decemberData->status_risiko == 'close') {
+            } elseif ($decemberData && $decemberData['status_risiko'] == 'close') {
                 $message = "Semua risiko sudah close di tahun {$header->year}.";
             } else {
                 $message = "Data Desember {$header->year} belum difinalisasi atau tidak ada data.";
             }
         } elseif ($header->year == $currentYear) {
             if ($currentMonth == 12) {
-                if ($decemberData && $decemberData->status_risiko == 'open') {
+                if ($decemberData && $decemberData['status_risiko'] == 'open') {
                     $isFollowUpRequired = true;
                     $message = "Perhatian: Risiko di bulan Desember masih open. Ini akan menjadi tindak lanjut di tahun " . ($currentYear + 1) . ".";
                     $followUpDetails = [

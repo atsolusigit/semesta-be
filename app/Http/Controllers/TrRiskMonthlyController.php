@@ -105,17 +105,17 @@ public function show($id)
 }
 
 
- // Function 1: Update Residual Risk Data
+// Function 1: Update Residual Risk Data
 public function updateResidual(Request $request, $id)
 {
     $data = TrRiskMonthly::with('header')->find($id);
     if (!$data) {
-        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
     }
 
     // Check if data is finalized
     if ($data->is_finalize) {
-        return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', null);
+        return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', ['id' => $id]);
     }
 
     // Enhanced validation with better date rules
@@ -159,7 +159,9 @@ public function updateResidual(Request $request, $id)
     ]);
 
     if ($validator->fails()) {
-        return json(422, false, 'Validasi Gagal', $validator->errors()->first(), $validator->errors());
+        $errorData = ['id' => $id]; // Put id first
+        $errorData = array_merge($errorData, $validator->errors()->toArray()); // Merge with validation errors
+        return json(422, false, 'Validasi Gagal', $validator->errors()->first(), $errorData);
     }
 
     DB::beginTransaction();
@@ -171,7 +173,7 @@ public function updateResidual(Request $request, $id)
             ->first();
 
         if (!$residualRiskHeatmap) {
-            return json(400, false, 'Kombinasi Tidak Ditemukan', 'Kombinasi dampak dan kemungkinan tidak ditemukan.', null);
+            return json(400, false, 'Kombinasi Tidak Ditemukan', 'Kombinasi dampak dan kemungkinan tidak ditemukan.', ['id' => $id]);
         }
 
         $updateData = [
@@ -227,11 +229,15 @@ public function updateResidual(Request $request, $id)
             $warnings[] = 'Perhatian: Risiko masih open di bulan Desember. Ini akan menjadi tindak lanjut di tahun berikutnya.';
         }
 
-        return json(200, true, 'Berhasil Diperbarui', 'Data residual risk berhasil diperbarui.', $data, $warnings);
+        // Prepare response data with id included
+        $responseData = $data->toArray();
+        $responseData['id'] = $data->id; // Explicitly add id to response
+
+        return json(200, true, 'Berhasil Diperbarui', 'Data residual risk berhasil diperbarui.', $responseData, $warnings);
 
     } catch (\Throwable $e) {
         DB::rollBack();
-        return json(500, false, 'Gagal Diperbarui', 'Terjadi kesalahan sistem.', $e->getMessage());
+        return json(500, false, 'Gagal Diperbarui', 'Terjadi kesalahan sistem.', ['id' => $id, 'error' => $e->getMessage()]);
     }
 }
 
@@ -253,8 +259,15 @@ public function updateQuantitative(Request $request, $id)
     ]);
 
     if ($validator->fails()) {
-        return json(422, false, 'Validasi Gagal', $validator->errors()->first(), $validator->errors());
-    }
+    $errors = $validator->errors()->toArray();
+    $firstField = array_key_first($errors);
+    $firstMessage = $errors[$firstField][0];
+
+    // Tambahkan ID bulanan ke dalam response
+    $errorsWithId = array_merge(['id' => $monthly->id], $errors);
+
+    return json(422, false, 'Validasi Gagal', $firstMessage, $errorsWithId);
+}
 
     DB::beginTransaction();
     try {

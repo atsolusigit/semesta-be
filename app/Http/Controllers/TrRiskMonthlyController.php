@@ -118,6 +118,25 @@ public function updateResidual(Request $request, $id)
         return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', ['id' => $id]);
     }
 
+    // NEW: Validate January finalization for other months
+    if ($data->month > 1) { // If current month is not January
+        $januaryData = TrRiskMonthly::where('header_id', $data->header_id)
+            ->where('month', 1)
+            ->first();
+
+        if (!$januaryData) {
+            return json(400, false, 'Data Januari Tidak Ditemukan', 'Data bulan Januari belum tersedia.', ['id' => $id]);
+        }
+
+        if (!$januaryData->is_finalize) {
+            return json(400, false, 'Akses Ditolak', 'Bulan Januari harus difinalisasi terlebih dahulu sebelum mengakses bulan lain.', [
+                'id' => $id,
+                'current_month' => $data->month,
+                'january_finalized' => false
+            ]);
+        }
+    }
+
     // Enhanced validation with better date rules
     $validator = Validator::make($request->all(), [
         'status_risiko' => 'required|in:open,close',
@@ -407,6 +426,140 @@ public function finalize(Request $request, $id)
             return json(500, false, 'Gagal Difinalisasi', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
+
+    public function bulkUpdateQuantitative(Request $request, $headerId)
+{
+    $header = TrRiskHeader::find($headerId);
+    if (!$header) {
+        return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', ['header_id' => $headerId]);
+    }
+
+    // Validasi input untuk 12 bulan
+    $validator = Validator::make($request->all(), [
+        'monthly_data' => 'required|array|min:1|max:12',
+        'monthly_data.*.month' => 'required|integer|min:1|max:12',
+        'monthly_data.*.target_quantitative' => 'required|numeric',
+        'monthly_data.*.target_notes' => 'nullable|string|max:1000',
+        'require_all_months' => 'nullable|boolean', // Optional: force complete 12 months
+    ]);
+
+    if ($validator->fails()) {
+        $errorData = ['header_id' => $headerId];
+        $errorData = array_merge($errorData, $validator->errors()->toArray());
+        return json(400, false, 'Validasi Gagal', $validator->errors()->first(), $errorData);
+    }
+
+    // Ambil data monthly yang sudah ada untuk header ini
+    $existingMonthly = TrRiskMonthly::where('header_id', $headerId)
+        ->get()
+        ->keyBy('month');
+
+    // Validasi: cek apakah ada data yang sudah difinalisasi
+    $finalizedMonths = [];
+    foreach ($request->monthly_data as $monthData) {
+        $month = $monthData['month'];
+        if (isset($existingMonthly[$month]) && $existingMonthly[$month]->is_finalize) {
+            $finalizedMonths[] = $month;
+        }
+    }
+
+    if (!empty($finalizedMonths)) {
+        return json(400, false, 'Data Sudah Difinalisasi', 'Bulan berikut sudah difinalisasi dan tidak bisa diubah: ' . implode(', ', $finalizedMonths), [
+            'header_id' => $headerId,
+            'finalized_months' => $finalizedMonths
+        ]);
+    }
+
+    // Validasi: pastikan tidak ada duplikasi bulan dalam request
+    $requestedMonths = collect($request->monthly_data)->pluck('month')->toArray();
+    if (count($requestedMonths) !== count(array_unique($requestedMonths))) {
+        return json(400, false, 'Duplikasi Bulan', 'Terdapat duplikasi bulan dalam data yang dikirim.', [
+            'header_id' => $headerId,
+            'requested_months' => $requestedMonths
+        ]);
+    }
+
+    // Validasi: cek kelengkapan 12 bulan jika diminta
+    if ($request->require_all_months === true) {
+        $allMonths = range(1, 12);
+        $missingMonths = array_diff($allMonths, $requestedMonths);
+
+        if (!empty($missingMonths)) {
+            return json(400, false, 'Data Tidak Lengkap', 'Semua bulan (1-12) harus diisi. Bulan yang belum diisi: ' . implode(', ', $missingMonths), [
+                'header_id' => $headerId,
+                'missing_months' => $missingMonths,
+                'provided_months' => $requestedMonths
+            ]);
+        }
+    }
+
+    // Validasi: peringatan jika kurang dari 12 bulan (tidak wajib, hanya info)
+    $warnings = [];
+    if (count($requestedMonths) < 12 && $request->require_all_months !== true) {
+        $allMonths = range(1, 12);
+        $missingMonths = array_diff($allMonths, $requestedMonths);
+        $warnings[] = 'Peringatan: Hanya ' . count($requestedMonths) . ' dari 12 bulan yang akan diupdate. Bulan yang tidak diupdate: ' . implode(', ', $missingMonths);
+    }
+
+    DB::beginTransaction();
+    try {
+        $updatedData = [];
+        $createdData = [];
+
+        foreach ($request->monthly_data as $monthData) {
+            $month = $monthData['month'];
+
+            if (isset($existingMonthly[$month])) {
+                // Update existing data
+                $monthly = $existingMonthly[$month];
+                $monthly->update([
+                    'target_quantitative' => $monthData['target_quantitative'],
+                    'target_notes' => $monthData['target_notes'] ?? null,
+                ]);
+                $monthly->load('header');
+                $updatedData[] = $this->cleanMonthlyData($monthly);
+            } else {
+                // Create new data (jika belum ada)
+                $monthly = TrRiskMonthly::create([
+                    'header_id' => $headerId,
+                    'month' => $month,
+                    'target_quantitative' => $monthData['target_quantitative'],
+                    'target_notes' => $monthData['target_notes'] ?? null,
+                    'is_finalize' => false,
+                    // Set default values untuk field yang required
+                    'status_risiko' => 'open',
+                    'start_date' => Carbon::create($header->year, $month, 1)->startOfMonth(),
+                    'expired_date' => Carbon::create($header->year, $month, 1)->endOfMonth(),
+                ]);
+                $monthly->load('header');
+                $createdData[] = $this->cleanMonthlyData($monthly);
+            }
+        }
+
+        DB::commit();
+
+        $result = [
+            'header_id' => $headerId,
+            'updated_count' => count($updatedData),
+            'created_count' => count($createdData),
+            'updated_data' => $updatedData,
+            'created_data' => $createdData,
+            'total_processed' => count($updatedData) + count($createdData)
+        ];
+
+        $message = "Berhasil memproses {$result['total_processed']} data. ";
+        $message .= "Updated: {$result['updated_count']}, Created: {$result['created_count']}.";
+
+        return json(200, true, 'Berhasil Bulk Update', $message, $result, $warnings);
+
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Bulk Update', 'Terjadi kesalahan sistem.', [
+            'header_id' => $headerId,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
 
     public function checkFollowUpStatus($headerId)
     {

@@ -357,5 +357,20 @@ if (!function_exists('check_if_follow_up_required')) {
     }
 }
 
+if (!function_exists('clean_monthly_data')) {
+    /**
+     * Membersihkan data bulanan dari field tidak relevan dan null
+     *
+     * @param array $monthlyData - Single monthly data array
+     * @return array
+     */
+    function clean_monthly_data(array $monthlyData)
+    {
+        return collect($monthlyData)
+            ->except(['target_option_position', 'realization_option_position'])
+            ->filter(fn($value) => !is_null($value))
+            ->toArray();
+    }
+}
 }
 

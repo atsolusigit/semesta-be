@@ -309,7 +309,7 @@ public function updateQuantitative(Request $request, $id)
 
     } catch (\Throwable $e) {
         DB::rollBack();
-        return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan sistem.', $e->getMessage());
+        return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan pada sistem.', $e->getMessage());
     }
 }
 

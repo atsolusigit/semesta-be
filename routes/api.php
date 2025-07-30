@@ -238,6 +238,7 @@ Route::middleware(['auth:api'])->group(function () {
     // Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'update']);
 
     // ===================== ADDITIONAL ENDPOINTS YANG DIPERLUKAN =====================
+
     // Endpoint untuk mengambil data monthly berdasarkan header
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/header/{headerId}', [TrRiskMonthlyController::class, 'getByHeader']);
 

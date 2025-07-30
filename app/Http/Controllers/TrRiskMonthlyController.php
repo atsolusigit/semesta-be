@@ -427,26 +427,66 @@ public function finalize(Request $request, $id)
         }
     }
 
-    public function bulkUpdateQuantitative(Request $request, $headerId)
+  public function bulkUpdateQuantitative(Request $request, $headerId)
 {
     $header = TrRiskHeader::find($headerId);
     if (!$header) {
         return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', ['header_id' => $headerId]);
     }
 
-    // Validasi input untuk 12 bulan
-    $validator = Validator::make($request->all(), [
-        'monthly_data' => 'required|array|min:1|max:12',
-        'monthly_data.*.month' => 'required|integer|min:1|max:12',
-        'monthly_data.*.target_quantitative' => 'required|numeric',
-        'monthly_data.*.target_notes' => 'nullable|string|max:1000',
-        'require_all_months' => 'nullable|boolean', // Optional: force complete 12 months
-    ]);
+    // Cek apakah request memiliki field month atau tidak
+    $hasMonthField = collect($request->monthly_data)->first() && isset(collect($request->monthly_data)->first()['month']);
+
+    // Validasi input - conditional berdasarkan ada tidaknya field month
+    if ($hasMonthField) {
+        // Validasi dengan month (request dari sistem lain/manual)
+        $validator = Validator::make($request->all(), [
+            'monthly_data' => 'required|array|min:1|max:12',
+            'monthly_data.*.month' => 'required|integer|min:1|max:12',
+            'monthly_data.*.target_quantitative' => 'sometimes|nullable|numeric',
+            'monthly_data.*.target_notes' => 'sometimes|nullable|string|max:1000',
+            'require_all_months' => 'nullable|boolean',
+            'update_mode' => 'nullable|string|in:selective,complete', // selective = hanya field yang ada, complete = set null untuk yang tidak ada
+        ]);
+    } else {
+        // Validasi tanpa month (request dari frontend UI) - auto assign berdasarkan urutan
+        $baseValidation = [
+            'monthly_data' => 'required|array|min:1|max:12',
+            'monthly_data.*.target_quantitative' => 'sometimes|nullable|numeric',
+            'monthly_data.*.target_notes' => 'sometimes|nullable|string|max:1000',
+            'require_all_months' => 'nullable|boolean',
+            'update_mode' => 'nullable|string|in:selective,complete',
+        ];
+
+        // Jika require_all_months = true, maka wajib 12 bulan
+        if ($request->require_all_months === true) {
+            $baseValidation['monthly_data'] = 'required|array|size:12'; // Exactly 12 months
+        }
+
+        $validator = Validator::make($request->all(), $baseValidation);
+    }
 
     if ($validator->fails()) {
         $errorData = ['header_id' => $headerId];
         $errorData = array_merge($errorData, $validator->errors()->toArray());
         return json(400, false, 'Validasi Gagal', $validator->errors()->first(), $errorData);
+    }
+
+    // Mode update: 'selective' = hanya update field yang ada, 'complete' = set null untuk field yang tidak ada
+    $updateMode = $request->update_mode ?? 'complete';
+
+    // Auto-assign month jika tidak ada field month
+    $processedMonthlyData = [];
+    if ($hasMonthField) {
+        // Gunakan month yang sudah ada di request
+        $processedMonthlyData = $request->monthly_data;
+    } else {
+        // Auto-assign month berdasarkan urutan array
+        foreach ($request->monthly_data as $index => $monthData) {
+            $processedMonthlyData[] = array_merge([
+                'month' => $index + 1, // Auto assign: index 0 = month 1, dst.
+            ], $monthData);
+        }
     }
 
     // Ambil data monthly yang sudah ada untuk header ini
@@ -456,7 +496,7 @@ public function finalize(Request $request, $id)
 
     // Validasi: cek apakah ada data yang sudah difinalisasi
     $finalizedMonths = [];
-    foreach ($request->monthly_data as $monthData) {
+    foreach ($processedMonthlyData as $monthData) {
         $month = $monthData['month'];
         if (isset($existingMonthly[$month]) && $existingMonthly[$month]->is_finalize) {
             $finalizedMonths[] = $month;
@@ -470,26 +510,43 @@ public function finalize(Request $request, $id)
         ]);
     }
 
-    // Validasi: pastikan tidak ada duplikasi bulan dalam request
-    $requestedMonths = collect($request->monthly_data)->pluck('month')->toArray();
-    if (count($requestedMonths) !== count(array_unique($requestedMonths))) {
-        return json(400, false, 'Duplikasi Bulan', 'Terdapat duplikasi bulan dalam data yang dikirim.', [
-            'header_id' => $headerId,
-            'requested_months' => $requestedMonths
-        ]);
+    // Validasi: pastikan tidak ada duplikasi bulan dalam request (hanya jika ada field month)
+    if ($hasMonthField) {
+        $requestedMonths = collect($processedMonthlyData)->pluck('month')->toArray();
+        if (count($requestedMonths) !== count(array_unique($requestedMonths))) {
+            return json(400, false, 'Duplikasi Bulan', 'Terdapat duplikasi bulan dalam data yang dikirim.', [
+                'header_id' => $headerId,
+                'requested_months' => $requestedMonths
+            ]);
+        }
+    } else {
+        // Untuk sequential, tidak mungkin ada duplikasi karena auto-assign berdasarkan index
+        $requestedMonths = collect($processedMonthlyData)->pluck('month')->toArray();
     }
 
     // Validasi: cek kelengkapan 12 bulan jika diminta
     if ($request->require_all_months === true) {
-        $allMonths = range(1, 12);
-        $missingMonths = array_diff($allMonths, $requestedMonths);
+        if ($hasMonthField) {
+            // Untuk request dengan month explicit
+            $allMonths = range(1, 12);
+            $missingMonths = array_diff($allMonths, $requestedMonths);
 
-        if (!empty($missingMonths)) {
-            return json(400, false, 'Data Tidak Lengkap', 'Semua bulan (1-12) harus diisi. Bulan yang belum diisi: ' . implode(', ', $missingMonths), [
-                'header_id' => $headerId,
-                'missing_months' => $missingMonths,
-                'provided_months' => $requestedMonths
-            ]);
+            if (!empty($missingMonths)) {
+                return json(400, false, 'Data Tidak Lengkap', 'Semua bulan (1-12) harus diisi. Bulan yang belum diisi: ' . implode(', ', $missingMonths), [
+                    'header_id' => $headerId,
+                    'missing_months' => $missingMonths,
+                    'provided_months' => $requestedMonths
+                ]);
+            }
+        } else {
+            // Untuk request tanpa month (sequential), harus tepat 12 data
+            if (count($processedMonthlyData) !== 12) {
+                return json(400, false, 'Data Tidak Lengkap', 'Untuk require_all_months=true, harus mengirim tepat 12 data untuk bulan Januari-Desember.', [
+                    'header_id' => $headerId,
+                    'required_count' => 12,
+                    'provided_count' => count($processedMonthlyData)
+                ]);
+            }
         }
     }
 
@@ -501,38 +558,81 @@ public function finalize(Request $request, $id)
         $warnings[] = 'Peringatan: Hanya ' . count($requestedMonths) . ' dari 12 bulan yang akan diupdate. Bulan yang tidak diupdate: ' . implode(', ', $missingMonths);
     }
 
+    // Validasi tambahan: pastikan header->year valid
+    if (!$header->year || $header->year < 1900 || $header->year > 2100) {
+        return json(400, false, 'Tahun Tidak Valid', 'Tahun pada header tidak valid untuk pembuatan tanggal.', [
+            'header_id' => $headerId,
+            'year' => $header->year
+        ]);
+    }
+
     DB::beginTransaction();
     try {
         $updatedData = [];
         $createdData = [];
 
-        foreach ($request->monthly_data as $monthData) {
+        foreach ($processedMonthlyData as $monthData) {
             $month = $monthData['month'];
 
             if (isset($existingMonthly[$month])) {
                 // Update existing data
                 $monthly = $existingMonthly[$month];
-                $monthly->update([
-                    'target_quantitative' => $monthData['target_quantitative'],
-                    'target_notes' => $monthData['target_notes'] ?? null,
-                ]);
+
+                if ($updateMode === 'selective') {
+                    // Mode selective: hanya update field yang ada di request
+                    $updateData = [];
+
+                    if (array_key_exists('target_quantitative', $monthData)) {
+                        $updateData['target_quantitative'] = $monthData['target_quantitative'];
+                    }
+
+                    if (array_key_exists('target_notes', $monthData)) {
+                        $updateData['target_notes'] = $monthData['target_notes'];
+                    }
+
+                    if (!empty($updateData)) {
+                        $monthly->update($updateData);
+                    }
+                } else {
+                    // Mode complete: mirip save per bulan, set null untuk field yang tidak ada
+                    $monthly->update([
+                        'target_quantitative' => $monthData['target_quantitative'] ?? null,
+                        'target_notes' => $monthData['target_notes'] ?? null,
+                    ]);
+                }
+
                 $monthly->load('header');
-                $updatedData[] = $this->cleanMonthlyData($monthly);
+
+                // Filter field null tertentu seperti pada save per bulan
+                $result = collect($monthly->toArray())->filter(function ($value, $key) {
+                    return !in_array($key, ['target_option_position', 'realization_option_position']) || !is_null($value);
+                });
+
+                $updatedData[] = $result->toArray();
+
             } else {
                 // Create new data (jika belum ada)
-                $monthly = TrRiskMonthly::create([
+                $createData = [
                     'header_id' => $headerId,
                     'month' => $month,
-                    'target_quantitative' => $monthData['target_quantitative'],
+                    'target_quantitative' => $monthData['target_quantitative'] ?? null,
                     'target_notes' => $monthData['target_notes'] ?? null,
                     'is_finalize' => false,
                     // Set default values untuk field yang required
                     'status_risiko' => 'open',
                     'start_date' => Carbon::create($header->year, $month, 1)->startOfMonth(),
                     'expired_date' => Carbon::create($header->year, $month, 1)->endOfMonth(),
-                ]);
+                ];
+
+                $monthly = TrRiskMonthly::create($createData);
                 $monthly->load('header');
-                $createdData[] = $this->cleanMonthlyData($monthly);
+
+                // Filter field null tertentu seperti pada save per bulan
+                $result = collect($monthly->toArray())->filter(function ($value, $key) {
+                    return !in_array($key, ['target_option_position', 'realization_option_position']) || !is_null($value);
+                });
+
+                $createdData[] = $result->toArray();
             }
         }
 
@@ -544,7 +644,9 @@ public function finalize(Request $request, $id)
             'created_count' => count($createdData),
             'updated_data' => $updatedData,
             'created_data' => $createdData,
-            'total_processed' => count($updatedData) + count($createdData)
+            'total_processed' => count($updatedData) + count($createdData),
+            'mode' => $hasMonthField ? 'explicit_month' : 'sequential_month',
+            'update_mode' => $updateMode
         ];
 
         $message = "Berhasil memproses {$result['total_processed']} data. ";

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\TrRiskMonthly;
 use App\Models\TrRiskHeader;
 use App\Models\MstHeatmap;
+use App\Http\Controllers\UploadController;
+use App\Models\TrRiskMonthlyUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -27,14 +29,24 @@ class TrRiskMonthlyController extends Controller
     ])->orderBy('header_id')->orderBy('month')->get();
 
     $cleaned = $data->map(function ($item) {
-        $arr = collect($item)->toArray();
+    $arr = collect($item)->toArray();
 
-        // Hapus jika null
-        if (is_null($arr['target_option_position'])) unset($arr['target_option_position']);
-        if (is_null($arr['realization_option_position'])) unset($arr['realization_option_position']);
+    if (is_null($arr['target_option_position'])) unset($arr['target_option_position']);
+    if (is_null($arr['realization_option_position'])) unset($arr['realization_option_position']);
 
-        return $arr;
-    });
+    // Tambahkan properti filename untuk setiap upload
+    $arr['uploads'] = collect($item->uploads)->map(function ($upload) {
+    return [
+        'id' => $upload->id,
+        'filepath' => $upload->filepath,
+        'domain' => $upload->domain, // ditampilkan sebagai label / nama file
+        'filename' => basename($upload->filepath),
+    ];
+});
+
+    return $arr;
+});
+
 
     return json(200, true, 'List data', 'Data risk monthly berhasil diambil.', $cleaned);
 }
@@ -62,11 +74,21 @@ public function show($id)
     if (is_null($arr['target_option_position'])) unset($arr['target_option_position']);
     if (is_null($arr['realization_option_position'])) unset($arr['realization_option_position']);
 
+    // Tambahkan filename ke setiap upload
+   $arr['uploads'] = collect($data->uploads)->map(function ($upload) {
+    return [
+        'id' => $upload->id,
+        'filepath' => $upload->filepath,
+        'domain' => $upload->domain,
+        'filename' => basename($upload->filepath),
+    ];
+});
+
+
     return json(200, true, 'Data Ditemukan', 'Detail data risk monthly berhasil diambil.', $arr);
 }
 
-
-    public function getByHeader($headerId)
+public function getByHeader($headerId)
 {
     $header = TrRiskHeader::find($headerId);
     if (!$header) {
@@ -92,6 +114,15 @@ public function show($id)
         if (is_null($arr['target_option_position'])) unset($arr['target_option_position']);
         if (is_null($arr['realization_option_position'])) unset($arr['realization_option_position']);
 
+        // Tambahkan filename ke setiap upload
+        $arr['uploads'] = collect($item->uploads)->map(function ($upload) {
+    return [
+        'id' => $upload->id,
+        'filepath' => $upload->filepath,
+        'domain' => $upload->domain,
+        'filename' => basename($upload->filepath),
+    ];
+});
         return $arr;
     });
 
@@ -104,6 +135,171 @@ public function show($id)
     ]);
 }
 
+public function updateResidualAndFinalize(Request $request, $id)
+{
+    $data = TrRiskMonthly::with('header')->find($id);
+    if (!$data) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
+    }
+
+    if ($data->is_finalize) {
+        return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', ['id' => $id]);
+    }
+
+    // Validate January finalization
+    if ($data->month > 1) {
+        $januaryData = TrRiskMonthly::where('header_id', $data->header_id)
+            ->where('month', 1)
+            ->first();
+
+        if (!$januaryData) {
+            return json(400, false, 'Data Januari Tidak Ditemukan', 'Data bulan Januari belum tersedia.', ['id' => $id]);
+        }
+
+        if (!$januaryData->is_finalize) {
+            return json(400, false, 'Akses Ditolak', 'Bulan Januari harus difinalisasi terlebih dahulu sebelum mengakses bulan lain.', [
+                'id' => $id,
+                'current_month' => $data->month,
+                'january_finalized' => false
+            ]);
+        }
+    }
+
+    $validator = Validator::make($request->all(), [
+        'status_risiko' => 'required|in:open,close',
+        'start_date' => [
+            'required',
+            'date',
+            function ($attribute, $value, $fail) use ($data) {
+                $expectedStartDate = Carbon::create($data->header->year, $data->month, 1)->startOfMonth();
+                $inputDate = Carbon::parse($value)->startOfMonth();
+
+                if (!$inputDate->isSameMonth($expectedStartDate)) {
+                    $fail('Start date harus dalam bulan ' . $expectedStartDate->format('F Y'));
+                }
+            },
+        ],
+        'expired_date' => [
+            'required',
+            'date',
+            'after_or_equal:start_date',
+            function ($attribute, $value, $fail) use ($data) {
+                $expectedEndDate = Carbon::create($data->header->year, $data->month, 1)->endOfMonth();
+                $inputDate = Carbon::parse($value)->endOfMonth();
+
+                if (!$inputDate->isSameMonth($expectedEndDate)) {
+                    $fail('Expired date harus dalam bulan ' . $expectedEndDate->format('F Y'));
+                }
+            },
+        ],
+        'realization_quantitative' => 'nullable|numeric',
+        'realization_option' => 'nullable|numeric|exists:mst_option,id',
+        'realization_notes' => 'nullable|string',
+        'realization_option_position' => 'nullable|string',
+        'target_option' => 'nullable|numeric|exists:mst_option,id',
+        'target_option_position' => 'nullable|string',
+        'residual_risk_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+        'residual_risk_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+        'residual_risk_satutahun_level_dampak' => 'nullable|exists:mst_heatmap_dampak,id',
+        'residual_risk_satutahun_level_kemungkinan' => 'nullable|exists:mst_heatmap_kemungkinan,id',
+    ]);
+
+    if ($validator->fails()) {
+        $errorData = ['id' => $id];
+        $errorData = array_merge($errorData, $validator->errors()->toArray());
+        return json(422, false, 'Validasi Gagal', $validator->errors()->first(), $errorData);
+    }
+
+    DB::beginTransaction();
+    try {
+        $residualRiskHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $request->residual_risk_level_dampak)
+            ->where('kemungkinan', $request->residual_risk_level_kemungkinan)
+            ->first();
+
+        if (!$residualRiskHeatmap) {
+            return json(400, false, 'Kombinasi Tidak Ditemukan', 'Kombinasi dampak dan kemungkinan tidak ditemukan.', ['id' => $id]);
+        }
+
+        $updateData = [
+            'status_risiko' => $request->status_risiko,
+            'start_date' => $request->start_date,
+            'expired_date' => $request->expired_date,
+            'realization_quantitative' => $request->realization_quantitative,
+            'realization_option' => $request->realization_option,
+            'realization_note' => $request->realization_notes,
+            'realization_option_position' => $request->realization_option_position,
+            'target_option' => $request->target_option,
+            'target_option_position' => $request->target_option_position,
+            'residual_risk_level_dampak' => $request->residual_risk_level_dampak,
+            'residual_risk_level_kemungkinan' => $request->residual_risk_level_kemungkinan,
+            'residual_risk_posisi_risiko' => $residualRiskHeatmap->result,
+            'residual_risk_level_risiko' => $residualRiskHeatmap->riskRange->name ?? null,
+        ];
+
+        if ($request->residual_risk_satutahun_level_dampak && $request->residual_risk_satutahun_level_kemungkinan) {
+            $residualRiskSatutahunHeatmap = MstHeatmap::with('riskRange')
+                ->where('dampak', $request->residual_risk_satutahun_level_dampak)
+                ->where('kemungkinan', $request->residual_risk_satutahun_level_kemungkinan)
+                ->first();
+
+            if ($residualRiskSatutahunHeatmap) {
+                $updateData['residual_risk_satutahun_level_dampak'] = $request->residual_risk_satutahun_level_dampak;
+                $updateData['residual_risk_satutahun_level_kemungkinan'] = $request->residual_risk_satutahun_level_kemungkinan;
+                $updateData['residual_risk_satutahun_posisi_risiko'] = $residualRiskSatutahunHeatmap->result;
+                $updateData['residual_risk_satutahun_level_risiko'] = $residualRiskSatutahunHeatmap->riskRange->name ?? null;
+            }
+        }
+
+        // Update data
+        $data->update($updateData);
+
+        // Finalisasi langsung
+        $data->is_finalize = true;
+        $data->finalized_at = Carbon::now();
+        $data->finalized_by = auth()->id() ?? null;
+        $data->save();
+
+        // Load relationships
+        $data->load([
+            'realizationOption:id,name,position',
+            'targetOption:id,name,position',
+        ]);
+
+        $data->makeHidden([
+            'realization_option_position',
+            'target_option_position'
+        ]);
+
+                // Simpan file upload jika dikirim dari frontend
+        if ($request->has('uploaded_files')) {
+            foreach ($request->uploaded_files as $file) {
+                TrRiskMonthlyUpload::create([
+                    'header_id'        => $data->header_id,
+                    'risk_monthly_id'  => $data->id,
+                    'filepath'         => $file['filepath'],
+                    'domain'           => $file['domain'] ?? basename($file['filepath']),
+                    'is_confirmed'     => true,
+                ]);
+            }
+        }
+        DB::commit();
+
+        $warnings = [];
+        if ($data->month == 12 && $data->status_risiko === 'open') {
+            $warnings[] = "Risiko masih open di bulan Desember. Ini akan menjadi tindak lanjut di tahun berikutnya.";
+        }
+
+        $responseData = $data->toArray();
+        $responseData['id'] = $data->id;
+
+        return json(200, true, 'Berhasil Diperbarui & Difinalisasi', 'Data berhasil disimpan dan difinalisasi.', $responseData, $warnings);
+
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Diproses', 'Terjadi kesalahan sistem.', ['id' => $id, 'error' => $e->getMessage()]);
+    }
+}
 
 // Function 1: Update Residual Risk Data
 public function updateResidual(Request $request, $id)
@@ -240,6 +436,19 @@ public function updateResidual(Request $request, $id)
             'target_option_position'
         ]);
 
+                // Simpan file upload jika dikirim dari frontend
+        if ($request->has('uploaded_files')) {
+            foreach ($request->uploaded_files as $file) {
+                TrRiskMonthlyUpload::create([
+                    'header_id'        => $data->header_id,
+                    'risk_monthly_id'  => $data->id,
+                    'filepath'         => $file['filepath'],
+                    'domain'           => $file['domain'] ?? basename($file['filepath']),
+                    'is_confirmed'     => true,
+                ]);
+            }
+        }
+
         DB::commit();
 
         // Return with follow-up warning if December and still open
@@ -342,6 +551,18 @@ public function finalize(Request $request, $id)
             'targetOption:id,name,position',
         ]);
 
+        // Simpan file upload jika dikirim dari frontend
+if ($request->has('uploaded_files')) {
+    foreach ($request->uploaded_files as $file) {
+        TrRiskMonthlyUpload::create([
+            'header_id'        => $data->header_id,
+            'risk_monthly_id'  => $data->id,
+            'filepath'         => $file['filepath'],
+            'domain'           => $file['domain'] ?? basename($file['filepath']),
+            'is_confirmed'     => true,
+        ]);
+    }
+}
         DB::commit();
 
         $dataArray = $data->toArray();
@@ -413,6 +634,19 @@ public function finalize(Request $request, $id)
                 $monthly->finalized_by = auth()->id() ?? null;
                 $monthly->save();
                 $finalizedCount++;
+            }
+
+            // Simpan file upload jika dikirim dari frontend
+            if ($request->has('uploaded_files')) {
+                foreach ($request->uploaded_files as $file) {
+                    TrRiskMonthlyUpload::create([
+                        'header_id'        => $data->header_id,
+                        'risk_monthly_id'  => $data->id,
+                        'filepath'         => $file['filepath'],
+                        'domain'           => $file['domain'] ?? basename($file['filepath']),
+                        'is_confirmed'     => true,
+                    ]);
+                }
             }
 
             DB::commit();
@@ -661,6 +895,53 @@ public function finalize(Request $request, $id)
             'error' => $e->getMessage()
         ]);
     }
+}
+
+public function uploadDocument(Request $request, $monthlyId)
+{
+    $user = auth()->user();
+
+    $monthly = TrRiskMonthly::with('header')->find($monthlyId);
+    if (!$monthly) {
+        return json(404, false, 'Not Found', 'Data risk monthly tidak ditemukan.', null);
+    }
+
+    // Cegah upload jika sudah finalisasi
+    if ($monthly->is_finalize) {
+        return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', null);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'file' => 'required|file|max:5120|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
+        'domain' => 'nullable|string|max:255',
+    ]);
+
+    if ($validator->fails()) {
+        return json(400, false, 'Validasi Gagal', 'File tidak valid.', $validator->errors());
+    }
+
+    $uploadController = new UploadController();
+    $upload = $uploadController->singleUpload($request);
+
+    $response = $upload instanceof \Illuminate\Http\JsonResponse
+        ? json_decode($upload->getContent(), true)
+        : null;
+
+    if (!($response['status'] ?? false)) {
+        return $upload;
+    }
+
+    // File berhasil diupload ke storage, tapi belum disimpan di DB
+    $fileUrl = $response['data'];
+    $originalName = $request->file('file')->getClientOriginalName();
+
+    $responseData = [
+        'filepath' => $fileUrl,
+        'domain' => $request->domain ?? $originalName,
+        'filename' => basename($fileUrl),
+    ];
+
+    return json(200, true, 'Berhasil Upload', 'File berhasil diupload. Silakan simpan atau finalisasi untuk menyimpan file ini ke sistem.', $responseData);
 }
 
     public function checkFollowUpStatus($headerId)

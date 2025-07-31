@@ -376,4 +376,69 @@ class TrRiskHeaderController extends Controller
             return json(500, false, 'Gagal Dihapus', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
+
+public function monitoring(Request $request)
+{
+    $sortOrder = strtolower($request->get('sort', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+    $headers = TrRiskHeader::with(['monthlyData', 'department', 'riskCode', 'optionTargetSatuTahun'])
+        ->when($request->tahun, function ($q) use ($request) {
+            $q->where('year', $request->tahun);
+        })
+        ->when($request->peristiwa, function ($q) use ($request) {
+            $q->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
+        })
+        ->when($request->unit_kerja, function ($q) use ($request) {
+            $q->whereHas('department', function ($q2) use ($request) {
+                $q2->where('name', 'like', '%' . $request->unit_kerja . '%');
+            });
+        })
+        ->orderBy('year', $sortOrder)
+        ->get();
+
+    $data = $headers->map(function ($header) {
+        $monthly = [];
+
+        for ($i = 1; $i <= 12; $i++) {
+            $bulan = str_pad($i, 2, '0', STR_PAD_LEFT);
+            $dataBulanan = $header->monthlyData->firstWhere('month', $i);
+
+            if ($dataBulanan) {
+                $target = $dataBulanan->target_quantitative ?? 0;
+                $realization = $dataBulanan->realization_quantitative ?? 0;
+
+                $percentage = ($target > 0)
+                    ? round(($realization / $target) * 100, 2)
+                    : 0;
+
+                $monthly["bulan_$bulan"] = [
+                    'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
+                    'realization_percentage' => $percentage . '%',
+                    'is_finalized' => (bool) $dataBulanan->is_finalize,
+                ];
+            } else {
+                $monthly["bulan_$bulan"] = [
+                    'residual_risk_level' => null,
+                    'realization_percentage' => '0%',
+                    'is_finalized' => false,
+                ];
+            }
+        }
+
+        return [
+            'id' => $header->id,
+            'risk_code' => $header->riskCode->code ?? '-',
+            'tahun' => $header->year,
+            'peristiwa' => $header->peristiwa_risiko,
+            'inherent_risk_level' => $header->inherent_risk_level_risiko,
+            'target_risk_level' => $header->residual_target_level_risiko,
+            'target_option_name' => $header->target_satu_tahun_option_name,
+            'unit_kerja' => $header->department->name ?? '-',
+            'monthly' => $monthly,
+        ];
+    });
+
+    return json(200, true, 'Data Monitoring Risk Profile Bulanan', 'Data Monitoring', $data);
+}
+
 }

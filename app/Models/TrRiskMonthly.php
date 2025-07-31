@@ -18,6 +18,7 @@ class TrRiskMonthly extends Model
         'process_code',
         'start_date',
         'expired_date',
+        'is_confirmed',
 
         'realization_quantitative',
         'realization_option',

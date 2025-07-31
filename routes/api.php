@@ -234,7 +234,9 @@ Route::middleware(['auth:api'])->group(function () {
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'show']);
     Route::middleware([RoleAccessMiddleware::class . ':1'])->delete('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'destroy']);
     Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}/quantitative', [TrRiskMonthlyController::class, 'updateQuantitative']);
-    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('risk-monthly/{id}/update-residual', [TrRiskMonthlyController::class, 'updateResidual']);
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}/update-residual', [TrRiskMonthlyController::class, 'updateResidual']);
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}/update-residual-and-finalize', [TrRiskMonthlyController::class, 'updateResidualAndFinalize']);
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->post('/risk-monthly/{id}/upload', [TrRiskMonthlyController::class, 'uploadDocument']);
     // Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'update']);
 
     // ===================== ADDITIONAL ENDPOINTS YANG DIPERLUKAN =====================

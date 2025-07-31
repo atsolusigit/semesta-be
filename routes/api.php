@@ -213,6 +213,8 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/ri
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header/{id}', [TrRiskHeaderController::class, 'show']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->get('/risk-monitoring', [TrRiskHeaderController::class, 'monitoring']);
+
 
 // ===================== MITIGATION MONTHLY =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/mitigation-monthly', [TrMitigationMonthlyController::class, 'index']);

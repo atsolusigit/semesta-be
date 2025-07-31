@@ -2,6 +2,9 @@
 
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use App\Models\MstHeatmap;
+use App\Models\TrRiskMonthlyUpload;
 
 if (!function_exists('check_validation')) {
     /**
@@ -372,5 +375,394 @@ if (!function_exists('clean_monthly_data')) {
             ->toArray();
     }
 }
+
+if (!function_exists('generate_risk_monthly_dates')) {
+    /**
+     * Generate start_date dan expired_date untuk risk monthly berdasarkan year dan month
+     *
+     * @param int $year
+     * @param int $month
+     * @return array
+     */
+    function generate_risk_monthly_dates($year, $month)
+    {
+        return [
+            'start_date' => Carbon::create($year, $month, 1)->startOfMonth()->format('Y-m-d'),
+            'expired_date' => Carbon::create($year, $month, 1)->endOfMonth()->format('Y-m-d')
+        ];
+    }
+}
+
+if (!function_exists('validate_risk_monthly_dates')) {
+    /**
+     * Validasi tanggal untuk risk monthly
+     *
+     * @param object $request
+     * @param int $year
+     * @param int $month
+     * @return array
+     */
+    function validate_risk_monthly_dates($request, $year, $month)
+    {
+        if (!$request->start_date && !$request->expired_date) {
+            return ['valid' => true, 'message' => 'Valid - dates will be auto-generated'];
+        }
+
+        $expectedStartDate = Carbon::create($year, $month, 1)->startOfMonth();
+        $expectedEndDate = Carbon::create($year, $month, 1)->endOfMonth();
+
+        if ($request->start_date) {
+            $inputStartDate = Carbon::parse($request->start_date)->startOfMonth();
+            if (!$inputStartDate->isSameMonth($expectedStartDate)) {
+                return [
+                    'valid' => false,
+                    'message' => 'Start date harus dalam bulan ' . $expectedStartDate->format('F Y')
+                ];
+            }
+        }
+
+        if ($request->expired_date) {
+            $inputEndDate = Carbon::parse($request->expired_date)->endOfMonth();
+            if (!$inputEndDate->isSameMonth($expectedEndDate)) {
+                return [
+                    'valid' => false,
+                    'message' => 'Expired date harus dalam bulan ' . $expectedEndDate->format('F Y')
+                ];
+            }
+        }
+
+        return ['valid' => true, 'message' => 'Valid'];
+    }
+}
+
+if (!function_exists('should_process_yearly_residual_risk')) {
+    /**
+     * Cek apakah yearly residual risk fields harus diproses
+     *
+     * @param object $request
+     * @return bool
+     */
+    function should_process_yearly_residual_risk($request)
+    {
+        return !empty($request->residual_risk_satutahun_level_dampak) &&
+               !empty($request->residual_risk_satutahun_level_kemungkinan);
+    }
+}
+
+if (!function_exists('process_yearly_residual_risk')) {
+    /**
+     * Proses yearly residual risk calculation
+     *
+     * @param object $request
+     * @return array|null
+     */
+    function process_yearly_residual_risk($request)
+    {
+        $residualRiskSatutahunHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $request->residual_risk_satutahun_level_dampak)
+            ->where('kemungkinan', $request->residual_risk_satutahun_level_kemungkinan)
+            ->first();
+
+        if ($residualRiskSatutahunHeatmap) {
+            return [
+                'residual_risk_satutahun_level_dampak' => $request->residual_risk_satutahun_level_dampak,
+                'residual_risk_satutahun_level_kemungkinan' => $request->residual_risk_satutahun_level_kemungkinan,
+                'residual_risk_satutahun_posisi_risiko' => $residualRiskSatutahunHeatmap->result,
+                'residual_risk_satutahun_level_risiko' => $residualRiskSatutahunHeatmap->riskRange->name ?? null,
+            ];
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('process_risk_monthly_file_uploads')) {
+    /**
+     * Proses file uploads untuk risk monthly
+     *
+     * @param array $uploadedFiles
+     * @param object $monthly
+     * @return void
+     */
+    function process_risk_monthly_file_uploads($uploadedFiles, $monthly)
+    {
+        if (!is_array($uploadedFiles)) {
+            return;
+        }
+
+        foreach ($uploadedFiles as $file) {
+            if (!isset($file['filepath']) || empty($file['filepath'])) {
+                continue;
+            }
+
+            TrRiskMonthlyUpload::create([
+                'header_id' => $monthly->header_id,
+                'risk_monthly_id' => $monthly->id,
+                'filepath' => $file['filepath'],
+                'domain' => $file['domain'] ?? basename($file['filepath']),
+                'is_confirmed' => true,
+            ]);
+        }
+    }
+}
+
+if (!function_exists('validate_bulk_quantitative_data')) {
+    /**
+     * Validasi data kuantitatif untuk bulk update
+     *
+     * @param array $monthlyData
+     * @param bool $hasMonthField
+     * @param int $headerId
+     * @return array
+     */
+    function validate_bulk_quantitative_data($monthlyData, $hasMonthField, $headerId)
+    {
+        foreach ($monthlyData as $index => $monthData) {
+            // Cek target_quantitative null atau kosong
+            if (array_key_exists('target_quantitative', $monthData) && is_null($monthData['target_quantitative'])) {
+                return [
+                    'valid' => false,
+                    'title' => 'Target Quantitative Tidak Boleh Kosong',
+                    'message' => "Data pada index {$index} memiliki kuantitatif target yang kosong. Mohon isi dengan nilai yang valid.",
+                    'data' => [
+                        'header_id' => $headerId,
+                        'invalid_index' => $index,
+                        'month' => $hasMonthField ? ($monthData['month'] ?? 'unknown') : ($index + 1),
+                        'error_field' => 'target_quantitative',
+                        'current_value' => $monthData['target_quantitative']
+                    ]
+                ];
+            }
+
+            // Validasi target_quantitative harus berupa angka positif
+            if (isset($monthData['target_quantitative']) && !is_null($monthData['target_quantitative'])) {
+                if (!is_numeric($monthData['target_quantitative']) || $monthData['target_quantitative'] < 0) {
+                    return [
+                        'valid' => false,
+                        'title' => 'Target Quantitative Tidak Valid',
+                        'message' => "Data pada index {$index} memiliki target_quantitative yang tidak valid. Harus berupa angka positif.",
+                        'data' => [
+                            'header_id' => $headerId,
+                            'invalid_index' => $index,
+                            'month' => $hasMonthField ? ($monthData['month'] ?? 'unknown') : ($index + 1),
+                            'error_field' => 'target_quantitative',
+                            'current_value' => $monthData['target_quantitative']
+                        ]
+                    ];
+                }
+            }
+        }
+
+        return ['valid' => true];
+    }
+}
+
+if (!function_exists('process_bulk_monthly_data')) {
+    /**
+     * Proses data bulanan untuk bulk update
+     *
+     * @param array $monthlyData
+     * @param bool $hasMonthField
+     * @return array
+     */
+    function process_bulk_monthly_data($monthlyData, $hasMonthField)
+    {
+        $processedMonthlyData = [];
+
+        if ($hasMonthField) {
+            $processedMonthlyData = $monthlyData;
+        } else {
+            foreach ($monthlyData as $index => $monthData) {
+                $processedMonthlyData[] = array_merge(['month' => $index + 1], $monthData);
+            }
+        }
+
+        $requestedMonths = collect($processedMonthlyData)->pluck('month')->toArray();
+
+        return [
+            'monthly_data' => $processedMonthlyData,
+            'requested_months' => $requestedMonths,
+            'mode' => $hasMonthField ? 'explicit_month' : 'sequential_month'
+        ];
+    }
+}
+
+if (!function_exists('validate_bulk_monthly_constraints')) {
+    /**
+     * Validasi constraints untuk bulk monthly update
+     *
+     * @param array $processedMonthlyData
+     * @param object $existingMonthly
+     * @param bool $requireAllMonths
+     * @param int $headerId
+     * @return array
+     */
+    function validate_bulk_monthly_constraints($processedMonthlyData, $existingMonthly, $requireAllMonths, $headerId)
+    {
+        $requestedMonths = collect($processedMonthlyData)->pluck('month')->toArray();
+        $warnings = [];
+
+        // Check finalization
+        $finalizedMonths = [];
+        foreach ($processedMonthlyData as $monthData) {
+            $month = $monthData['month'];
+            if (isset($existingMonthly[$month]) && $existingMonthly[$month]->is_finalize) {
+                $finalizedMonths[] = $month;
+            }
+        }
+
+        if (!empty($finalizedMonths)) {
+            return [
+                'valid' => false,
+                'title' => 'Data Sudah Difinalisasi',
+                'message' => 'Bulan berikut sudah difinalisasi dan tidak bisa diubah: ' . implode(', ', $finalizedMonths),
+                'data' => [
+                    'header_id' => $headerId,
+                    'finalized_months' => $finalizedMonths
+                ]
+            ];
+        }
+
+        // Check for duplicate months
+        if (count($requestedMonths) !== count(array_unique($requestedMonths))) {
+            return [
+                'valid' => false,
+                'title' => 'Duplikasi Bulan',
+                'message' => 'Terdapat duplikasi bulan dalam data yang dikirim.',
+                'data' => [
+                    'header_id' => $headerId,
+                    'requested_months' => $requestedMonths
+                ]
+            ];
+        }
+
+        // Validate completeness if required
+        if ($requireAllMonths === true) {
+            $allMonths = range(1, 12);
+            $missingMonths = array_diff($allMonths, $requestedMonths);
+
+            if (!empty($missingMonths)) {
+                return [
+                    'valid' => false,
+                    'title' => 'Data Tidak Lengkap',
+                    'message' => 'Semua bulan (1-12) harus diisi. Bulan yang belum diisi: ' . implode(', ', $missingMonths),
+                    'data' => [
+                        'header_id' => $headerId,
+                        'missing_months' => $missingMonths,
+                        'provided_months' => $requestedMonths
+                    ]
+                ];
+            }
+        }
+
+        // Generate warnings for incomplete data
+        if (count($requestedMonths) < 12 && $requireAllMonths !== true) {
+            $allMonths = range(1, 12);
+            $missingMonths = array_diff($allMonths, $requestedMonths);
+            $warnings[] = 'Peringatan: Hanya ' . count($requestedMonths) . ' dari 12 bulan yang akan diupdate. Bulan yang tidak diupdate: ' . implode(', ', $missingMonths);
+        }
+
+        return [
+            'valid' => true,
+            'warnings' => $warnings
+        ];
+    }
+}
+
+if (!function_exists('validate_header_year')) {
+    /**
+     * Validasi tahun header
+     *
+     * @param int $year
+     * @return bool
+     */
+    function validate_header_year($year)
+    {
+        return $year && $year >= 1900 && $year <= 2100;
+    }
+}
+
+if (!function_exists('execute_bulk_quantitative_update')) {
+    /**
+     * Eksekusi bulk update kuantitatif
+     *
+     * @param array $processedMonthlyData
+     * @param object $existingMonthly
+     * @param object $header
+     * @param string $updateMode
+     * @return array
+     */
+    function execute_bulk_quantitative_update($processedMonthlyData, $existingMonthly, $header, $updateMode)
+    {
+        $updatedData = [];
+        $createdData = [];
+
+        foreach ($processedMonthlyData as $monthData) {
+            $month = $monthData['month'];
+
+            if (isset($existingMonthly[$month])) {
+                // Update existing data
+                $monthly = $existingMonthly[$month];
+
+                if ($updateMode === 'selective') {
+                    $updateData = [];
+
+                    if (array_key_exists('target_quantitative', $monthData)) {
+                        $updateData['target_quantitative'] = $monthData['target_quantitative'];
+                    }
+
+                    if (array_key_exists('target_notes', $monthData)) {
+                        $updateData['target_notes'] = $monthData['target_notes'];
+                    }
+
+                    if (!empty($updateData)) {
+                        $monthly->update($updateData);
+                    }
+                } else {
+                    // Complete mode: update all available fields
+                    $monthly->update([
+                        'target_quantitative' => $monthData['target_quantitative'],
+                        'target_notes' => $monthData['target_notes'] ?? null,
+                    ]);
+                }
+
+                $monthly->load('header');
+                $result = clean_monthly_data($monthly->toArray());
+                $updatedData[] = $result;
+
+            } else {
+                // Create new data with auto-generated dates
+                $autoGeneratedDates = generate_risk_monthly_dates($header->year, $month);
+
+                $createData = [
+                    'header_id' => $header->id,
+                    'month' => $month,
+                    'target_quantitative' => $monthData['target_quantitative'],
+                    'target_notes' => $monthData['target_notes'] ?? null,
+                    'is_finalize' => false,
+                    'status_risiko' => 'open',
+                    'start_date' => $autoGeneratedDates['start_date'],
+                    'expired_date' => $autoGeneratedDates['expired_date'],
+                ];
+
+                $monthly = \App\Models\TrRiskMonthly::create($createData);
+                $monthly->load('header');
+                $result = clean_monthly_data($monthly->toArray());
+                $createdData[] = $result;
+            }
+        }
+
+        return [
+            'header_id' => $header->id,
+            'updated_count' => count($updatedData),
+            'created_count' => count($createdData),
+            'updated_data' => $updatedData,
+            'created_data' => $createdData,
+            'total_processed' => count($updatedData) + count($createdData),
+            'update_mode' => $updateMode
+        ];
+    }
+}
+
 }
 

@@ -407,9 +407,10 @@ public function monitoring(Request $request)
                 $target = $dataBulanan->target_quantitative ?? 0;
                 $realization = $dataBulanan->realization_quantitative ?? 0;
 
-                $percentage = ($target > 0)
-                    ? round(($realization / $target) * 100, 2)
-                    : 0;
+                $percentage = ($realization > 0)
+                ? round(($target / $realization) * 100, 2)
+                : 0;
+
 
                 $monthly["bulan_$bulan"] = [
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
@@ -432,7 +433,7 @@ public function monitoring(Request $request)
             'peristiwa' => $header->peristiwa_risiko,
             'inherent_risk_level' => $header->inherent_risk_level_risiko,
             'target_risk_level' => $header->residual_target_level_risiko,
-            'target_option_name' => $header->target_satu_tahun_option_name,
+            'target_quantitative_satu_tahun' => $header->target_quantitative_satu_tahun,
             'unit_kerja' => $header->department->name ?? '-',
             'monthly' => $monthly,
         ];

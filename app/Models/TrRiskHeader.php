@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\MstHeatmap;
+
 
 class TrRiskHeader extends Model
 {
@@ -138,6 +140,25 @@ class TrRiskHeader extends Model
     {
         return $this->belongsTo(MstOption::class, 'target_satu_tahun_option', 'id');
     }
+
+   public function inherentHeatmapRange()
+{
+    return MstHeatmapRiskRange::where('start', '<=', $this->inherent_risk_posisi_risiko)
+        ->where('end', '>=', $this->inherent_risk_posisi_risiko)
+        ->first();
+}
+
+public function residualTargetHeatmapRange()
+{
+    return MstHeatmapRiskRange::where('start', '<=', $this->residual_target_posisi_risiko)
+        ->where('end', '>=', $this->residual_target_posisi_risiko)
+        ->first();
+}
+    public function residualHeatmap()
+    {
+        return $this->belongsTo(MstHeatmap::class, 'residual_risk_posisi_risiko', 'result');
+    }
+
 
     // =====================================
     // ACCESSORS

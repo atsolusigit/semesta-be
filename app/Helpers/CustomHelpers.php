@@ -763,6 +763,25 @@ if (!function_exists('execute_bulk_quantitative_update')) {
         ];
     }
 }
+if (!function_exists('get_color_by_position')) {
+    /**
+     * Get heatmap color by risk position.
+     *
+     * @param int|null $position
+     * @return string|null
+     */
+    function get_color_by_position($position)
+    {
+        if (!$position) {
+            return null;
+        }
 
+        $riskRange = \App\Models\MstHeatmapRiskRange::where('start', '<=', $position)
+            ->where('end', '>=', $position)
+            ->first();
+
+        return $riskRange ? $riskRange->color : null;
+    }
+}
 }
 

@@ -381,23 +381,32 @@ public function monitoring(Request $request)
 {
     $sortOrder = strtolower($request->get('sort', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-    $headers = TrRiskHeader::with(['monthlyData', 'department', 'riskCode', 'optionTargetSatuTahun'])
-        ->when($request->tahun, function ($q) use ($request) {
-            $q->where('year', $request->tahun);
-        })
-        ->when($request->peristiwa, function ($q) use ($request) {
-            $q->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
-        })
-        ->when($request->unit_kerja, function ($q) use ($request) {
-            $q->whereHas('department', function ($q2) use ($request) {
-                $q2->where('name', 'like', '%' . $request->unit_kerja . '%');
-            });
-        })
-        ->orderBy('year', $sortOrder)
-        ->get();
+    $headers = TrRiskHeader::with([
+        'monthlyData',
+        'department',
+        'riskCode',
+        'optionTargetSatuTahun'
+    ])
+    ->when($request->tahun, function ($q) use ($request) {
+        $q->where('year', $request->tahun);
+    })
+    ->when($request->peristiwa, function ($q) use ($request) {
+        $q->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
+    })
+    ->when($request->unit_kerja, function ($q) use ($request) {
+        $q->whereHas('department', function ($q2) use ($request) {
+            $q2->where('name', 'like', '%' . $request->unit_kerja . '%');
+        });
+    })
+    ->orderBy('year', $sortOrder)
+    ->get();
 
     $data = $headers->map(function ($header) {
         $monthly = [];
+
+        // Get inherent dan residual target colors
+        $inherentColor = get_color_by_position($header->inherent_risk_posisi_risiko);
+        $residualTargetColor = get_color_by_position($header->residual_target_posisi_risiko);
 
         for ($i = 1; $i <= 12; $i++) {
             $bulan = str_pad($i, 2, '0', STR_PAD_LEFT);
@@ -406,20 +415,23 @@ public function monitoring(Request $request)
             if ($dataBulanan) {
                 $target = $dataBulanan->target_quantitative ?? 0;
                 $realization = $dataBulanan->realization_quantitative ?? 0;
+                $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
 
-                $percentage = ($realization > 0)
-                ? round(($target / $realization) * 100, 2)
-                : 0;
-
+                // Get color untuk monthly data
+                $monthlyColor = get_color_by_position($dataBulanan->residual_risk_posisi_risiko);
 
                 $monthly["bulan_$bulan"] = [
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
+                    'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
+                    'residual_risk_posisi_risiko_color' => $monthlyColor,
                     'realization_percentage' => $percentage . '%',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
                 ];
             } else {
                 $monthly["bulan_$bulan"] = [
                     'residual_risk_level' => null,
+                    'residual_risk_posisi_risiko' => null,
+                    'residual_risk_posisi_risiko_color' => null,
                     'realization_percentage' => '0%',
                     'is_finalized' => false,
                 ];
@@ -432,7 +444,11 @@ public function monitoring(Request $request)
             'tahun' => $header->year,
             'peristiwa' => $header->peristiwa_risiko,
             'inherent_risk_level' => $header->inherent_risk_level_risiko,
+            'inherent_risk_posisi_risiko' => $header->inherent_risk_posisi_risiko,
+            'inherent_risk_posisi_risiko_color' => $inherentColor,
             'target_risk_level' => $header->residual_target_level_risiko,
+            'residual_target_posisi_risiko' => $header->residual_target_posisi_risiko,
+            'residual_target_posisi_risiko_color' => $residualTargetColor,
             'target_quantitative_satu_tahun' => $header->target_quantitative_satu_tahun,
             'unit_kerja' => $header->department->name ?? '-',
             'monthly' => $monthly,

@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\MstHeatmap;
+
 
 class TrRiskMonthly extends Model
 {
@@ -79,6 +81,17 @@ class TrRiskMonthly extends Model
         return $this->belongsTo(MstRiskCode::class, 'risk_code', 'id');
     }
 
+   public function residualHeatmap()
+    {
+        return $this->belongsTo(MstHeatmapRiskRange::class, 'residual_risk_posisi_risiko', 'id');
+    }
+
+    public function residualHeatmapRange()
+    {
+        return MstHeatmapRiskRange::where('start', '<=', $this->residual_risk_posisi_risiko)
+            ->where('end', '>=', $this->residual_risk_posisi_risiko)
+            ->first();
+    }
 
     // =====================================
     // HEATMAP RELATIONS (UPDATED)

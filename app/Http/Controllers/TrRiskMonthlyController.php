@@ -269,8 +269,32 @@ class TrRiskMonthlyController extends Controller
         $data->makeHidden(['realization_option_position', 'target_option_position']);
 
         $responseData = $data->toArray();
-        $responseData['id'] = $data->id;
-        $responseData['warnings'] = $warnings;
+        $responseData = [
+    'id' => $data->id,
+    'header_id' => $data->header_id,
+    'month' => $data->month,
+    'risk_code' => $data->risk_code,
+    'status_risiko' => $data->status_risiko,
+    'process_code' => $data->process_code,
+    'start_date' => $data->start_date,
+    'expired_date' => $data->expired_date,
+    'realization_quantitative' => $data->realization_quantitative,
+    'realization_note' => $data->realization_note,
+    'target_quantitative' => $data->target_quantitative,
+    'target_notes' => $data->target_notes,
+    'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
+    'residual_risk_level_kemungkinan' => $data->residual_risk_level_kemungkinan,
+    'residual_risk_posisi_risiko' => $data->residual_risk_posisi_risiko,
+    'residual_risk_level_risiko' => $data->residual_risk_level_risiko,
+    'residual_risk_level_risiko_color' => $residualRiskHeatmap->riskRange->color ?? null,
+    'is_finalize' => $data->is_finalize,
+    'finalized_at' => $data->finalized_at,
+    'finalized_by' => $data->finalized_by,
+    'created_at' => $data->created_at,
+    'updated_at' => $data->updated_at,
+    'header' => $data->header,
+    'warnings' => $warnings,
+];
 
         return json(200, true, 'Berhasil Diperbarui & Difinalisasi', 'Data berhasil disimpan dan difinalisasi.', $responseData, $warnings);
 
@@ -279,7 +303,6 @@ class TrRiskMonthlyController extends Controller
         return json(500, false, 'Gagal Diproses', 'Terjadi kesalahan sistem.', ['id' => $id, 'error' => $e->getMessage()]);
     }
 }
-
 
     public function updateResidual(Request $request, $id)
 {
@@ -396,8 +419,32 @@ class TrRiskMonthlyController extends Controller
         $data->makeHidden(['realization_option_position', 'target_option_position']);
 
         $responseData = $data->toArray();
-        $responseData['id'] = $data->id;
-        $responseData['warnings'] = $warnings;
+       $responseData = [
+    'id' => $data->id,
+    'header_id' => $data->header_id,
+    'month' => $data->month,
+    'risk_code' => $data->risk_code,
+    'status_risiko' => $data->status_risiko,
+    'process_code' => $data->process_code,
+    'start_date' => $data->start_date,
+    'expired_date' => $data->expired_date,
+    'realization_quantitative' => $data->realization_quantitative,
+    'realization_note' => $data->realization_note,
+    'target_quantitative' => $data->target_quantitative,
+    'target_notes' => $data->target_notes,
+    'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
+    'residual_risk_level_kemungkinan' => $data->residual_risk_level_kemungkinan,
+    'residual_risk_posisi_risiko' => $data->residual_risk_posisi_risiko,
+    'residual_risk_level_risiko' => $data->residual_risk_level_risiko,
+    'residual_risk_level_risiko_color' => $residualRiskHeatmap->riskRange->color ?? null,
+    'is_finalize' => $data->is_finalize,
+    'finalized_at' => $data->finalized_at,
+    'finalized_by' => $data->finalized_by,
+    'created_at' => $data->created_at,
+    'updated_at' => $data->updated_at,
+    'header' => $data->header,
+    'warnings' => $warnings,
+];
 
         return json(200, true, 'Berhasil Diperbarui', 'Data residual risk berhasil diperbarui.', $responseData, $warnings);
 

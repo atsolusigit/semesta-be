@@ -16,7 +16,7 @@ use App\Models\MstHeatmapKemungkinan;
 
 class TrRiskHeaderController extends Controller
 {
-   public function index()
+   public function index(Request $request)
 {
     $data = TrRiskHeader::with([
         'riskCode:id,name',
@@ -29,9 +29,21 @@ class TrRiskHeaderController extends Controller
         'monthlyData' => function($query) {
             $query->orderBy('month', 'asc');
         }
-    ])->orderBy('id', 'asc')->get();
+    ])
+    ->when($request->peristiwa, function ($query) use ($request) {
+        $query->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
+    })
+    ->when($request->unit_kerja, function ($query) use ($request) {
+        $query->whereHas('department', function ($q) use ($request) {
+            $q->where('name', 'like', '%' . $request->unit_kerja . '%');
+        });
+    })
+    ->when($request->tahun, function ($query) use ($request) {
+        $query->where('year', $request->tahun);
+    })
+    ->orderBy('id', 'asc')
+    ->get();
 
-    // Transform setiap item
     $orderedData = $data->map(function ($item) {
         return [
             'id' => $item->id,
@@ -48,7 +60,6 @@ class TrRiskHeaderController extends Controller
             'inherent_risk_level_risiko' => $item->inherent_risk_level_risiko,
             'internal_control' => $item->internal_control,
 
-            // Grup target satu tahun
             'target_satu_tahun_option' => $item->target_satu_tahun_option,
             'target_satu_tahun_option_name' => $item->target_satu_tahun_option_name,
             'target_satu_tahun_notes' => $item->target_satu_tahun_notes,
@@ -65,7 +76,6 @@ class TrRiskHeaderController extends Controller
             'created_at' => $item->created_at,
             'updated_at' => $item->updated_at,
 
-            // Relationships
             'ir_dampak' => $item->irDampak,
             'ir_kemungkinan' => $item->irKemungkinan,
             'rr_dampak' => $item->rrDampak,
@@ -77,6 +87,7 @@ class TrRiskHeaderController extends Controller
 
     return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $orderedData);
 }
+
     public function show($id)
 {
     $data = TrRiskHeader::with([
@@ -382,7 +393,7 @@ public function monitoring(Request $request)
     $sortOrder = strtolower($request->get('sort', 'desc')) === 'asc' ? 'asc' : 'desc';
 
     $headers = TrRiskHeader::with([
-        'monthlyData',
+        'monthlyData', // ambil semua data bulanan tanpa filter finalize
         'department',
         'riskCode',
         'optionTargetSatuTahun'
@@ -404,12 +415,10 @@ public function monitoring(Request $request)
     $data = $headers->map(function ($header) {
         $monthly = [];
 
-        // Get inherent dan residual target colors
         $inherentColor = get_color_by_position($header->inherent_risk_posisi_risiko);
         $residualTargetColor = get_color_by_position($header->residual_target_posisi_risiko);
 
         for ($i = 1; $i <= 12; $i++) {
-            $bulan = str_pad($i, 2, '0', STR_PAD_LEFT);
             $dataBulanan = $header->monthlyData->firstWhere('month', $i);
 
             if ($dataBulanan) {
@@ -417,18 +426,17 @@ public function monitoring(Request $request)
                 $realization = $dataBulanan->realization_quantitative ?? 0;
                 $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
 
-                // Get color untuk monthly data
-                $monthlyColor = get_color_by_position($dataBulanan->residual_risk_posisi_risiko);
-
-                $monthly["bulan_$bulan"] = [
+                $monthly[] = [
+                    'bulan' => $i,
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
                     'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
-                    'residual_risk_posisi_risiko_color' => $monthlyColor,
+                    'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                     'realization_percentage' => $percentage . '%',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
                 ];
             } else {
-                $monthly["bulan_$bulan"] = [
+                $monthly[] = [
+                    'bulan' => $i,
                     'residual_risk_level' => null,
                     'residual_risk_posisi_risiko' => null,
                     'residual_risk_posisi_risiko_color' => null,

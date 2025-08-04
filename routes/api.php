@@ -21,6 +21,7 @@ use App\Http\Controllers\TrRiskHeaderController;
 use App\Http\Controllers\TrRiskMonthlyController;
 use App\Http\Controllers\TrMitigationMonthlyController;
 use App\Http\Controllers\TrRiskMonthlyUploadController;
+use App\Http\Controllers\ExportRiskController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -229,6 +230,7 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/ri
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly-upload/{id}', [TrRiskMonthlyUploadController::class, 'show']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-upload/{id}', [TrRiskMonthlyUploadController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-monthly-upload/{id}', [TrRiskMonthlyUploadController::class, 'destroy']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->post('/risk-monthly-upload/temp', [TrRiskMonthlyUploadController::class, 'deleteTempFile']);
 
 // ===================== RISK MONTHLY =====================
 Route::middleware(['auth:api'])->group(function () {
@@ -259,4 +261,15 @@ Route::middleware(['auth:api'])->group(function () {
 
     // Endpoint untuk statistik data monthly
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/header/{headerId}/statistics', [TrRiskMonthlyController::class, 'getStatistics']);
+});
+
+// ===================== Export File =====================
+
+Route::middleware([RoleAccessMiddleware::class . ':1,2'])->group(function () {
+    Route::get('/export-risk/{id}/preview', [ExportRiskController::class, 'preview'])
+        ->where('id', '[0-9]+');
+
+    Route::get('/export-risk/{id}/{format}', [ExportRiskController::class, 'export'])
+        ->where(['id' => '[0-9]+', 'format' => 'pdf|excel']);
+
 });

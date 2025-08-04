@@ -9,7 +9,8 @@ COPY . /app
 RUN install-php-extensions \
     pcntl \
     zip \
-    pdo_mysql
+    pdo_mysql \
+    gd
 
 RUN curl -sS https://getcomposer.org/installer | php && \
     php composer.phar install --no-dev --optimize-autoloader

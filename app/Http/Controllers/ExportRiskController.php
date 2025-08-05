@@ -42,10 +42,12 @@ class ExportRiskController extends Controller
                 return $pdf->download($filename);
             }
 
-            if ($format === 'excel') {
+                    if ($format === 'excel') {
                 $filename = "Risk_Report_{$projectName}_{$unixTime}.xlsx";
                 $export = new RiskExport($header);
-                return Excel::download($export, $filename);
+                return Excel::download($export, $filename, \Maatwebsite\Excel\Excel::XLSX, [
+                    'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                ]);
             }
 
         } catch (\Exception $e) {

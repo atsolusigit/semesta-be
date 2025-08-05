@@ -22,24 +22,30 @@ class UploadController extends Controller
 
         if ($request->hasFile('file')) {
             $name_file = time() . '_' . Str::slug(pathinfo($request->file('file')->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $request->file('file')->getClientOriginalExtension();
-    
-            $path = Storage::disk('s3')->put('semesta',$request->file('file'),[
+
+            $path = Storage::disk('s3')->putFileAs('semesta', $request->file('file'), $name_file, [
                 'ACL' => 'public-read',
                 'visibility' => 'public',
             ]);
-    
+
             $url = Storage::disk('s3')->url($path);
-    
-            return json(200, 'true', 'success', 'upload successfully.', $url);
+
+            return json(200, true, 'Berhasil Upload', 'File berhasil diupload.', [
+                'filepath' => $url,
+                'domain' => $request->file('file')->getClientOriginalName(),
+                'filename' => basename($url),
+            ]);
         }
+
+        return json(400, false, 'Tidak ada file', 'Mohon unggah file.', null);
     }
 
     public function multipleUpload(Request $request)
     {
         //check validation
         $array_validation = [
-            'file' => 'required|array',
-            'file.*' => 'file|mimes:jpeg,jpg,png,gif|max:5120', // max 5MB per file
+            'file' => 'required|array|min:1',
+            'file.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:5120', // max 5MB per file
         ];
 
         if (check_validation($request->all(), $array_validation)[0] != 0) {
@@ -48,21 +54,26 @@ class UploadController extends Controller
         //check validation
 
         if ($request->hasFile('file')) {
-            $uploadedUrls = [];
-            foreach ($request->file('file') as $file) {
-                $name_file = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
-        
-                $path = Storage::disk('s3')->put('semesta',$file,[
+            $uploadedFiles = [];
+            foreach ($request->file('file') as $index => $file) {
+                $name_file = time() . '_' . $index . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
+
+                $path = Storage::disk('s3')->putFileAs('semesta', $file, $name_file, [
                     'ACL' => 'public-read',
                     'visibility' => 'public',
                 ]);
-        
+
                 $url = Storage::disk('s3')->url($path);
 
-                array_push($uploadedUrls, $url);
+                $uploadedFiles[] = [
+                    'filepath' => $url,
+                    'domain' => $file->getClientOriginalName(),
+                    'filename' => basename($url),
+                ];
             }
-    
-            return json(200, 'true', 'success', 'upload successfully.', $uploadedUrls);
+
+            return json(200, true, 'Berhasil Upload', 'Semua file berhasil diupload.', $uploadedFiles);
         }
+        return json(400, false, 'Tidak ada file', 'Mohon unggah minimal 1 file.', null);
     }
 }

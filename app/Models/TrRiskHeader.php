@@ -140,6 +140,10 @@ class TrRiskHeader extends Model
     {
         return $this->belongsTo(MstOption::class, 'target_satu_tahun_option', 'id');
     }
+    public function uploads(): HasMany
+    {
+        return $this->hasMany(TrRiskMonthlyUpload::class, 'header_id');
+    }
 
    public function inherentHeatmapRange()
 {

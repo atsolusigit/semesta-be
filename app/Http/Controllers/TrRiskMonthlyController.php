@@ -39,13 +39,13 @@ class TrRiskMonthlyController extends Controller
                 unset($arr['realization_option_position']);
             }
 
-            // Format uploads with filename
+            // Format uploads
             $arr['uploads'] = collect($item->uploads)->map(function ($upload) {
                 return [
                     'id' => $upload->id,
                     'filepath' => $upload->filepath,
                     'domain' => $upload->domain,
-                    'filename' => basename($upload->filepath),
+
                 ];
             });
 
@@ -86,7 +86,6 @@ class TrRiskMonthlyController extends Controller
                 'id' => $upload->id,
                 'filepath' => $upload->filepath,
                 'domain' => $upload->domain,
-                'filename' => basename($upload->filepath),
             ];
         });
 
@@ -128,7 +127,6 @@ class TrRiskMonthlyController extends Controller
                     'id' => $upload->id,
                     'filepath' => $upload->filepath,
                     'domain' => $upload->domain,
-                    'filename' => basename($upload->filepath),
                 ];
             });
             return $arr;
@@ -265,7 +263,7 @@ class TrRiskMonthlyController extends Controller
             $warnings[] = "Status Risiko masih open di bulan Desember. Ini akan menjadi tindak lanjut di tahun berikutnya.";
         }
 
-        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position']);
+        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position','uploads',]);
         $data->makeHidden(['realization_option_position', 'target_option_position']);
 
         $responseData = $data->toArray();
@@ -293,6 +291,12 @@ class TrRiskMonthlyController extends Controller
     'created_at' => $data->created_at,
     'updated_at' => $data->updated_at,
     'header' => $data->header,
+     'uploaded_files' => $data->uploads->map(function ($file) {
+                return [
+                    'filepath' => $file->filepath,
+                    'domain' => $file->domain,
+                ];
+            }),
     'warnings' => $warnings,
 ];
 
@@ -415,7 +419,7 @@ class TrRiskMonthlyController extends Controller
             $warnings[] = 'Perhatian: Status Risiko masih open di bulan Desember. Ini akan menjadi tindak lanjut di tahun berikutnya.';
         }
 
-        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position']);
+        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position','uploads',]);
         $data->makeHidden(['realization_option_position', 'target_option_position']);
 
         $responseData = $data->toArray();
@@ -443,6 +447,12 @@ class TrRiskMonthlyController extends Controller
     'created_at' => $data->created_at,
     'updated_at' => $data->updated_at,
     'header' => $data->header,
+    'uploaded_files' => $data->uploads->map(function ($file) {
+                return [
+                    'filepath' => $file->filepath,
+                    'domain' => $file->domain,
+                ];
+            }),
     'warnings' => $warnings,
 ];
 
@@ -711,54 +721,90 @@ class TrRiskMonthlyController extends Controller
         }
     }
 
-    public function uploadDocument(Request $request, $monthlyId)
-    {
-        $monthly = TrRiskMonthly::with('header')->find($monthlyId);
-        if (!$monthly) {
-            return json(404, false, 'Not Found', 'Data risk monthly tidak ditemukan.', null);
-        }
+   public function uploadDocument(Request $request, $monthlyId)
+{
+    $monthly = TrRiskMonthly::with('header')->find($monthlyId);
+    if (!$monthly) {
+        return json(404, false, 'Not Found', 'Data risk monthly tidak ditemukan.', null);
+    }
 
-        if ($monthly->is_finalize) {
-            return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', null);
-        }
+    if ($monthly->is_finalize) {
+        return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', null);
+    }
 
-        $validationRules = [
+    // Deteksi apakah file tunggal atau array
+    $files = $request->file('file');
+    $isMultiple = is_array($files);
+
+    // Validasi
+    $validationRules = $isMultiple
+        ? [
+            'file' => 'required|array',
+            'file.*' => 'file|max:5120|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
+            'domain' => 'nullable|string|max:255',
+        ]
+        : [
             'file' => 'required|file|max:5120|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
             'domain' => 'nullable|string|max:255',
         ];
 
-        $validation = check_validation($request->all(), $validationRules);
-        if ($validation[0] == 1) {
-            return $validation[1];
-        }
-
-        try {
-            $uploadController = new UploadController();
-            $upload = $uploadController->singleUpload($request);
-
-            $response = $upload instanceof \Illuminate\Http\JsonResponse
-                ? json_decode($upload->getContent(), true)
-                : null;
-
-            if (!($response['status'] ?? false)) {
-                return $upload;
-            }
-
-            $fileUrl = $response['data'];
-            $originalName = $request->file('file')->getClientOriginalName();
-
-            $responseData = [
-                'filepath' => $fileUrl,
-                'domain' => $request->domain ?? $originalName,
-                'filename' => basename($fileUrl),
-            ];
-
-            return json(200, true, 'Berhasil Upload', 'File berhasil diupload. Silakan simpan atau finalisasi untuk menyimpan file ini ke sistem.', $responseData);
-
-        } catch (\Throwable $e) {
-            return json(500, false, 'Gagal Upload', 'Terjadi kesalahan saat upload file.', $e->getMessage());
-        }
+    $validation = check_validation($request->all(), $validationRules);
+    if ($validation[0] === 1) {
+        return $validation[1];
     }
+
+    try {
+        $uploadController = new UploadController();
+
+        if ($isMultiple) {
+            $upload = $uploadController->multipleUpload($request);
+        } else {
+            $upload = $uploadController->singleUpload($request);
+        }
+
+        $response = $upload instanceof \Illuminate\Http\JsonResponse
+            ? json_decode($upload->getContent(), true)
+            : null;
+
+        if (!($response['status'] ?? false)) {
+            return $upload;
+        }
+
+        // Format response
+        $responseData = [];
+
+if ($isMultiple) {
+    $responseData = [];
+    foreach ($response['data'] as $item) {
+        $responseData[] = [
+            'filepath' => $item['filepath'],
+            'domain' => $item['domain'],
+
+        ];
+    }
+} else {
+    $item = $response['data'];
+    $responseData = [
+        'filepath' => $item['filepath'],
+        'domain' => $item['domain'],
+
+    ];
+}
+
+        return json(
+            200,
+            true,
+            'Berhasil Upload',
+            $isMultiple
+                ? 'Semua file berhasil diupload. Silakan simpan atau finalisasi untuk menyimpan file ke sistem.'
+                : 'File berhasil diupload. Silakan simpan atau finalisasi untuk menyimpan file ke sistem.',
+            $responseData
+        );
+
+    } catch (\Throwable $e) {
+        return json(500, false, 'Gagal Upload', 'Terjadi kesalahan saat upload file.', $e->getMessage());
+    }
+}
 
     public function checkFollowUpStatus($headerId)
     {

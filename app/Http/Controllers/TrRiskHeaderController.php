@@ -27,7 +27,7 @@ class TrRiskHeaderController extends Controller
         'department:id,name',
         'optionTargetSatuTahun:id,name,position',
         'monthlyData' => function($query) {
-            $query->orderBy('month', 'asc');
+            $query->orderBy('month', 'asc')->with('uploads');
         }
     ])
     ->when($request->peristiwa, function ($query) use ($request) {
@@ -70,6 +70,7 @@ class TrRiskHeaderController extends Controller
                     'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                     'realization_percentage' => $percentage . '%',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
+                    'monthly_data' => $dataBulanan,
                 ];
             } else {
                 $monthly[] = [
@@ -79,9 +80,19 @@ class TrRiskHeaderController extends Controller
                     'residual_risk_posisi_risiko_color' => null,
                     'realization_percentage' => '0%',
                     'is_finalized' => false,
+                    'monthly_data' => null,
                 ];
             }
         }
+
+        // Format uploads
+        $headerUploads = $item->uploads->map(function ($upload) {
+            return [
+                'id' => $upload->id,
+                'filepath' => $upload->filepath,
+                'domain' => $upload->domain,
+            ];
+        });
 
         return [
             'id' => $item->id,
@@ -124,13 +135,14 @@ class TrRiskHeaderController extends Controller
             'department' => $item->department ?? null,
             'monthly_data' => $item->monthlyData ?? collect([]),
             'monthly' => $monthly,
+            'uploads' => $headerUploads,
         ];
     });
 
     return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $orderedData);
 }
 
-    public function show($id)
+   public function show($id)
 {
     $data = TrRiskHeader::with([
         'riskCode:id,name',
@@ -141,7 +153,7 @@ class TrRiskHeaderController extends Controller
         'department:id,name',
         'optionTargetSatuTahun:id,name,position',
         'monthlyData' => function($query) {
-            $query->orderBy('month', 'asc');
+            $query->orderBy('month', 'asc')->with('uploads');
         }
     ])->find($id);
 
@@ -173,6 +185,7 @@ class TrRiskHeaderController extends Controller
                 'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                 'realization_percentage' => $percentage . '%',
                 'is_finalized' => (bool) $dataBulanan->is_finalize,
+                'monthly_data' => $dataBulanan,
             ];
         } else {
             $monthly[] = [
@@ -182,11 +195,12 @@ class TrRiskHeaderController extends Controller
                 'residual_risk_posisi_risiko_color' => null,
                 'realization_percentage' => '0%',
                 'is_finalized' => false,
+                'monthly_data' => null,
             ];
         }
     }
 
-    // Transform untuk mengatur urutan field
+    //  mengatur urutan field
     $orderedData = [
         'id' => $data->id,
         'risk_code' => $data->riskCode ?? null,
@@ -453,7 +467,6 @@ class TrRiskHeaderController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
         }
 
-
         $finalizedMonthly = TrRiskMonthly::where('header_id', $id)
             ->where('is_finalize', true)
             ->exists();
@@ -475,7 +488,9 @@ public function monitoring(Request $request)
     $sortOrder = strtolower($request->get('sort', 'desc')) === 'asc' ? 'asc' : 'desc';
 
     $headers = TrRiskHeader::with([
-        'monthlyData', // ambil semua data bulanan tanpa filter finalize
+        'monthlyData' => function($query) {
+            $query->orderBy('month', 'asc')->with('uploads');
+        },
         'department',
         'riskCode',
         'optionTargetSatuTahun'
@@ -515,6 +530,7 @@ public function monitoring(Request $request)
                     'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                     'realization_percentage' => $percentage . '%',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
+                    'monthly_data' => $dataBulanan,
                 ];
             } else {
                 $monthly[] = [
@@ -524,6 +540,7 @@ public function monitoring(Request $request)
                     'residual_risk_posisi_risiko_color' => null,
                     'realization_percentage' => '0%',
                     'is_finalized' => false,
+                    'monthly_data' => null,
                 ];
             }
         }

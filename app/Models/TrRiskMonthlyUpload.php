@@ -10,6 +10,7 @@ class TrRiskMonthlyUpload extends Model
     protected $fillable = [
         'header_id',
         'risk_monthly_id',
+        'risk_monthly_entry_id',
         'filepath',
         'domain',
     ];

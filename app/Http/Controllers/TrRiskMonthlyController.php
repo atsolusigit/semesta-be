@@ -16,63 +16,162 @@ use Carbon\Carbon;
 class TrRiskMonthlyController extends Controller
 {
     public function index()
-    {
-        $data = TrRiskMonthly::with([
-            'header',
-            'riskCode:id,name',
-            'rrLevelDampak',
-            'rrLevelKemungkinan',
-            'rrYearLevelDampak',
-            'rrYearLevelKemungkinan',
-            'mitigations',
-            'uploads',
-        ])->orderBy('header_id')->orderBy('month')->get();
+{
+    $data = TrRiskMonthly::with([
+        'header',
+        'riskCode:id,name',
+        'rrLevelDampak',
+        'rrLevelKemungkinan',
+        'rrYearLevelDampak',
+        'rrYearLevelKemungkinan',
+        'mitigations',
+        'uploads',
+        'entriesResidual.optionDampak:id,label,color',
+        'entriesResidual.optionKemungkinan:id,label,color',
+        'entriesQuantitative',
+    ])
+    ->orderBy('header_id')
+    ->orderBy('month')
+    ->get();
 
-        $cleaned = $data->map(function ($item) {
-            $arr = collect($item)->toArray();
+    $cleaned = $data->map(function ($item) {
+        $arr = collect($item)->toArray();
 
-            // Remove null optional fields
-            if (is_null($arr['target_option_position'] ?? null)) {
-                unset($arr['target_option_position']);
-            }
-            if (is_null($arr['realization_option_position'] ?? null)) {
-                unset($arr['realization_option_position']);
-            }
-
-            // Format uploads
-            $arr['uploads'] = collect($item->uploads)->map(function ($upload) {
-                return [
-                    'id' => $upload->id,
-                    'filepath' => $upload->filepath,
-                    'domain' => $upload->domain,
-
-                ];
-            });
-
-            return $arr;
-        });
-
-        return json(200, true, 'List data', 'Data risk monthly berhasil diambil.', $cleaned);
-    }
-
-    public function show($id)
-    {
-        $data = TrRiskMonthly::with([
-            'header',
-            'riskCode:id,name',
-            'rrLevelDampak',
-            'rrLevelKemungkinan',
-            'rrYearLevelDampak',
-            'rrYearLevelKemungkinan',
-            'mitigations',
-            'uploads',
-        ])->find($id);
-
-        if (!$data) {
-            return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
+        // Remove null optional fields
+        if (is_null($arr['target_option_position'] ?? null)) {
+            unset($arr['target_option_position']);
+        }
+        if (is_null($arr['realization_option_position'] ?? null)) {
+            unset($arr['realization_option_position']);
         }
 
-        $arr = collect($data)->toArray();
+        // Format uploads
+        $arr['uploaded_files'] = collect($item['uploads'])->map(function ($upload) {
+            return [
+                'id' => $upload['id'],
+                'filepath' => $upload['filepath'],
+                'domain' => $upload['domain'],
+            ];
+        });
+
+        // Format entries_residual jika ada
+        $arr['residual_data'] = collect($item['entries_residual'] ?? [])->map(function ($entry) {
+            return [
+                'dampak_id' => $entry['dampak_id'],
+                'kemungkinan_id' => $entry['kemungkinan_id'],
+                'option_dampak' => $entry['option_dampak'] ?? null,
+                'option_kemungkinan' => $entry['option_kemungkinan'] ?? null,
+                'created_at' => $entry['created_at'],
+            ];
+        });
+
+        // Format entries_quantitative jika ada
+        $arr['quantitative_data'] = collect($item['entries_quantitative'] ?? [])->map(function ($entry) {
+            return [
+                'id' => $entry['id'],
+                'target_quantitative' => $entry['target'],
+                'realization_quantitative' => $entry['realization'],
+                'target_notes' => $entry['target_notes'],
+                'realization_notes' => $entry['realization_notes'],
+                'created_at' => $entry['created_at'],
+            ];
+        });
+
+        return $arr;
+    });
+
+    return json(200, true, 'List data', 'Data risk monthly berhasil diambil.', $cleaned);
+}
+
+    public function show($id)
+{
+    $data = TrRiskMonthly::with([
+        'header',
+        'riskCode:id,name',
+        'rrLevelDampak',
+        'rrLevelKemungkinan',
+        'rrYearLevelDampak',
+        'rrYearLevelKemungkinan',
+        'mitigations',
+        'uploads',
+        'entry',
+        'entry.quantitative',
+        'entry.residual',
+        'entry.uploads',
+    ])->find($id);
+
+    if (!$data) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
+    }
+
+    $arr = collect($data)->toArray();
+
+    // Bersihkan field opsional jika null
+    if (is_null($arr['target_option_position'] ?? null)) {
+        unset($arr['target_option_position']);
+    }
+    if (is_null($arr['realization_option_position'] ?? null)) {
+        unset($arr['realization_option_position']);
+    }
+
+    // Ambil data uploads dari entry.uploads
+    $arr['uploaded_files'] = collect($data->entry?->uploads ?? [])->map(function ($upload) {
+        return [
+            'filepath' => $upload->filepath,
+            'domain' => $upload->domain,
+        ];
+    });
+
+    // Ambil data quantitative
+    $arr['quantitative'] = [
+        'target_quantitative' => $data->entry?->quantitative->target_quantitative,
+        'target_notes' => $data->entry?->quantitative->target_notes,
+        'realization_quantitative' => $data->entry?->quantitative->realization_quantitative,
+        'realization_notes' => $data->entry?->quantitative->realization_notes,
+    ];
+
+    // Ambil data residual
+    $arr['residual'] = [
+        'status_risiko' => $data->entry?->residual->status_risiko,
+        'residual_risk_level_dampak' => $data->entry?->residual->residual_risk_level_dampak,
+        'residual_risk_level_kemungkinan' => $data->entry?->residual->residual_risk_level_kemungkinan,
+    ];
+
+    $monthNames = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+    ];
+    $arr['month_name'] = $monthNames[$data->month] . ' ' . ($data->year ?? ($data->header->year ?? ''));
+
+    return json(200, true, 'Data Ditemukan', 'Detail data risk monthly berhasil diambil.', $arr);
+}
+
+
+    public function getByHeader($headerId)
+{
+    $header = TrRiskHeader::find($headerId);
+    if (!$header) {
+        return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+    }
+
+    $data = TrRiskMonthly::with([
+        'header',
+        'riskCode:id,name',
+        'rrLevelDampak',
+        'rrLevelKemungkinan',
+        'rrYearLevelDampak',
+        'rrYearLevelKemungkinan',
+        'mitigations',
+        'uploads',
+        'residualEntries',
+        'quantitativeEntries',
+    ])->where('header_id', $headerId)
+      ->orderBy('month')
+      ->get();
+
+    $cleaned = $data->map(function ($item) {
+        $arr = collect($item)->toArray();
 
         if (is_null($arr['target_option_position'] ?? null)) {
             unset($arr['target_option_position']);
@@ -81,7 +180,8 @@ class TrRiskMonthlyController extends Controller
             unset($arr['realization_option_position']);
         }
 
-        $arr['uploads'] = collect($data->uploads)->map(function ($upload) {
+        // Map uploads
+        $arr['uploads'] = collect($item->uploads)->map(function ($upload) {
             return [
                 'id' => $upload->id,
                 'filepath' => $upload->filepath,
@@ -89,57 +189,35 @@ class TrRiskMonthlyController extends Controller
             ];
         });
 
-        return json(200, true, 'Data Ditemukan', 'Detail data risk monthly berhasil diambil.', $arr);
-    }
-
-    public function getByHeader($headerId)
-    {
-        $header = TrRiskHeader::find($headerId);
-        if (!$header) {
-            return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
-        }
-
-        $data = TrRiskMonthly::with([
-            'header',
-            'riskCode:id,name',
-            'rrLevelDampak',
-            'rrLevelKemungkinan',
-            'rrYearLevelDampak',
-            'rrYearLevelKemungkinan',
-            'mitigations',
-            'uploads',
-        ])->where('header_id', $headerId)
-          ->orderBy('month')
-          ->get();
-
-        $cleaned = $data->map(function ($item) {
-            $arr = collect($item)->toArray();
-
-            if (is_null($arr['target_option_position'] ?? null)) {
-                unset($arr['target_option_position']);
-            }
-            if (is_null($arr['realization_option_position'] ?? null)) {
-                unset($arr['realization_option_position']);
-            }
-
-            $arr['uploads'] = collect($item->uploads)->map(function ($upload) {
-                return [
-                    'id' => $upload->id,
-                    'filepath' => $upload->filepath,
-                    'domain' => $upload->domain,
-                ];
-            });
-            return $arr;
+        // Map residual entries
+        $arr['residual_entries'] = collect($item->residualEntries)->map(function ($entry) {
+            return [
+                'id' => $entry->id,
+                'field' => $entry->field,
+                'value' => $entry->value,
+            ];
         });
 
-        $followUpInfo = get_follow_up_info($header, $cleaned);
+        // Map quantitative entries
+        $arr['quantitative_entries'] = collect($item->quantitativeEntries)->map(function ($entry) {
+            return [
+                'id' => $entry->id,
+                'field' => $entry->field,
+                'value' => $entry->value,
+            ];
+        });
 
-        return json(200, true, 'Data Ditemukan', 'Data monthly untuk header berhasil diambil.', [
-            'header' => $header,
-            'monthly_data' => $cleaned,
-            'follow_up_info' => $followUpInfo
-        ]);
-    }
+        return $arr;
+    });
+
+    $followUpInfo = get_follow_up_info($header, $cleaned);
+
+    return json(200, true, 'Data Ditemukan', 'Data monthly untuk header berhasil diambil.', [
+        'header' => $header,
+        'monthly_data' => $cleaned,
+        'follow_up_info' => $followUpInfo
+    ]);
+}
 
     public function updateResidualAndFinalize(Request $request, $id)
 {
@@ -148,8 +226,8 @@ class TrRiskMonthlyController extends Controller
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
     }
 
-    if ($data->is_finalize) {
-        return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', ['id' => $id]);
+   if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
+        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
     }
 
     // Validasi semua bulan sebelumnya harus sudah difinalisasi
@@ -193,7 +271,7 @@ class TrRiskMonthlyController extends Controller
 
     $dateValidation = validate_risk_monthly_dates($request, $data->header->year, $data->month);
     if (!$dateValidation['valid']) {
-        return json(422, false, 'Validasi Gagal', $dateValidation['message'], ['id' => $id]);
+        return json(400, false, 'Validasi Gagal', $dateValidation['message'], ['id' => $id]);
     }
 
     DB::beginTransaction();
@@ -293,6 +371,7 @@ class TrRiskMonthlyController extends Controller
     'header' => $data->header,
      'uploaded_files' => $data->uploads->map(function ($file) {
                 return [
+                    'id' => $file->id,
                     'filepath' => $file->filepath,
                     'domain' => $file->domain,
                 ];
@@ -310,14 +389,15 @@ class TrRiskMonthlyController extends Controller
 
     public function updateResidual(Request $request, $id)
 {
-    $data = TrRiskMonthly::with('header')->find($id);
+      $data = TrRiskMonthly::with('header')->find($id);
     if (!$data) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
     }
 
-    if ($data->is_finalize) {
-        return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', ['id' => $id]);
+    if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
+        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', ['id' => $id]);
     }
+
 
     // Validasi semua bulan sebelumnya harus sudah difinalisasi
     if ($data->month > 1) {
@@ -361,7 +441,7 @@ class TrRiskMonthlyController extends Controller
     // Validasi tanggal sesuai tahun & bulan
     $dateValidation = validate_risk_monthly_dates($request, $data->header->year, $data->month);
     if (!$dateValidation['valid']) {
-        return json(422, false, 'Validasi Gagal', $dateValidation['message'], ['id' => $id]);
+        return json(400, false, 'Validasi Gagal', $dateValidation['message'], ['id' => $id]);
     }
 
     DB::beginTransaction();
@@ -449,6 +529,7 @@ class TrRiskMonthlyController extends Controller
     'header' => $data->header,
     'uploaded_files' => $data->uploads->map(function ($file) {
                 return [
+                    'id' => $file->id,
                     'filepath' => $file->filepath,
                     'domain' => $file->domain,
                 ];
@@ -467,93 +548,111 @@ class TrRiskMonthlyController extends Controller
     }
 }
 
-    public function updateQuantitative(Request $request, $id)
-    {
-        $monthly = TrRiskMonthly::with('header')->find($id);
-        if (!$monthly) {
-            return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
-        }
-
-        if ($monthly->is_finalize) {
-            return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa diubah.', null);
-        }
-
-        $validationRules = [
-            'target_quantitative' => 'required|numeric',
-            'target_notes' => 'nullable|string',
-        ];
-
-        $validation = check_validation($request->all(), $validationRules);
-        if ($validation[0] == 1) {
-            return $validation[1];
-        }
-
-        DB::beginTransaction();
-        try {
-            $monthly->update([
-                'target_quantitative' => $request->target_quantitative,
-                'target_notes' => $request->target_notes,
-            ]);
-
-            DB::commit();
-
-            $monthly->load('header');
-            $result = clean_monthly_data($monthly->toArray());
-
-            return json(200, true, 'Berhasil Diupdate', 'Data target kuantitatif berhasil diupdate.', $result);
-
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan pada sistem.', $e->getMessage());
-        }
+  public function updateQuantitative(Request $request, $id)
+{
+     $monthly = TrRiskMonthly::with('header.uploads')->find($id);
+    if (!$monthly) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
     }
+
+    if ($monthly->is_finalize || $monthly->entries()->where('is_finalize', true)->exists()) {
+        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
+    }
+
+    $validationRules = [
+        'target_quantitative' => 'required|numeric',
+        'target_notes' => 'nullable|string',
+    ];
+
+
+    $validation = check_validation($request->all(), $validationRules);
+    if ($validation[0] == 1) {
+        return $validation[1];
+    }
+
+    DB::beginTransaction();
+    try {
+
+        $monthly->update([
+            'target_quantitative' => $request->target_quantitative,
+            'target_notes' => $request->target_notes,
+        ]);
+
+        DB::commit();
+
+        $monthly->load('header.uploads');
+        $result = clean_monthly_data($monthly->toArray());
+        $monthlyUploads = $monthly->header->uploads ? $monthly->header->uploads->where('risk_monthly_id', $monthly->id) : collect([]);
+
+        $result['uploaded_files'] = $monthlyUploads->count() > 0
+            ? $monthlyUploads->map(function ($file) {
+                return [
+                     'id' => $file->id,
+                    'filepath' => $file->filepath,
+                    'domain' => $file->domain,
+                ];
+            })->toArray()
+            : [];
+        if (isset($result['header']['uploads'])) {
+            unset($result['header']['uploads']);
+        }
+
+        return json(200, true, 'Berhasil Diupdate', 'Data target kuantitatif berhasil diupdate.', $result);
+
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan pada sistem.', $e->getMessage());
+    }
+}
 
     public function finalize(Request $request, $id)
-    {
-        $data = TrRiskMonthly::with('header')->find($id);
-        if (!$data) {
-            return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
-        }
-
-        if ($data->is_finalize) {
-            return json(400, false, 'Sudah Difinalisasi', 'Data sudah difinalisasi sebelumnya.', null);
-        }
-
-        $validationResult = validate_monthly_data_for_finalization($data);
-        if (!$validationResult['valid']) {
-            return json(400, false, 'Data Tidak Lengkap', $validationResult['message'], $validationResult['missing_fields']);
-        }
-
-        DB::beginTransaction();
-        try {
-            $data->is_finalize = true;
-            $data->finalized_at = Carbon::now();
-            $data->finalized_by = auth()->id() ?? null;
-            $data->save();
-
-            $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position']);
-
-            // Handle file uploads
-            if ($request->has('uploaded_files')) {
-                process_risk_monthly_file_uploads($request->uploaded_files, $data);
-            }
-
-            DB::commit();
-
-            $dataArray = clean_monthly_data($data->toArray());
-
-            $warnings = [];
-            if ($data->month == 12 && $data->status_risiko === 'open') {
-                $warnings[] = "Risiko di bulan Desember masih open. Ini akan menjadi tindak lanjut di tahun " . ($data->header->year + 1);
-            }
-
-            return json(200, true, 'Berhasil Difinalisasi', 'Data risk monthly berhasil difinalisasi.', $dataArray, $warnings);
-
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return json(500, false, 'Gagal Difinalisasi', 'Terjadi kesalahan sistem.', $e->getMessage());
-        }
+{
+    $data = TrRiskMonthly::with('header')->find($id);
+    if (!$data) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
     }
+
+    // Cek apakah data monthly atau entry-nya sudah difinalisasi
+    if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
+        return json(400, false, 'Tidak Bisa Finalisasi', 'Data sudah difinalisasi sebelumnya dari sisi bulanan atau entry.', null);
+    }
+
+    // Validasi kelengkapan data sebelum finalisasi
+    $validationResult = validate_monthly_data_for_finalization($data);
+    if (!$validationResult['valid']) {
+        return json(400, false, 'Data Tidak Lengkap', $validationResult['message'], $validationResult['missing_fields']);
+    }
+
+    DB::beginTransaction();
+    try {
+        $data->is_finalize = true;
+        $data->finalized_at = Carbon::now();
+        $data->finalized_by = auth()->id() ?? null;
+        $data->save();
+
+        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position']);
+
+        // Handle file uploads jika ada
+        if ($request->has('uploaded_files')) {
+            process_risk_monthly_file_uploads($request->uploaded_files, $data);
+        }
+
+        DB::commit();
+
+        $dataArray = clean_monthly_data($data->toArray());
+
+        $warnings = [];
+        if ($data->month == 12 && $data->status_risiko === 'open') {
+            $warnings[] = "Risiko di bulan Desember masih open. Ini akan menjadi tindak lanjut di tahun " . ($data->header->year + 1);
+        }
+
+        return json(200, true, 'Berhasil Difinalisasi', 'Data risk monthly berhasil difinalisasi.', $dataArray, $warnings);
+
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Difinalisasi', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
 
     public function finalizeAll(Request $request, $headerId)
     {
@@ -619,107 +718,146 @@ class TrRiskMonthlyController extends Controller
     }
 
     public function bulkUpdateQuantitative(Request $request, $headerId)
-    {
-        $header = TrRiskHeader::find($headerId);
-        if (!$header) {
-            return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', ['header_id' => $headerId]);
+{
+   $header = TrRiskHeader::find($headerId);
+    if (!$header) {
+        return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', ['header_id' => $headerId]);
+    }
+
+    if (empty($request->monthly_data)) {
+        return json(400, false, 'Data Kosong', 'Data perbulan tidak boleh kosong.', ['header_id' => $headerId]);
+    }
+
+    $finalized = $header->monthly()->where(function ($query) {
+        $query->where('is_finalize', true)
+              ->orWhereHas('entries', function ($q) {
+                  $q->where('is_finalize', true);
+              });
+    })->exists();
+
+    if ($finalized) {
+        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
+    }
+
+    $hasMonthField = collect($request->monthly_data)->first() && isset(collect($request->monthly_data)->first()['month']);
+
+    $bulkValidation = validate_bulk_quantitative_data($request->monthly_data, $hasMonthField, $headerId);
+    if (!$bulkValidation['valid']) {
+        return json(400, false, $bulkValidation['title'], $bulkValidation['message'], $bulkValidation['data']);
+    }
+
+    if ($hasMonthField) {
+        $validationRules = [
+            'monthly_data' => 'required|array|min:1|max:12',
+            'monthly_data.*.month' => 'required|integer|min:1|max:12',
+            'monthly_data.*.target_quantitative' => 'required|numeric|min:0',
+            'monthly_data.*.target_notes' => 'nullable|string|max:1000',
+            'require_all_months' => 'nullable|boolean',
+            'update_mode' => 'nullable|string|in:selective,complete',
+        ];
+    } else {
+        $validationRules = [
+            'monthly_data' => 'required|array|min:1|max:12',
+            'monthly_data.*.target_quantitative' => 'required|numeric|min:0',
+            'monthly_data.*.target_notes' => 'nullable|string|max:1000',
+            'require_all_months' => 'nullable|boolean',
+            'update_mode' => 'nullable|string|in:selective,complete',
+        ];
+
+        if ($request->require_all_months === true) {
+            $validationRules['monthly_data'] = 'required|array|size:12';
         }
+    }
 
-        if (empty($request->monthly_data)) {
-            return json(400, false, 'Data Kosong', 'Data perbulan tidak boleh kosong.', ['header_id' => $headerId]);
-        }
+    $validation = check_validation($request->all(), $validationRules);
+    if ($validation[0] == 1) {
+        return $validation[1];
+    }
 
-        // Check if request has month field
-        $hasMonthField = collect($request->monthly_data)->first() && isset(collect($request->monthly_data)->first()['month']);
+    $updateMode = $request->update_mode ?? 'complete';
+    $processedData = process_bulk_monthly_data($request->monthly_data, $hasMonthField);
+    $existingMonthly = TrRiskMonthly::where('header_id', $headerId)->get()->keyBy('month');
 
-        // Enhanced validation for target_quantitative using existing helper
-        $bulkValidation = validate_bulk_quantitative_data($request->monthly_data, $hasMonthField, $headerId);
-        if (!$bulkValidation['valid']) {
-            return json(400, false, $bulkValidation['title'], $bulkValidation['message'], $bulkValidation['data']);
-        }
+    $bulkValidationResult = validate_bulk_monthly_constraints(
+        $processedData['monthly_data'],
+        $existingMonthly,
+        $request->require_all_months,
+        $headerId
+    );
 
-        // Basic validation rules
-        if ($hasMonthField) {
-            $validationRules = [
-                'monthly_data' => 'required|array|min:1|max:12',
-                'monthly_data.*.month' => 'required|integer|min:1|max:12',
-                'monthly_data.*.target_quantitative' => 'required|numeric|min:0',
-                'monthly_data.*.target_notes' => 'nullable|string|max:1000',
-                'require_all_months' => 'nullable|boolean',
-                'update_mode' => 'nullable|string|in:selective,complete',
-            ];
-        } else {
-            $validationRules = [
-                'monthly_data' => 'required|array|min:1|max:12',
-                'monthly_data.*.target_quantitative' => 'required|numeric|min:0',
-                'monthly_data.*.target_notes' => 'nullable|string|max:1000',
-                'require_all_months' => 'nullable|boolean',
-                'update_mode' => 'nullable|string|in:selective,complete',
-            ];
+    if (!$bulkValidationResult['valid']) {
+        return json(400, false, $bulkValidationResult['title'], $bulkValidationResult['message'], $bulkValidationResult['data']);
+    }
 
-            if ($request->require_all_months === true) {
-                $validationRules['monthly_data'] = 'required|array|size:12';
+    $warnings = $bulkValidationResult['warnings'] ?? [];
+
+    if (!validate_header_year($header->year)) {
+        return json(400, false, 'Tahun Tidak Valid', 'Tahun pada header tidak valid untuk pembuatan tanggal.', [
+            'header_id' => $headerId,
+            'year' => $header->year
+        ]);
+    }
+
+    DB::beginTransaction();
+    try {
+        $result = execute_bulk_quantitative_update(
+            $processedData['monthly_data'],
+            $existingMonthly,
+            $header,
+            $updateMode
+        );
+
+        // Load uploads untuk header ini
+        $header->load('uploads');
+
+        // Add uploaded_files to each item in updated_data berdasarkan risk_monthly_id
+        if (isset($result['updated_data']) && is_array($result['updated_data'])) {
+            foreach ($result['updated_data'] as &$item) {
+                // Filter uploads berdasarkan risk_monthly_id yang sesuai dengan item
+                $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
+
+                $item['uploaded_files'] = $monthlyUploads->count() > 0
+                    ? $monthlyUploads->map(function ($file) {
+                        return [
+                            'id' => $file->id,
+                            'filepath' => $file->filepath,
+                            'domain' => $file->domain,
+                        ];
+                    })->values()->toArray()
+                    : [];
             }
         }
 
-        $validation = check_validation($request->all(), $validationRules);
-        if ($validation[0] == 1) {
-            return $validation[1];
+        if (isset($result['created_data']) && is_array($result['created_data'])) {
+            foreach ($result['created_data'] as &$item) {
+                $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
+
+                $item['uploaded_files'] = $monthlyUploads->count() > 0
+                    ? $monthlyUploads->map(function ($file) {
+                        return [
+                            'filepath' => $file->filepath,
+                            'domain' => $file->domain,
+                        ];
+                    })->values()->toArray()
+                    : [];
+            }
         }
 
-        $updateMode = $request->update_mode ?? 'complete';
+        DB::commit();
 
-        // Process monthly data
-        $processedData = process_bulk_monthly_data($request->monthly_data, $hasMonthField);
+        $message = "Berhasil memproses {$result['total_processed']} data. ";
+        $message .= "Updated: {$result['updated_count']}, Created: {$result['created_count']}.";
 
-        // Get existing monthly data
-        $existingMonthly = TrRiskMonthly::where('header_id', $headerId)->get()->keyBy('month');
+        return json(200, true, 'Berhasil Bulk Update', $message, $result, $warnings);
 
-        // Validate finalization and completeness
-        $bulkValidationResult = validate_bulk_monthly_constraints(
-            $processedData['monthly_data'],
-            $existingMonthly,
-            $request->require_all_months,
-            $headerId
-        );
-
-        if (!$bulkValidationResult['valid']) {
-            return json(400, false, $bulkValidationResult['title'], $bulkValidationResult['message'], $bulkValidationResult['data']);
-        }
-
-        $warnings = $bulkValidationResult['warnings'] ?? [];
-
-        if (!validate_header_year($header->year)) {
-            return json(400, false, 'Tahun Tidak Valid', 'Tahun pada header tidak valid untuk pembuatan tanggal.', [
-                'header_id' => $headerId,
-                'year' => $header->year
-            ]);
-        }
-
-        DB::beginTransaction();
-        try {
-            $result = execute_bulk_quantitative_update(
-                $processedData['monthly_data'],
-                $existingMonthly,
-                $header,
-                $updateMode
-            );
-
-            DB::commit();
-
-            $message = "Berhasil memproses {$result['total_processed']} data. ";
-            $message .= "Updated: {$result['updated_count']}, Created: {$result['created_count']}.";
-
-            return json(200, true, 'Berhasil Bulk Update', $message, $result, $warnings);
-
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return json(500, false, 'Gagal Bulk Update', 'Terjadi kesalahan sistem.', [
-                'header_id' => $headerId,
-                'error' => $e->getMessage()
-            ]);
-        }
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Bulk Update', 'Terjadi kesalahan sistem.', [
+            'header_id' => $headerId,
+            'error' => $e->getMessage()
+        ]);
     }
+}
 
    public function uploadDocument(Request $request, $monthlyId)
 {

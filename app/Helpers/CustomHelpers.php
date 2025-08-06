@@ -506,6 +506,38 @@ if (!function_exists('process_risk_monthly_file_uploads')) {
     }
 }
 
+if (!function_exists('process_risk_monthly_entry_file_uploads')) {
+    /**
+     * Proses file uploads untuk risk monthly entry
+     *
+     * @param array $uploadedFiles
+     * @param object $entry
+     * @return void
+     */
+    function process_risk_monthly_entry_file_uploads($uploadedFiles, $entry)
+    {
+        if (!is_array($uploadedFiles)) {
+            return;
+        }
+
+        foreach ($uploadedFiles as $file) {
+            if (!isset($file['filepath']) || empty($file['filepath'])) {
+                continue;
+            }
+
+                \App\Models\TrRiskMonthlyUpload::create([
+                'header_id' => $entry->header_id,
+                'risk_monthly_id' => $entry->monthly_id,
+                'risk_monthly_entry_id' => $entry->id,
+                'filepath' => $file['filepath'],
+                'domain' => $file['domain'] ?? basename($file['filepath']),
+                'is_confirmed' => true,
+            ]);
+        }
+    }
+}
+
+
 if (!function_exists('validate_bulk_quantitative_data')) {
     /**
      * Validasi data kuantitatif untuk bulk update

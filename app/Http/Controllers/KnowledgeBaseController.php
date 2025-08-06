@@ -8,6 +8,7 @@ use App\Models\KnowledgeBaseReader;
 use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\File;
+use Carbon\Carbon;
 
 class KnowledgeBaseController extends Controller
 {
@@ -101,6 +102,7 @@ class KnowledgeBaseController extends Controller
             'description' => $data->description,
             'long_description' => $data->long_description,
             'img_path' => $data->img_path,
+            'doc_path' => $data->doc_path,
             'type' => $data->type,
             'type_label' => $data->type_label,
             'creator_id' => $data->creator_id,
@@ -134,6 +136,7 @@ class KnowledgeBaseController extends Controller
 
     $array_validation = [
         'img_path' => 'required|string|max:255',
+        'doc_path' => 'nullable|string|max:255',
         'description' => 'nullable|string|max:500',
         'long_description' => 'nullable|string|max:1000',
         'type' => 'required|in:1,2,3,4,5',
@@ -149,6 +152,7 @@ class KnowledgeBaseController extends Controller
         $Base = Knowledgebase::create([
             'creator_id' => $user->id,
             'img_path' => $request->img_path,
+            'doc_path' => $request->doc_path,
             'description' => $request->description,
             'long_description' => $request->long_description,
             'type' => $request->type,
@@ -190,6 +194,7 @@ class KnowledgeBaseController extends Controller
 
     $array_validation = [
         'img_path' => 'nullable|string|max:255',
+        'doc_path' => 'nullable|string|max:255',
         'description' => 'nullable|string|max:500',
         'long_description' => 'nullable|string|max:1000',
         'type' => 'nullable|in:1,2,3,4,5',
@@ -220,8 +225,13 @@ class KnowledgeBaseController extends Controller
             $Base->type = $request->type;
         }
 
+         if ($request->filled('doc_path')) {
+        $Base->doc_path = $request->doc_path;
+    }
+
         $Base->save();
         DB::commit();
+        $Base->creator_id = encrypt_decrypt_md5('enc', $Base->creator_id);
 
         // Return minimal response tanpa load creator
         $Base->type_label = match ($Base->type) {
@@ -245,57 +255,71 @@ class KnowledgeBaseController extends Controller
 }
 
     public function destroy($id)
-    {
-        $user = JWTAuth::parseToken()->authenticate();
-        if (!in_array($user->role_id, [1, 6])) {
-            return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk menghapus data', null);
-        }
+{
+    $user = JWTAuth::parseToken()->authenticate();
+    if (!in_array($user->role_id, [1, 6])) {
+        return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk menghapus data', null);
+    }
 
-        // Langsung gunakan ID tanpa dekripsi
-        $Base = Knowledgebase::find($id);
-        if (!$Base) {
-            return json(404, false, 'not_found', 'Data tidak ditemukan', null);
-        }
+    $Base = Knowledgebase::find($id);
+    if (!$Base) {
+        return json(404, false, 'not_found', 'Data tidak ditemukan', null);
+    }
 
-        try {
+    try {
+        // Hapus file gambar jika ada
+        if (!empty($Base->img_path) && File::exists(public_path('storage/' . $Base->img_path))) {
             File::delete(public_path('storage/' . $Base->img_path));
-            $Base->delete();
-            return json(200, true, 'success', 'Data berhasil dihapus', null);
-        } catch (\Exception $e) {
-            return json(500, false, 'error', 'Gagal menghapus data: ' . $e->getMessage(), null);
         }
+
+        // Hapus file dokumen jika ada
+        if (!empty($Base->doc_path) && File::exists(public_path('storage/' . $Base->doc_path))) {
+            File::delete(public_path('storage/' . $Base->doc_path));
+        }
+
+        $Base->delete();
+
+        return json(200, true, 'success', 'Data berhasil dihapus', null);
+    } catch (\Exception $e) {
+        return json(500, false, 'error', 'Gagal menghapus data: ' . $e->getMessage(), null);
     }
+}
 
-    public function trackReader($id)
-    {
-        try {
-            $user = JWTAuth::parseToken()->authenticate();
+public function trackReader($id)
+{
+    try {
+        $user = JWTAuth::parseToken()->authenticate();
 
-            // Langsung gunakan ID tanpa dekripsi
-            $knowledge = Knowledgebase::find($id);
-            if (!$knowledge) {
-                return json(404, false, 'not_found', 'Knowledge Base tidak ditemukan', null);
-            }
+        $knowledge = Knowledgebase::find($id);
+        if (!$knowledge) {
+            return json(404, false, 'not_found', 'Knowledge Base tidak ditemukan', null);
+        }
 
-            $existing = KnowledgeBaseReader::where('user_id', $user->id)
-                ->where('id_knowledge', $id)
-                ->first();
+        $existing = KnowledgeBaseReader::where('user_id', $user->id)
+            ->where('id_knowledge', $id)
+            ->first();
 
-            if ($existing) {
-                return json(200, true, 'reader_exists', 'User sudah membaca knowledge ini', null);
-            }
-
-            KnowledgeBaseReader::create([
-                'user_id' => $user->id,
-                'id_knowledge' => $id
+        if ($existing) {
+            return json(200, true, 'reader_exists', 'User sudah membaca knowledge ini', [
+                'knowledge_title' => $knowledge->description ?? null,
+                'read_at' => $existing->created_at->timezone('Asia/Jakarta')->toDateTimeString(),
             ]);
-
-            return json(200, true, 'reader_tracked', 'Pembacaan berhasil dicatat', null);
-
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return json(401, false, 'unauthenticated', 'Token tidak valid atau kedaluwarsa', null);
-        } catch (\Exception $e) {
-            return json(500, false, 'error', 'Gagal mencatat pembaca: ' . $e->getMessage(), null);
         }
+
+        $reader = KnowledgeBaseReader::create([
+            'user_id' => $user->id,
+            'id_knowledge' => $id
+        ]);
+
+        return json(200, true, 'reader_tracked', 'Pembacaan berhasil dicatat', [
+            'knowledge_title' => $knowledge->description ?? null,
+            'read_at' => $reader->created_at->timezone('Asia/Jakarta')->toDateTimeString(),
+        ]);
+
+    } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+        return json(401, false, 'unauthenticated', 'Token tidak valid atau kedaluwarsa', null);
+    } catch (\Exception $e) {
+        return json(500, false, 'error', 'Gagal mencatat pembaca: ' . $e->getMessage(), null);
     }
+}
 }

@@ -22,7 +22,9 @@ use App\Http\Controllers\TrRiskMonthlyController;
 use App\Http\Controllers\TrMitigationMonthlyController;
 use App\Http\Controllers\TrRiskMonthlyUploadController;
 use App\Http\Controllers\ExportRiskController;
-
+use App\Http\Controllers\HeatmapController;
+use App\Http\Controllers\TrRiskHeaderEntryController;
+use App\Http\Controllers\TrRiskMonthlyEntryController;
 // ============================
 //  Auth Routes (tanpa token)
 // ============================
@@ -216,6 +218,18 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/ris
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->get('/risk-monitoring', [TrRiskHeaderController::class, 'monitoring']);
 
+// ===================== RISK HEADER ENTRY =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header/{id}/entry', [TrRiskHeaderEntryController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/risk-header/{id}/entry/monthly/{monthlyId}', [TrRiskHeaderEntryController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header-entry/{id}', [TrRiskHeaderEntryController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-header-entry/{header_entry_id}/monthly/{monthlyId}', [TrRiskHeaderEntryController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-header-entry/{id}', [TrRiskHeaderEntryController::class, 'destroy']);
+
+// ===================== RISK MONTHLY ENTRY =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-entry/{id}/quantitative', [TrRiskMonthlyEntryController::class, 'updateQuantitative']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-entry/{id}/residual', [TrRiskMonthlyEntryController::class, 'updateResidual']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-entry/{id}/residual-and-finalize', [TrRiskMonthlyEntryController::class, 'updateResidualAndFinalize']);
+// Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-entry/{id}/bulk-update-quantitative', [TrRiskMonthlyEntryController::class, 'bulkUpdateQuantitative']);
 
 // ===================== MITIGATION MONTHLY =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/mitigation-monthly', [TrMitigationMonthlyController::class, 'index']);

@@ -16,7 +16,7 @@ use App\Models\MstHeatmapKemungkinan;
 
 class TrRiskHeaderController extends Controller
 {
-  public function index(Request $request)
+ public function index(Request $request)
 {
     $data = TrRiskHeader::with([
         'riskCode:id,name',
@@ -26,35 +26,41 @@ class TrRiskHeaderController extends Controller
         'rrKemungkinan:id,label',
         'department:id,name',
         'optionTargetSatuTahun:id,name,position',
-        'monthlyData' => function($query) {
+        'uploads',
+        'monthlyData' => function ($query) {
             $query->orderBy('month', 'asc')->with('uploads');
-        }
+        },
+        'headerEntry.monthlyEntryData.uploads',
+        'headerEntry.riskCode:id,name',
+        'headerEntry.irDampak:id,label',
+        'headerEntry.irKemungkinan:id,label',
+        'headerEntry.rrDampak:id,label',
+        'headerEntry.rrKemungkinan:id,label',
+        'headerEntry.rrPosisi:id,result,color',
+        'headerEntry.irPosisi:id,result,color',
+        'headerEntry.department:id,name',
+        'headerEntry.optionTargetSatuTahun:id,name,position',
     ])
-    ->when($request->peristiwa, function ($query) use ($request) {
-        $query->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
-    })
-    ->when($request->unit_kerja, function ($query) use ($request) {
-        $query->whereHas('department', function ($q) use ($request) {
-            $q->where('name', 'like', '%' . $request->unit_kerja . '%');
-        });
-    })
-    ->when($request->tahun, function ($query) use ($request) {
-        $query->where('year', $request->tahun);
-    })
-    ->orderBy('id', 'asc')
-    ->get();
+        ->when($request->peristiwa, function ($query) use ($request) {
+            $query->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
+        })
+        ->when($request->unit_kerja, function ($query) use ($request) {
+            $query->whereHas('department', function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->unit_kerja . '%');
+            });
+        })
+        ->when($request->tahun, function ($query) use ($request) {
+            $query->where('year', $request->tahun);
+        })
+        ->orderBy('id', 'asc')
+        ->get();
 
     $orderedData = $data->map(function ($item) {
-        // Cari data heatmap berdasarkan dampak dan kemungkinan
-        $heatmap = MstHeatmap::where('dampak', $item->residual_target_level_dampak)
-            ->where('kemungkinan', $item->residual_target_level_kemungkinan)
-            ->first();
-
-        // Generate monthly monitoring data seperti di method monitoring
-        $monthly = [];
         $inherentColor = get_color_by_position($item->inherent_risk_posisi_risiko);
         $residualTargetColor = get_color_by_position($item->residual_target_posisi_risiko);
 
+        // Generate 12 bulan dengan data monthlyData dan upload lengkap dengan id upload
+        $monthly = [];
         for ($i = 1; $i <= 12; $i++) {
             $dataBulanan = $item->monthlyData->firstWhere('month', $i);
 
@@ -71,6 +77,13 @@ class TrRiskHeaderController extends Controller
                     'realization_percentage' => $percentage . '%',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
                     'monthly_data' => $dataBulanan,
+                    'uploads' => $dataBulanan->uploads->map(function ($upload) {
+                        return [
+                            'id' => $upload->id,
+                            'filepath' => $upload->filepath,
+                            'domain' => $upload->domain,
+                        ];
+                    }),
                 ];
             } else {
                 $monthly[] = [
@@ -81,11 +94,12 @@ class TrRiskHeaderController extends Controller
                     'realization_percentage' => '0%',
                     'is_finalized' => false,
                     'monthly_data' => null,
+                    'uploads' => [],
                 ];
             }
         }
 
-        // Format uploads
+        // Uploads header lengkap dengan id (optional tetap saya tampilkan di sini)
         $headerUploads = $item->uploads->map(function ($upload) {
             return [
                 'id' => $upload->id,
@@ -94,7 +108,70 @@ class TrRiskHeaderController extends Controller
             ];
         });
 
+        // Entry data lengkap dengan 12 bulan dan upload id
+        $entryData = $item->headerEntry->map(function ($entry) {
+            $monthlyEntries = collect();
+            for ($i = 1; $i <= 12; $i++) {
+                $monthlyEntry = $entry->monthlyEntryData->firstWhere('month', $i);
+                if ($monthlyEntry) {
+                    $target = $monthlyEntry->target_quantitative ?? 0;
+                    $realization = $monthlyEntry->realization_quantitative ?? 0;
+                    $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+
+                    $monthlyEntries[] = [
+                        'bulan' => $i,
+                        'residual_risk_level' => $monthlyEntry->residual_risk_level_risiko,
+                        'residual_risk_posisi_risiko' => $monthlyEntry->residual_risk_posisi_risiko,
+                        'residual_risk_posisi_risiko_color' => get_color_by_position($monthlyEntry->residual_risk_posisi_risiko),
+                        'realization_percentage' => $percentage . '%',
+                        'is_finalized' => (bool) $monthlyEntry->is_finalize,
+                        'monthly_entry_data' => $monthlyEntry,
+                        'uploads' => $monthlyEntry->uploads->map(function ($upload) {
+                            return [
+                                'id' => $upload->id,
+                                'filepath' => $upload->filepath,
+                                'domain' => $upload->domain,
+                            ];
+                        }),
+                    ];
+                } else {
+                    $monthlyEntries[] = [
+                        'bulan' => $i,
+                        'residual_risk_level' => null,
+                        'residual_risk_posisi_risiko' => null,
+                        'residual_risk_posisi_risiko_color' => null,
+                        'realization_percentage' => '0%',
+                        'is_finalized' => false,
+                        'monthly_entry_data' => null,
+                        'uploads' => [],
+                    ];
+                }
+            }
+
+            // Hapus field yang bernilai null sebelum return
+            $entryArray = [
+                'id' => $entry->id,
+                // 'header_id' => $entry->header_id, // dihilangkan jika null
+                // 'judul_entry' => $entry->judul_entry, // dihilangkan jika null
+                // 'keterangan' => $entry->keterangan, // dihilangkan jika null
+                'monthly_entry' => $monthlyEntries,
+            ];
+
+            if ($entry->header_id !== null) {
+                $entryArray['header_id'] = $entry->header_id;
+            }
+            if ($entry->judul_entry !== null) {
+                $entryArray['judul_entry'] = $entry->judul_entry;
+            }
+            if ($entry->keterangan !== null) {
+                $entryArray['keterangan'] = $entry->keterangan;
+            }
+
+            return $entryArray;
+        });
+
         return [
+            // Header data
             'id' => $item->id,
             'risk_code' => $item->riskCode ?? null,
             'process_code' => $item->process_code ?? '',
@@ -133,9 +210,15 @@ class TrRiskHeaderController extends Controller
             'rr_dampak' => $item->rrDampak ?? null,
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             'department' => $item->department ?? null,
-            'monthly_data' => $item->monthlyData ?? collect([]),
+
+            // Array 12 bulan dengan uploads dan id upload di dalamnya
             'monthly' => $monthly,
+
+            // Upload header tetap muncul (optional)
             'uploads' => $headerUploads,
+
+            // Entry data lengkap dengan monthly_entry dan uploads di dalamnya
+            'entry_data' => $entryData,
         ];
     });
 

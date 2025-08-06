@@ -93,6 +93,21 @@ class TrRiskMonthly extends Model
             ->first();
     }
 
+        public function entryQuantitative()
+    {
+        return $this->hasOne(TrRiskMonthlyEntry::class)->where('type', 'quantitative');
+    }
+
+    public function entryResidual()
+    {
+        return $this->hasOne(TrRiskMonthlyEntry::class)->where('type', 'residual');
+    }
+    public function entries()
+    {
+        return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
+    }
+
+
     // =====================================
     // HEATMAP RELATIONS (UPDATED)
     // =====================================

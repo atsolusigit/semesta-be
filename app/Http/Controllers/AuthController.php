@@ -173,6 +173,7 @@ class AuthController extends Controller
                 'status' => $user->status,
                 'profile_img' => $user->profile_img ?? "",
                 'department_id' => $user->department_id,
+                'department_name' => optional($user->department)->name ?? '-',
                 'jtkn' => $user->jtkn,
                 'fbtk' => $user->fbtk,
                 'role_id' => $user->role_id,

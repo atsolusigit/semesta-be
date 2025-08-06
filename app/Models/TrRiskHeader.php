@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\MstHeatmap;
-
+use App\Models\TrRiskMonthlyEntry;
 
 class TrRiskHeader extends Model
 {
@@ -163,6 +163,10 @@ public function residualTargetHeatmapRange()
         return $this->belongsTo(MstHeatmap::class, 'residual_risk_posisi_risiko', 'result');
     }
 
+    public function headerEntry()
+    {
+        return $this->hasMany(TrRiskHeaderEntry::class, 'tr_risk_header_id', 'id');
+    }
 
     // =====================================
     // ACCESSORS

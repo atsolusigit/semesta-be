@@ -99,6 +99,16 @@ class TrRiskMonthly extends Model
         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
     }
 
+    // optional relations for entries
+//       public function entriesQuantitative()
+//     {
+//         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
+//     }
+//   public function entriesResidual()
+//     {
+//         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
+//     }
+
 
     // =====================================
     // HEATMAP RELATIONS (UPDATED)

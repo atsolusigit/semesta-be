@@ -45,6 +45,7 @@ class TrRiskMonthly extends Model
         'residual_risk_satutahun_level_risiko',
 
         'is_finalize',
+        'entries',
     ];
 
     protected $casts = [
@@ -93,19 +94,20 @@ class TrRiskMonthly extends Model
             ->first();
     }
 
-        public function entryQuantitative()
-    {
-        return $this->hasOne(TrRiskMonthlyEntry::class)->where('type', 'quantitative');
-    }
-
-    public function entryResidual()
-    {
-        return $this->hasOne(TrRiskMonthlyEntry::class)->where('type', 'residual');
-    }
     public function entries()
     {
         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
     }
+
+    // optional relations for entries
+//       public function entriesQuantitative()
+//     {
+//         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
+//     }
+//   public function entriesResidual()
+//     {
+//         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
+//     }
 
 
     // =====================================

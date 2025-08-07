@@ -68,10 +68,8 @@ class TrRiskHeaderController extends Controller
                 $realization = $dataBulanan->realization_quantitative ?? 0;
                 $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
 
-                // Simpan monthly_data sebagai objek berdasarkan bulan
                 $monthlyDataMap[$i] = $dataBulanan;
 
-                // Simpan summary ke dalam monthly[]
                 $monthly[] = [
                     'bulan' => $i,
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
@@ -200,7 +198,44 @@ class TrRiskHeaderController extends Controller
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             'department' => $item->department ?? null,
 
-            'monthly_data' => $item->monthlyData ?? collect([]),
+            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) {
+    $target = $dataBulanan->target_quantitative ?? 0;
+    $realization = $dataBulanan->realization_quantitative ?? 0;
+    $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+
+    return [
+        'id' => $dataBulanan->id,
+        'header_id' => $dataBulanan->header_id,
+        'month' => $dataBulanan->month,
+        'risk_code' => $dataBulanan->risk_code,
+        'status_risiko' => $dataBulanan->status_risiko,
+        'process_code' => $dataBulanan->process_code,
+        'start_date' => $dataBulanan->start_date,
+        'expired_date' => $dataBulanan->expired_date,
+        'realization_quantitative' => $realization,
+        'realization_note' => $dataBulanan->realization_note,
+        'target_quantitative' => $target,
+        'target_notes' => $dataBulanan->target_notes,
+        'residual_risk_level_dampak' => $dataBulanan->residual_risk_level_dampak,
+        'residual_risk_level_kemungkinan' => $dataBulanan->residual_risk_level_kemungkinan,
+        'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
+        'residual_risk_level_risiko' => $dataBulanan->residual_risk_level_risiko,
+        'residual_risk_level_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
+        'realization_percentage' => $percentage . '%',
+        'is_finalize' => (bool) $dataBulanan->is_finalize,
+        'finalized_at' => $dataBulanan->finalized_at,
+        'finalized_by' => $dataBulanan->finalized_by,
+        'created_at' => $dataBulanan->created_at,
+        'updated_at' => $dataBulanan->updated_at,
+        'uploads' => $dataBulanan->uploads->map(function ($upload) {
+            return [
+                'id' => $upload->id,
+                'filepath' => $upload->filepath,
+                'domain' => $upload->domain,
+            ];
+        }),
+    ];
+}),
             'monthly' => $monthly,
 
             'uploads' => $headerUploads,
@@ -211,8 +246,7 @@ class TrRiskHeaderController extends Controller
     return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $orderedData);
 }
 
-
-   public function show($id)
+  public function show($id)
 {
     $data = TrRiskHeader::with([
         'riskCode:id,name',
@@ -231,14 +265,11 @@ class TrRiskHeaderController extends Controller
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
     }
 
-    $heatmap = MstHeatmap::where('dampak', $data->residual_target_level_dampak)
-    ->where('kemungkinan', $data->residual_target_level_kemungkinan)
-    ->first();
-
-    // Generate monthly monitoring data seperti di method monitoring
-    $monthly = [];
     $inherentColor = get_color_by_position($data->inherent_risk_posisi_risiko);
     $residualTargetColor = get_color_by_position($data->residual_target_posisi_risiko);
+
+    $monthly = [];
+    $monthlyData = [];
 
     for ($i = 1; $i <= 12; $i++) {
         $dataBulanan = $data->monthlyData->firstWhere('month', $i);
@@ -248,6 +279,7 @@ class TrRiskHeaderController extends Controller
             $realization = $dataBulanan->realization_quantitative ?? 0;
             $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
 
+            // Monthly summary
             $monthly[] = [
                 'bulan' => $i,
                 'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
@@ -257,7 +289,35 @@ class TrRiskHeaderController extends Controller
                 'is_finalized' => (bool) $dataBulanan->is_finalize,
                 'monthly_data' => $dataBulanan,
             ];
+
+            // Monthly full data format
+            $monthlyData[] = [
+                'id' => $dataBulanan->id,
+                'header_id' => $dataBulanan->header_id,
+                'month' => $dataBulanan->month,
+                'risk_code' => $dataBulanan->risk_code,
+                'status_risiko' => $dataBulanan->status_risiko,
+                'process_code' => $dataBulanan->process_code,
+                'start_date' => $dataBulanan->start_date,
+                'expired_date' => $dataBulanan->expired_date,
+                'realization_quantitative' => $dataBulanan->realization_quantitative,
+                'realization_note' => $dataBulanan->realization_note,
+                'target_quantitative' => $dataBulanan->target_quantitative,
+                'target_notes' => $dataBulanan->target_notes,
+                'residual_risk_level_dampak' => $dataBulanan->residual_risk_level_dampak,
+                'residual_risk_level_kemungkinan' => $dataBulanan->residual_risk_level_kemungkinan,
+                'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
+                'residual_risk_level_risiko' => $dataBulanan->residual_risk_level_risiko,
+                'residual_risk_level_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
+                'is_finalize' => (bool) $dataBulanan->is_finalize,
+                'finalized_at' => $dataBulanan->finalized_at,
+                'finalized_by' => $dataBulanan->finalized_by,
+                'created_at' => $dataBulanan->created_at,
+                'updated_at' => $dataBulanan->updated_at,
+                'uploads' => $dataBulanan->uploads ?? [],
+            ];
         } else {
+            // Monthly summary kosong
             $monthly[] = [
                 'bulan' => $i,
                 'residual_risk_level' => null,
@@ -267,10 +327,36 @@ class TrRiskHeaderController extends Controller
                 'is_finalized' => false,
                 'monthly_data' => null,
             ];
+
+            // Data bulanan kosong tetap tampil agar konsisten 12 bulan
+            $monthlyData[] = [
+                'id' => null,
+                'header_id' => $data->id,
+                'month' => $i,
+                'risk_code' => null,
+                'status_risiko' => 'open',
+                'process_code' => $data->process_code,
+                'start_date' => null,
+                'expired_date' => null,
+                'realization_quantitative' => null,
+                'realization_note' => null,
+                'target_quantitative' => null,
+                'target_notes' => null,
+                'residual_risk_level_dampak' => null,
+                'residual_risk_level_kemungkinan' => null,
+                'residual_risk_posisi_risiko' => null,
+                'residual_risk_level_risiko' => null,
+                'residual_risk_level_risiko_color' => null,
+                'is_finalize' => false,
+                'finalized_at' => null,
+                'finalized_by' => null,
+                'created_at' => null,
+                'updated_at' => null,
+                'uploads' => [],
+            ];
         }
     }
 
-    //  mengatur urutan field
     $orderedData = [
         'id' => $data->id,
         'risk_code' => $data->riskCode ?? null,
@@ -311,7 +397,7 @@ class TrRiskHeaderController extends Controller
         'rr_dampak' => $data->rrDampak ?? null,
         'rr_kemungkinan' => $data->rrKemungkinan ?? null,
         'department' => $data->department ?? null,
-        'monthly_data' => $data->monthlyData ?? collect([]),
+        'monthly_data' => $monthlyData,
         'monthly' => $monthly,
     ];
 

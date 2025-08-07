@@ -200,7 +200,7 @@ class TrRiskHeaderController extends Controller
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             'department' => $item->department ?? null,
 
-            'monthly_data' => $monthlyDataMap,
+            'monthly_data' => $item->monthlyData ?? collect([]),
             'monthly' => $monthly,
 
             'uploads' => $headerUploads,
@@ -585,13 +585,22 @@ public function monitoring(Request $request)
         $inherentColor = get_color_by_position($header->inherent_risk_posisi_risiko);
         $residualTargetColor = get_color_by_position($header->residual_target_posisi_risiko);
 
+        $targetTahunan = $header->target_quantitative_satu_tahun ?? 0;
+
         for ($i = 1; $i <= 12; $i++) {
             $dataBulanan = $header->monthlyData->firstWhere('month', $i);
 
             if ($dataBulanan) {
                 $target = $dataBulanan->target_quantitative ?? 0;
                 $realization = $dataBulanan->realization_quantitative ?? 0;
-                $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+
+                $percentage = ($target > 0)
+                    ? round(($realization / $target) * 100, 2)
+                    : 0;
+
+                $percentageTahunan = ($targetTahunan > 0)
+                    ? round(($realization / $targetTahunan) * 100, 6)
+                    : 0;
 
                 $monthly[] = [
                     'bulan' => $i,
@@ -599,6 +608,7 @@ public function monitoring(Request $request)
                     'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                     'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                     'realization_percentage' => $percentage . '%',
+                    'realization_percentage_tahunan' => $percentageTahunan . '%',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
                     'monthly_data' => $dataBulanan,
                 ];
@@ -609,6 +619,7 @@ public function monitoring(Request $request)
                     'residual_risk_posisi_risiko' => null,
                     'residual_risk_posisi_risiko_color' => null,
                     'realization_percentage' => '0%',
+                    'realization_percentage_tahunan' => '0%',
                     'is_finalized' => false,
                     'monthly_data' => null,
                 ];

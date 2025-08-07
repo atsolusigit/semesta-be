@@ -26,9 +26,8 @@ class TrRiskMonthlyController extends Controller
         'rrYearLevelKemungkinan',
         'mitigations',
         'uploads',
-        'entriesResidual.optionDampak:id,label,color',
-        'entriesResidual.optionKemungkinan:id,label,color',
-        'entriesQuantitative',
+        'entries.rrLevelDampak',
+        'entries.rrLevelKemungkinan',
     ])
     ->orderBy('header_id')
     ->orderBy('month')
@@ -54,25 +53,33 @@ class TrRiskMonthlyController extends Controller
             ];
         });
 
-        // Format entries_residual jika ada
-        $arr['residual_data'] = collect($item['entries_residual'] ?? [])->map(function ($entry) {
+        // Filter entries residual
+        $residual = collect($item['entries'])->filter(function ($entry) {
+            return isset($entry['residual_risk_level_dampak']) || isset($entry['residual_risk_satutahun_level_dampak']);
+        })->values();
+
+        $arr['residual_data'] = $residual->map(function ($entry) {
             return [
-                'dampak_id' => $entry['dampak_id'],
-                'kemungkinan_id' => $entry['kemungkinan_id'],
-                'option_dampak' => $entry['option_dampak'] ?? null,
-                'option_kemungkinan' => $entry['option_kemungkinan'] ?? null,
+                'dampak_id' => $entry['residual_risk_level_dampak'],
+                'kemungkinan_id' => $entry['residual_risk_level_kemungkinan'],
+                'LevelDampak' => $entry['level_dampak'] ?? null,
+                'LevelKemungkinan' => $entry['level_kemungkinan'] ?? null,
                 'created_at' => $entry['created_at'],
             ];
         });
 
-        // Format entries_quantitative jika ada
-        $arr['quantitative_data'] = collect($item['entries_quantitative'] ?? [])->map(function ($entry) {
+        // Filter entries quantitative
+        $quantitative = collect($item['entries'])->filter(function ($entry) {
+            return isset($entry['target_quantitative']) || isset($entry['realization_quantitative']);
+        })->values();
+
+        $arr['quantitative_data'] = $quantitative->map(function ($entry) {
             return [
                 'id' => $entry['id'],
-                'target_quantitative' => $entry['target'],
-                'realization_quantitative' => $entry['realization'],
+                'target_quantitative' => $entry['target_quantitative'],
+                'realization_quantitative' => $entry['realization_quantitative'],
                 'target_notes' => $entry['target_notes'],
-                'realization_notes' => $entry['realization_notes'],
+                'realization_notes' => $entry['realization_note'], // <- sesuai field migration
                 'created_at' => $entry['created_at'],
             ];
         });
@@ -82,7 +89,6 @@ class TrRiskMonthlyController extends Controller
 
     return json(200, true, 'List data', 'Data risk monthly berhasil diambil.', $cleaned);
 }
-
     public function show($id)
 {
     $data = TrRiskMonthly::with([
@@ -94,10 +100,8 @@ class TrRiskMonthlyController extends Controller
         'rrYearLevelKemungkinan',
         'mitigations',
         'uploads',
-        'entry',
-        'entry.quantitative',
-        'entry.residual',
-        'entry.uploads',
+        'entries.rrLevelDampak',
+        'entries.rrLevelKemungkinan',
     ])->find($id);
 
     if (!$data) {
@@ -164,8 +168,6 @@ class TrRiskMonthlyController extends Controller
         'rrYearLevelKemungkinan',
         'mitigations',
         'uploads',
-        'residualEntries',
-        'quantitativeEntries',
     ])->where('header_id', $headerId)
       ->orderBy('month')
       ->get();
@@ -189,33 +191,33 @@ class TrRiskMonthlyController extends Controller
             ];
         });
 
-        // Map residual entries
-        $arr['residual_entries'] = collect($item->residualEntries)->map(function ($entry) {
-            return [
-                'id' => $entry->id,
-                'field' => $entry->field,
-                'value' => $entry->value,
-            ];
-        });
+     $arr['residual_entries'] = collect($item->entries)->filter(function ($entry) {
+    return str_starts_with($entry->field, 'residual');
+})->values()->map(function ($entry) {
+    return [
+        'id' => $entry->id,
+        'field' => $entry->field,
+        'value' => $entry->value,
+    ];
+});
 
-        // Map quantitative entries
-        $arr['quantitative_entries'] = collect($item->quantitativeEntries)->map(function ($entry) {
-            return [
-                'id' => $entry->id,
-                'field' => $entry->field,
-                'value' => $entry->value,
-            ];
-        });
+$arr['quantitative_entries'] = collect($item->entries)->filter(function ($entry) {
+    return str_starts_with($entry->field, 'realization_') || str_starts_with($entry->field, 'target_');
+})->values()->map(function ($entry) {
+    return [
+        'id' => $entry->id,
+        'field' => $entry->field,
+        'value' => $entry->value,
+    ];
+});
+
 
         return $arr;
     });
 
-    $followUpInfo = get_follow_up_info($header, $cleaned);
-
     return json(200, true, 'Data Ditemukan', 'Data monthly untuk header berhasil diambil.', [
         'header' => $header,
         'monthly_data' => $cleaned,
-        'follow_up_info' => $followUpInfo
     ]);
 }
 

@@ -11,6 +11,10 @@ use App\Http\Middleware\RoleAccessMiddleware;
 use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Models\MstHeatmap;
+use App\Models\MstHeatmapRiskRange;
+use App\Models\MstOption;
+use Illuminate\Support\Facades\DB;
 
 class TrRiskHeaderEntryController extends Controller
 {
@@ -83,28 +87,87 @@ class TrRiskHeaderEntryController extends Controller
         return json(400, false, 'Validasi Gagal', $validator->errors()->first(), null);
     }
 
-    $entry = TrRiskHeaderEntry::create(array_merge(
-        $request->only((new TrRiskHeaderEntry)->getFillable()),
-        ['tr_risk_header_id' => $headerId]
-    ));
+    try {
+        DB::beginTransaction();
 
-    $monthlyEntry = TrRiskMonthlyEntry::create([
-        'header_id' => $headerId,
-        'tr_risk_header_entry_id' => $entry->id,
-        'monthly_id' => $monthlyId,
-        'month' => $monthly->month,
-    ]);
+        $data = $request->all();
 
-    return json(200, true, 'Berhasil Disimpan', 'Data entry berhasil disimpan.', [
-        'entry_header' => $entry,
-        'monthly_entry' => $monthlyEntry,
-    ]);
+        // Auto-fill target_satu_tahun_position
+        if (!empty($data['target_satu_tahun_option'])) {
+            $option = MstOption::find($data['target_satu_tahun_option']);
+            if ($option) {
+                $data['target_satu_tahun_position'] = $option->position;
+            }
+        }
+
+        // Auto-fill inherent risk result & level_risiko
+        if (!empty($data['inherent_risk_level_dampak']) && !empty($data['inherent_risk_level_kemungkinan'])) {
+            $ir = MstHeatmap::with('riskRange')
+                ->where('dampak', $data['inherent_risk_level_dampak'])
+                ->where('kemungkinan', $data['inherent_risk_level_kemungkinan'])
+                ->first();
+
+            if ($ir) {
+                $data['inherent_risk_posisi_risiko'] = $ir->result;
+                $data['inherent_risk_level_risiko'] = $ir->riskRange->name ?? null;
+            }
+        }
+
+        // Auto-fill residual risk result & level_risiko
+        if (!empty($data['residual_target_level_dampak']) && !empty($data['residual_target_level_kemungkinan'])) {
+            $rr = MstHeatmap::with('riskRange')
+                ->where('dampak', $data['residual_target_level_dampak'])
+                ->where('kemungkinan', $data['residual_target_level_kemungkinan'])
+                ->first();
+
+            if ($rr) {
+                $data['residual_target_posisi_risiko'] = $rr->result;
+                $data['residual_target_level_risiko'] = $rr->riskRange->name ?? null;
+            }
+        }
+
+        // Buat instance entry baru dan set process_code otomatis
+        $entry = new TrRiskHeaderEntry(
+            array_merge(
+                $request->only((new TrRiskHeaderEntry)->getFillable()),
+                ['tr_risk_header_id' => $headerId],
+                [
+                    'inherent_risk_posisi_risiko' => $data['inherent_risk_posisi_risiko'] ?? null,
+                    'inherent_risk_level_risiko' => $data['inherent_risk_level_risiko'] ?? null,
+                    'residual_target_posisi_risiko' => $data['residual_target_posisi_risiko'] ?? null,
+                    'residual_target_level_risiko' => $data['residual_target_level_risiko'] ?? null,
+                    'target_satu_tahun_position' => $data['target_satu_tahun_position'] ?? null,
+                ]
+            )
+        );
+
+        // Set process_code secara otomatis berdasarkan year dan department_id
+        $entry->year = $data['year'] ?? $header->year;
+        $entry->department_id = $data['department_id'] ?? $header->department_id;
+        $entry->setNextProcessCode()->save();
+
+        // Simpan entry monthly
+        $monthlyEntry = TrRiskMonthlyEntry::create([
+            'header_id' => $headerId,
+            'tr_risk_header_entry_id' => $entry->id,
+            'monthly_id' => $monthlyId,
+            'month' => $monthly->month,
+        ]);
+
+        DB::commit();
+
+        return json(200, true, 'Berhasil Disimpan', 'Data entry berhasil disimpan.', [
+            'entry_header' => $entry,
+            'monthly_entry' => $monthlyEntry,
+        ]);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
 }
-
 
    public function update(Request $request, $id)
 {
-    // Ambil data entry beserta relasi header-nya
     $entry = TrRiskHeaderEntry::with('header')->find($id);
     if (!$entry) {
         return json(404, false, 'Not Found', 'Data entry tidak ditemukan.', null);
@@ -149,13 +212,64 @@ class TrRiskHeaderEntryController extends Controller
         return json(400, false, 'Validasi Gagal', $validator->errors()->first(), null);
     }
 
-    // Update hanya kolom yang boleh diisi
-    $entry->update($request->only((new TrRiskHeaderEntry)->getFillable()));
+    try {
+        DB::beginTransaction();
 
-    return json(200, true, 'Berhasil', 'Data entry berhasil diperbarui.', $entry);
+        $data = $request->all();
+
+        // Auto-fill posisi target satu tahun
+        if (!empty($data['target_satu_tahun_option'])) {
+            $option = MstOption::find($data['target_satu_tahun_option']);
+            if ($option) {
+                $data['target_satu_tahun_position'] = $option->position;
+            }
+        }
+
+        // Auto-fill inherent risk result & level risiko
+        if (!empty($data['inherent_risk_level_dampak']) && !empty($data['inherent_risk_level_kemungkinan'])) {
+            $ir = MstHeatmap::with('riskRange')
+                ->where('dampak', $data['inherent_risk_level_dampak'])
+                ->where('kemungkinan', $data['inherent_risk_level_kemungkinan'])
+                ->first();
+
+            if ($ir) {
+                $data['inherent_risk_posisi_risiko'] = $ir->result;
+                $data['inherent_risk_level_risiko'] = $ir->riskRange->name ?? null;
+            }
+        }
+
+        // Auto-fill residual risk result & level risiko
+        if (!empty($data['residual_target_level_dampak']) && !empty($data['residual_target_level_kemungkinan'])) {
+            $rr = MstHeatmap::with('riskRange')
+                ->where('dampak', $data['residual_target_level_dampak'])
+                ->where('kemungkinan', $data['residual_target_level_kemungkinan'])
+                ->first();
+
+            if ($rr) {
+                $data['residual_target_posisi_risiko'] = $rr->result;
+                $data['residual_target_level_risiko'] = $rr->riskRange->name ?? null;
+            }
+        }
+
+        $entry->update(array_merge(
+            $request->only((new TrRiskHeaderEntry)->getFillable()),
+            [
+                'inherent_risk_posisi_risiko' => $data['inherent_risk_posisi_risiko'] ?? null,
+                'inherent_risk_level_risiko' => $data['inherent_risk_level_risiko'] ?? null,
+                'residual_target_posisi_risiko' => $data['residual_target_posisi_risiko'] ?? null,
+                'residual_target_level_risiko' => $data['residual_target_level_risiko'] ?? null,
+                'target_satu_tahun_position' => $data['target_satu_tahun_position'] ?? null,
+            ]
+        ));
+
+        DB::commit();
+
+        return json(200, true, 'Berhasil', 'Data entry berhasil diperbarui.', $entry);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal', 'Terjadi kesalahan saat menyimpan data.', $e->getMessage());
+    }
 }
-
-
     public function destroy($id)
     {
         $data = TrRiskHeaderEntry::find($id);

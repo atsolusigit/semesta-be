@@ -103,4 +103,25 @@ class TrRiskHeaderEntry extends Model
     return $this->hasMany(TrRiskMonthlyEntry::class, 'tr_risk_header_entry_id', 'id');
 }
 
+public static function getNextProcessCode($year = null, $departmentId = null)
+    {
+        $query = static::query();
+
+        if ($year) {
+            $query->where('year', $year);
+        }
+
+        if ($departmentId) {
+            $query->where('department_id', $departmentId);
+        }
+
+        $lastCode = $query->max('process_code') ?? 0;
+        return $lastCode + 1;
+    }
+
+    public function setNextProcessCode()
+    {
+        $this->process_code = static::getNextProcessCode($this->year, $this->department_id);
+        return $this;
+    }
 }

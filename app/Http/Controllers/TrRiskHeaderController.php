@@ -36,8 +36,6 @@ class TrRiskHeaderController extends Controller
         'headerEntry.irKemungkinan:id,label',
         'headerEntry.rrDampak:id,label',
         'headerEntry.rrKemungkinan:id,label',
-        'headerEntry.rrPosisi:id,result,color',
-        'headerEntry.irPosisi:id,result,color',
         'headerEntry.department:id,name',
         'headerEntry.optionTargetSatuTahun:id,name,position',
     ])

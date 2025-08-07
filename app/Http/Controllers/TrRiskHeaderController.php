@@ -57,8 +57,9 @@ class TrRiskHeaderController extends Controller
         $inherentColor = get_color_by_position($item->inherent_risk_posisi_risiko);
         $residualTargetColor = get_color_by_position($item->residual_target_posisi_risiko);
 
-        // Generate 12 bulan dengan data monthlyData dan upload lengkap dengan id upload
+        $monthlyDataMap = [];
         $monthly = [];
+
         for ($i = 1; $i <= 12; $i++) {
             $dataBulanan = $item->monthlyData->firstWhere('month', $i);
 
@@ -67,6 +68,10 @@ class TrRiskHeaderController extends Controller
                 $realization = $dataBulanan->realization_quantitative ?? 0;
                 $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
 
+                // Simpan monthly_data sebagai objek berdasarkan bulan
+                $monthlyDataMap[$i] = $dataBulanan;
+
+                // Simpan summary ke dalam monthly[]
                 $monthly[] = [
                     'bulan' => $i,
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
@@ -74,7 +79,6 @@ class TrRiskHeaderController extends Controller
                     'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                     'realization_percentage' => $percentage . '%',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
-                    'monthly_data' => $dataBulanan,
                     'uploads' => $dataBulanan->uploads->map(function ($upload) {
                         return [
                             'id' => $upload->id,
@@ -84,6 +88,7 @@ class TrRiskHeaderController extends Controller
                     }),
                 ];
             } else {
+                $monthlyDataMap[$i] = null;
                 $monthly[] = [
                     'bulan' => $i,
                     'residual_risk_level' => null,
@@ -91,13 +96,11 @@ class TrRiskHeaderController extends Controller
                     'residual_risk_posisi_risiko_color' => null,
                     'realization_percentage' => '0%',
                     'is_finalized' => false,
-                    'monthly_data' => null,
                     'uploads' => [],
                 ];
             }
         }
 
-        // Uploads header lengkap dengan id (optional tetap saya tampilkan di sini)
         $headerUploads = $item->uploads->map(function ($upload) {
             return [
                 'id' => $upload->id,
@@ -106,7 +109,6 @@ class TrRiskHeaderController extends Controller
             ];
         });
 
-        // Entry data lengkap dengan 12 bulan dan upload id
         $entryData = $item->headerEntry->map(function ($entry) {
             $monthlyEntries = collect();
             for ($i = 1; $i <= 12; $i++) {
@@ -146,30 +148,19 @@ class TrRiskHeaderController extends Controller
                 }
             }
 
-            // Hapus field yang bernilai null sebelum return
             $entryArray = [
                 'id' => $entry->id,
-                // 'header_id' => $entry->header_id, // dihilangkan jika null
-                // 'judul_entry' => $entry->judul_entry, // dihilangkan jika null
-                // 'keterangan' => $entry->keterangan, // dihilangkan jika null
                 'monthly_entry' => $monthlyEntries,
             ];
 
-            if ($entry->header_id !== null) {
-                $entryArray['header_id'] = $entry->header_id;
-            }
-            if ($entry->judul_entry !== null) {
-                $entryArray['judul_entry'] = $entry->judul_entry;
-            }
-            if ($entry->keterangan !== null) {
-                $entryArray['keterangan'] = $entry->keterangan;
-            }
+            if ($entry->header_id !== null) $entryArray['header_id'] = $entry->header_id;
+            if ($entry->judul_entry !== null) $entryArray['judul_entry'] = $entry->judul_entry;
+            if ($entry->keterangan !== null) $entryArray['keterangan'] = $entry->keterangan;
 
             return $entryArray;
         });
 
         return [
-            // Header data
             'id' => $item->id,
             'risk_code' => $item->riskCode ?? null,
             'process_code' => $item->process_code ?? '',
@@ -209,19 +200,17 @@ class TrRiskHeaderController extends Controller
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             'department' => $item->department ?? null,
 
-            // Array 12 bulan dengan uploads dan id upload di dalamnya
+            'monthly_data' => $monthlyDataMap,
             'monthly' => $monthly,
 
-            // Upload header tetap muncul (optional)
             'uploads' => $headerUploads,
-
-            // Entry data lengkap dengan monthly_entry dan uploads di dalamnya
             'entry_data' => $entryData,
         ];
     });
 
     return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $orderedData);
 }
+
 
    public function show($id)
 {

@@ -14,7 +14,8 @@ class Knowledgebase extends Model
     protected $table = 'knowledgebase';
 
     protected $fillable = [
-        'creator_id', 'img_path', 'doc_path','description', 'long_description', 'type'
+        'creator_id', 'img_path', 'doc_path','description', 'long_description', 'type','title','created_by',
+        'updated_by',
     ];
 
     public function creator()

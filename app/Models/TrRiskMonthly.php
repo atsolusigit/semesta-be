@@ -45,6 +45,10 @@ class TrRiskMonthly extends Model
         'residual_risk_satutahun_level_risiko',
 
         'is_finalize',
+        'created_by',
+        'updated_by',
+        'updated_at',
+        'finalized_by',
         'entries',
     ];
 
@@ -108,6 +112,13 @@ class TrRiskMonthly extends Model
 //     {
 //         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
 //     }
+
+    public function createdBy() {
+    return $this->belongsTo(User::class, 'created_by');
+    }
+    public function updatedBy() {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
 
     // =====================================

@@ -815,5 +815,104 @@ if (!function_exists('get_color_by_position')) {
         return $riskRange ? $riskRange->color : null;
     }
 }
+
+if (!function_exists('clean_string')) {
+    /**
+     * Bersihkan string dari karakter tidak valid agar aman di JSON dan encoding UTF-8.
+     *
+     * @param mixed $string
+     * @return mixed
+     */
+    function clean_string($string)
+    {
+        if (!is_string($string)) return $string;
+
+        // Hapus karakter kontrol yang tidak diinginkan
+        $string = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $string);
+
+        // Pastikan encoding UTF-8 valid
+        if (!mb_check_encoding($string, 'UTF-8')) {
+            $detected = mb_detect_encoding($string, ['UTF-8', 'ISO-8859-1', 'Windows-1252'], true);
+            if ($detected !== false) {
+                $string = mb_convert_encoding($string, 'UTF-8', $detected);
+            } else {
+                // Remove byte sequences yang invalid
+                $string = iconv('UTF-8', 'UTF-8//IGNORE', $string);
+            }
+        }
+
+        return trim($string);
+    }
+}
+
+if (!function_exists('clean_recursive')) {
+    /**
+     * Bersihkan array/object secara rekursif menggunakan clean_string.
+     *
+     * @param mixed $data
+     * @return mixed
+     */
+    function clean_recursive($data)
+    {
+        if (is_array($data)) {
+            $cleaned = [];
+            foreach ($data as $key => $value) {
+                $cleanedKey = is_string($key) ? clean_string($key) : $key;
+                $cleaned[$cleanedKey] = clean_recursive($value);
+            }
+            return $cleaned;
+        }
+
+        if (is_object($data)) {
+            if (method_exists($data, 'toArray')) {
+                return clean_recursive($data->toArray());
+            }
+
+            $cleaned = new \stdClass();
+            foreach (get_object_vars($data) as $key => $value) {
+                $cleanedKey = clean_string($key);
+                $cleaned->$cleanedKey = clean_recursive($value);
+            }
+            return $cleaned;
+        }
+
+        if (is_string($data)) {
+            return clean_string($data);
+        }
+
+        return $data;
+    }
+}
+
+if (!function_exists('get_decrypted_username')) {
+    /**
+     * Ambil dan dekripsi username dari objek user, fallback ke 'Unknown User' jika gagal.
+     *
+     * @param object|null $userObject
+     * @return string
+     */
+    function get_decrypted_username($userObject)
+    {
+        if (!$userObject || !isset($userObject->username) || !isset($userObject->id)) {
+            return 'Unknown User';
+        }
+
+        try {
+            $decryptedRaw = encrypt_decrypt_db('dec', $userObject->username, $userObject->id);
+            if (is_string($decryptedRaw) && !empty(trim($decryptedRaw))) {
+                $cleaned = clean_string($decryptedRaw);
+                if (!empty($cleaned)) {
+                    return $cleaned;
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Error decrypt username for user ID {$userObject->id}: " . $e->getMessage());
+        }
+
+        return 'Unknown User';
+    }
+}
+
+
 }
 

@@ -216,7 +216,7 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/ri
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header/{id}', [TrRiskHeaderController::class, 'show']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->get('/risk-monitoring', [TrRiskHeaderController::class, 'monitoring']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monitoring', [TrRiskHeaderController::class, 'monitoring']);
 
 // ===================== RISK HEADER ENTRY =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header/{id}/entry', [TrRiskHeaderEntryController::class, 'index']);
@@ -278,12 +278,10 @@ Route::middleware(['auth:api'])->group(function () {
 });
 
 // ===================== Export File =====================
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->group(function () {
+    Route::get('/export-risk/{format}', [ExportRiskController::class, 'export'])
+        ->where(['format' => 'pdf|excel']);
 
-Route::middleware([RoleAccessMiddleware::class . ':1,2'])->group(function () {
     Route::get('/export-risk/{id}/preview', [ExportRiskController::class, 'preview'])
         ->where('id', '[0-9]+');
-
-    Route::get('/export-risk/{id}/{format}', [ExportRiskController::class, 'export'])
-        ->where(['id' => '[0-9]+', 'format' => 'pdf|excel']);
-
 });

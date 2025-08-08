@@ -15,7 +15,7 @@ use Carbon\Carbon;
 
 class TrRiskMonthlyController extends Controller
 {
-    public function index()
+  public function index()
 {
     $data = TrRiskMonthly::with([
         'header',
@@ -28,6 +28,8 @@ class TrRiskMonthlyController extends Controller
         'uploads',
         'entries.rrLevelDampak',
         'entries.rrLevelKemungkinan',
+        'createdBy',
+        'updatedBy',
     ])
     ->orderBy('header_id')
     ->orderBy('month')
@@ -79,17 +81,24 @@ class TrRiskMonthlyController extends Controller
                 'target_quantitative' => $entry['target_quantitative'],
                 'realization_quantitative' => $entry['realization_quantitative'],
                 'target_notes' => $entry['target_notes'],
-                'realization_notes' => $entry['realization_note'], // <- sesuai field migration
+                'realization_notes' => $entry['realization_note'], // sesuai field migration
                 'created_at' => $entry['created_at'],
             ];
         });
 
+        // Tambahkan created_by_name dan updated_by_name, bersihkan dengan clean_string()
+        $arr['created_by_name'] = $item->createdBy ? clean_string(get_decrypted_username($item->createdBy)) : 'Unknown User';
+        $arr['updated_by_name'] = $item->updatedBy ? clean_string(get_decrypted_username($item->updatedBy)) : 'Unknown User';
+
         return $arr;
     });
 
+    // Bersihkan seluruh data hasil map dengan clean_recursive untuk jaga-jaga
+    $cleaned = clean_recursive($cleaned->toArray());
+
     return json(200, true, 'List data', 'Data risk monthly berhasil diambil.', $cleaned);
 }
-    public function show($id)
+public function show($id)
 {
     $data = TrRiskMonthly::with([
         'header',
@@ -102,6 +111,8 @@ class TrRiskMonthlyController extends Controller
         'uploads',
         'entries.rrLevelDampak',
         'entries.rrLevelKemungkinan',
+        'createdBy',
+        'updatedBy',
     ])->find($id);
 
     if (!$data) {
@@ -129,30 +140,37 @@ class TrRiskMonthlyController extends Controller
 
     // Ambil data quantitative
     $arr['quantitative'] = [
-        'target_quantitative' => $data->entry?->quantitative->target_quantitative,
-        'target_notes' => $data->entry?->quantitative->target_notes,
-        'realization_quantitative' => $data->entry?->quantitative->realization_quantitative,
-        'realization_notes' => $data->entry?->quantitative->realization_notes,
+        'target_quantitative' => $data->entry?->quantitative->target_quantitative ?? null,
+        'target_notes' => $data->entry?->quantitative->target_notes ?? null,
+        'realization_quantitative' => $data->entry?->quantitative->realization_quantitative ?? null,
+        'realization_notes' => $data->entry?->quantitative->realization_notes ?? null,
     ];
 
     // Ambil data residual
     $arr['residual'] = [
-        'status_risiko' => $data->entry?->residual->status_risiko,
-        'residual_risk_level_dampak' => $data->entry?->residual->residual_risk_level_dampak,
-        'residual_risk_level_kemungkinan' => $data->entry?->residual->residual_risk_level_kemungkinan,
+        'status_risiko' => $data->entry?->residual->status_risiko ?? null,
+        'residual_risk_level_dampak' => $data->entry?->residual->residual_risk_level_dampak ?? null,
+        'residual_risk_level_kemungkinan' => $data->entry?->residual->residual_risk_level_kemungkinan ?? null,
     ];
+
+    // Tambahkan created_by_name dan updated_by_name, bersihkan dengan clean_string()
+    $arr['created_by_name'] = $data->createdBy ? clean_string(get_decrypted_username($data->createdBy)) : 'Unknown User';
+    $arr['updated_by_name'] = $data->updatedBy ? clean_string(get_decrypted_username($data->updatedBy)) : 'Unknown User';
 
     $monthNames = [
         1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
         5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
         9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
     ];
-    $arr['month_name'] = $monthNames[$data->month] . ' ' . ($data->year ?? ($data->header->year ?? ''));
+    $arr['month_name'] = ($monthNames[$data->month] ?? 'Unknown') . ' ' . ($data->year ?? ($data->header->year ?? ''));
+
+    // Bersihkan seluruh array untuk keamanan encoding
+    $arr = clean_recursive($arr);
 
     return json(200, true, 'Data Ditemukan', 'Detail data risk monthly berhasil diambil.', $arr);
 }
 
-    public function getByHeader($headerId)
+public function getByHeader($headerId)
 {
     $header = TrRiskHeader::find($headerId);
     if (!$header) {
@@ -168,7 +186,9 @@ class TrRiskMonthlyController extends Controller
         'rrYearLevelKemungkinan',
         'mitigations',
         'uploads',
-        'entries'
+        'entries',
+        'createdBy',
+        'updatedBy',
     ])->where('header_id', $headerId)
       ->orderBy('month')
       ->get();
@@ -192,7 +212,7 @@ class TrRiskMonthlyController extends Controller
             ];
         });
 
-       $residual = collect($item['entries'])->filter(function ($entry) {
+        $residual = collect($item['entries'])->filter(function ($entry) {
             return isset($entry['residual_risk_level_dampak']) || isset($entry['residual_risk_satutahun_level_dampak']);
         })->values();
 
@@ -217,13 +237,20 @@ class TrRiskMonthlyController extends Controller
                 'target_quantitative' => $entry['target_quantitative'],
                 'realization_quantitative' => $entry['realization_quantitative'],
                 'target_notes' => $entry['target_notes'],
-                'realization_notes' => $entry['realization_note'], // <- sesuai field migration
+                'realization_notes' => $entry['realization_note'], // sesuai field migration
                 'created_at' => $entry['created_at'],
             ];
         });
 
+        // Tambahkan created_by_name dan updated_by_name
+        $arr['created_by_name'] = $item->createdBy ? clean_string(get_decrypted_username($item->createdBy)) : 'Unknown User';
+        $arr['updated_by_name'] = $item->updatedBy ? clean_string(get_decrypted_username($item->updatedBy)) : 'Unknown User';
+
         return $arr;
     });
+
+    // Bersihkan seluruh data
+    $cleaned = clean_recursive($cleaned->toArray());
 
     return json(200, true, 'Data Ditemukan', 'Data monthly untuk header berhasil diambil.', [
         'header' => $header,
@@ -231,14 +258,15 @@ class TrRiskMonthlyController extends Controller
     ]);
 }
 
+
     public function updateResidualAndFinalize(Request $request, $id)
 {
-    $data = TrRiskMonthly::with('header')->find($id);
+    $data = TrRiskMonthly::with('header.createdBy', 'uploads')->find($id);
     if (!$data) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
     }
 
-   if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
+    if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
         return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
     }
 
@@ -276,11 +304,11 @@ class TrRiskMonthlyController extends Controller
         'residual_risk_satutahun_level_kemungkinan' => 'nullable|exists:mst_heatmap_kemungkinan,id',
     ];
 
-   $validation = check_validation($request->all(), $validationRules);
-if ($validation[0] == 1) {
-    $errors = $validation[1]->getData(true)['data'] ?? [];
-    return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
-}
+    $validation = check_validation($request->all(), $validationRules);
+    if ($validation[0] == 1) {
+        $errors = $validation[1]->getData(true)['data'] ?? [];
+        return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+    }
 
     $dateValidation = validate_risk_monthly_dates($request, $data->header->year, $data->month);
     if (!$dateValidation['valid']) {
@@ -288,6 +316,7 @@ if ($validation[0] == 1) {
     }
 
     DB::beginTransaction();
+
     try {
         $residualRiskHeatmap = MstHeatmap::with('riskRange')
             ->where('dampak', $request->residual_risk_level_dampak)
@@ -324,6 +353,7 @@ if ($validation[0] == 1) {
             'residual_risk_level_kemungkinan' => $request->residual_risk_level_kemungkinan,
             'residual_risk_posisi_risiko' => $residualRiskHeatmap->result,
             'residual_risk_level_risiko' => $residualRiskHeatmap->riskRange->name ?? null,
+            'updated_by' => auth()->id(),
         ];
 
         // Optional: proses field tahunan jika valid
@@ -338,7 +368,7 @@ if ($validation[0] == 1) {
 
         // Finalisasi otomatis
         $data->is_finalize = true;
-        $data->finalized_at = Carbon::now();
+        $data->finalized_at = now();
         $data->finalized_by = auth()->id() ?? null;
         $data->save();
 
@@ -354,43 +384,52 @@ if ($validation[0] == 1) {
             $warnings[] = "Status Risiko masih open di bulan Desember. Ini akan menjadi tindak lanjut di tahun berikutnya.";
         }
 
-        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position','uploads',]);
+        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position', 'uploads']);
         $data->makeHidden(['realization_option_position', 'target_option_position']);
 
-        $responseData = $data->toArray();
+        // Gunakan helper decrypt username dan bersihkan string di semua output
+        $createdByName = get_decrypted_username($data->header->createdBy ?? null);
+
         $responseData = [
-    'id' => $data->id,
-    'header_id' => $data->header_id,
-    'month' => $data->month,
-    'risk_code' => $data->risk_code,
-    'status_risiko' => $data->status_risiko,
-    'process_code' => $data->process_code,
-    'start_date' => $data->start_date,
-    'expired_date' => $data->expired_date,
-    'realization_quantitative' => $data->realization_quantitative,
-    'realization_note' => $data->realization_note,
-    'target_quantitative' => $data->target_quantitative,
-    'target_notes' => $data->target_notes,
-    'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
-    'residual_risk_level_kemungkinan' => $data->residual_risk_level_kemungkinan,
-    'residual_risk_posisi_risiko' => $data->residual_risk_posisi_risiko,
-    'residual_risk_level_risiko' => $data->residual_risk_level_risiko,
-    'residual_risk_level_risiko_color' => $residualRiskHeatmap->riskRange->color ?? null,
-    'is_finalize' => $data->is_finalize,
-    'finalized_at' => $data->finalized_at,
-    'finalized_by' => $data->finalized_by,
-    'created_at' => $data->created_at,
-    'updated_at' => $data->updated_at,
-    'header' => $data->header,
-     'uploaded_files' => $data->uploads->map(function ($file) {
+            'id' => $data->id,
+            'header_id' => $data->header_id,
+            'month' => $data->month,
+            'risk_code' => clean_string($data->risk_code),
+            'status_risiko' => clean_string($data->status_risiko),
+            'process_code' => clean_string($data->process_code),
+            'start_date' => clean_string($data->start_date),
+            'expired_date' => clean_string($data->expired_date),
+            'realization_quantitative' => $data->realization_quantitative,
+            'realization_note' => clean_string($data->realization_note),
+            'target_quantitative' => $data->target_quantitative,
+            'target_notes' => clean_string($data->target_notes),
+            'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
+            'residual_risk_level_kemungkinan' => $data->residual_risk_level_kemungkinan,
+            'residual_risk_posisi_risiko' => $data->residual_risk_posisi_risiko,
+            'residual_risk_level_risiko' => clean_string($data->residual_risk_level_risiko),
+            'residual_risk_level_risiko_color' => $residualRiskHeatmap->riskRange->color ?? null,
+            'is_finalize' => $data->is_finalize,
+            'finalized_at' => clean_string($data->finalized_at),
+            'finalized_by' => $data->finalized_by,
+            'created_at' => clean_string($data->created_at),
+            'updated_at' => clean_string($data->updated_at),
+            'header' => [
+                'id' => $data->header->id,
+                'year' => $data->header->year,
+                'created_by' => $data->header->created_by,
+                'created_at' => clean_string($data->header->created_at),
+                'updated_at' => clean_string($data->header->updated_at),
+                'created_by_name' => $createdByName,
+            ],
+            'uploaded_files' => $data->uploads->map(function ($file) {
                 return [
                     'id' => $file->id,
-                    'filepath' => $file->filepath,
-                    'domain' => $file->domain,
+                    'filepath' => clean_string($file->filepath),
+                    'domain' => clean_string($file->domain),
                 ];
             }),
-    'warnings' => $warnings,
-];
+            'warnings' => $warnings,
+        ];
 
         return json(200, true, 'Berhasil Diperbarui & Difinalisasi', 'Data berhasil disimpan dan difinalisasi.', $responseData, $warnings);
 
@@ -400,9 +439,9 @@ if ($validation[0] == 1) {
     }
 }
 
-    public function updateResidual(Request $request, $id)
+   public function updateResidual(Request $request, $id)
 {
-      $data = TrRiskMonthly::with('header')->find($id);
+    $data = TrRiskMonthly::with('header.createdBy', 'uploads')->find($id);
     if (!$data) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
     }
@@ -411,8 +450,6 @@ if ($validation[0] == 1) {
         return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', ['id' => $id]);
     }
 
-
-    // Validasi semua bulan sebelumnya harus sudah difinalisasi
     if ($data->month > 1) {
         $unfinalized = TrRiskMonthly::where('header_id', $data->header_id)
             ->where('month', '<', $data->month)
@@ -427,7 +464,6 @@ if ($validation[0] == 1) {
         }
     }
 
-    // Auto-generate tanggal default jika tidak disediakan
     $autoGeneratedDates = generate_risk_monthly_dates($data->header->year, $data->month);
 
     $validationRules = [
@@ -445,20 +481,20 @@ if ($validation[0] == 1) {
         'residual_risk_satutahun_level_dampak' => 'nullable|exists:mst_heatmap_dampak,id',
         'residual_risk_satutahun_level_kemungkinan' => 'nullable|exists:mst_heatmap_kemungkinan,id',
     ];
-   $validation = check_validation($request->all(), $validationRules);
-if ($validation[0] == 1) {
-    $errors = $validation[1]->getData(true)['data'] ?? [];
-    return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
-}
-    // Validasi tanggal sesuai tahun & bulan
+    $validation = check_validation($request->all(), $validationRules);
+    if ($validation[0] == 1) {
+        $errors = $validation[1]->getData(true)['data'] ?? [];
+        return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+    }
+
     $dateValidation = validate_risk_monthly_dates($request, $data->header->year, $data->month);
     if (!$dateValidation['valid']) {
         return json(400, false, 'Validasi Gagal', $dateValidation['message'], ['id' => $id]);
     }
 
     DB::beginTransaction();
+
     try {
-        // Ambil heatmap residual
         $residualRiskHeatmap = MstHeatmap::with('riskRange')
             ->where('dampak', $request->residual_risk_level_dampak)
             ->where('kemungkinan', $request->residual_risk_level_kemungkinan)
@@ -474,11 +510,9 @@ if ($validation[0] == 1) {
             'expired_date' => $request->expired_date ?? $autoGeneratedDates['expired_date'],
             'realization_quantitative' => $request->realization_quantitative,
             'realization_option' => $request->realization_option,
-
             'realization_note' => ($data->month == 12 && $request->status_risiko === 'open')
-            ? trim(($request->realization_notes ? $request->realization_notes . ' | ' : '') . 'Tindak lanjut di tahun berikutnya.')
-            : $request->realization_notes,
-
+                ? trim(($request->realization_notes ? $request->realization_notes . ' | ' : '') . 'Tindak lanjut di tahun berikutnya.')
+                : $request->realization_notes,
             'realization_option_position' => $request->realization_option_position,
             'target_option' => $request->target_option,
             'target_option_position' => $request->target_option_position,
@@ -486,9 +520,9 @@ if ($validation[0] == 1) {
             'residual_risk_level_kemungkinan' => $request->residual_risk_level_kemungkinan,
             'residual_risk_posisi_risiko' => $residualRiskHeatmap->result,
             'residual_risk_level_risiko' => $residualRiskHeatmap->riskRange->name ?? null,
+            'updated_by' => auth()->id(),
         ];
 
-        // Proses data risiko residual tahunan jika lengkap
         if (should_process_yearly_residual_risk($request)) {
             $yearlyData = process_yearly_residual_risk($request);
             if ($yearlyData) {
@@ -498,56 +532,64 @@ if ($validation[0] == 1) {
 
         $data->update($updateData);
 
-        // Tangani file upload jika dikirim
         if ($request->has('uploaded_files')) {
             process_risk_monthly_file_uploads($request->uploaded_files, $data);
         }
 
         DB::commit();
 
-        // Berikan warning khusus jika bulan Desember masih open
         $warnings = [];
         if ($data->month == 12 && $request->status_risiko === 'open') {
             $warnings[] = 'Perhatian: Status Risiko masih open di bulan Desember. Ini akan menjadi tindak lanjut di tahun berikutnya.';
         }
 
-        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position','uploads',]);
+        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position', 'uploads']);
+
         $data->makeHidden(['realization_option_position', 'target_option_position']);
 
-        $responseData = $data->toArray();
-       $responseData = [
-    'id' => $data->id,
-    'header_id' => $data->header_id,
-    'month' => $data->month,
-    'risk_code' => $data->risk_code,
-    'status_risiko' => $data->status_risiko,
-    'process_code' => $data->process_code,
-    'start_date' => $data->start_date,
-    'expired_date' => $data->expired_date,
-    'realization_quantitative' => $data->realization_quantitative,
-    'realization_note' => $data->realization_note,
-    'target_quantitative' => $data->target_quantitative,
-    'target_notes' => $data->target_notes,
-    'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
-    'residual_risk_level_kemungkinan' => $data->residual_risk_level_kemungkinan,
-    'residual_risk_posisi_risiko' => $data->residual_risk_posisi_risiko,
-    'residual_risk_level_risiko' => $data->residual_risk_level_risiko,
-    'residual_risk_level_risiko_color' => $residualRiskHeatmap->riskRange->color ?? null,
-    'is_finalize' => $data->is_finalize,
-    'finalized_at' => $data->finalized_at,
-    'finalized_by' => $data->finalized_by,
-    'created_at' => $data->created_at,
-    'updated_at' => $data->updated_at,
-    'header' => $data->header,
-    'uploaded_files' => $data->uploads->map(function ($file) {
+        $createdByName = get_decrypted_username($data->header->createdBy ?? null);
+
+        // Pastikan semua string dibersihkan dengan helper clean_string() kamu
+        $responseData = [
+            'id' => $data->id,
+            'header_id' => $data->header_id,
+            'month' => $data->month,
+            'risk_code' => clean_string($data->risk_code),
+            'status_risiko' => clean_string($data->status_risiko),
+            'process_code' => clean_string($data->process_code),
+            'start_date' => clean_string($data->start_date),
+            'expired_date' => clean_string($data->expired_date),
+            'realization_quantitative' => $data->realization_quantitative,
+            'realization_note' => clean_string($data->realization_note),
+            'target_quantitative' => $data->target_quantitative,
+            'target_notes' => clean_string($data->target_notes),
+            'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
+            'residual_risk_level_kemungkinan' => $data->residual_risk_level_kemungkinan,
+            'residual_risk_posisi_risiko' => $data->residual_risk_posisi_risiko,
+            'residual_risk_level_risiko' => clean_string($data->residual_risk_level_risiko),
+            'residual_risk_level_risiko_color' => $residualRiskHeatmap->riskRange->color ?? null,
+            'is_finalize' => $data->is_finalize,
+            'finalized_at' => $data->finalized_at,
+            'finalized_by' => $data->finalized_by,
+            'created_at' => clean_string($data->created_at),
+            'updated_at' => clean_string($data->updated_at),
+            'header' => [
+                'id' => $data->header->id,
+                'year' => $data->header->year,
+                'created_by' => $data->header->created_by,
+                'created_at' => clean_string($data->header->created_at),
+                'updated_at' => clean_string($data->header->updated_at),
+            ],
+            'uploaded_files' => $data->uploads->map(function ($file) {
                 return [
                     'id' => $file->id,
-                    'filepath' => $file->filepath,
-                    'domain' => $file->domain,
+                    'filepath' => clean_string($file->filepath),
+                    'domain' => clean_string($file->domain),
                 ];
             }),
-    'warnings' => $warnings,
-];
+            'created_by_name' => $createdByName,
+            'warnings' => $warnings,
+        ];
 
         return json(200, true, 'Berhasil Diperbarui', 'Data residual risk berhasil diperbarui.', $responseData, $warnings);
 
@@ -562,7 +604,7 @@ if ($validation[0] == 1) {
 
   public function updateQuantitative(Request $request, $id)
 {
-     $monthly = TrRiskMonthly::with('header.uploads')->find($id);
+    $monthly = TrRiskMonthly::with('header.createdBy', 'header.uploads')->find($id);
     if (!$monthly) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
     }
@@ -576,45 +618,59 @@ if ($validation[0] == 1) {
         'target_notes' => 'nullable|string',
     ];
 
-
-   $validation = check_validation($request->all(), $validationRules);
-if ($validation[0] == 1) {
-    $errors = $validation[1]->getData(true)['data'] ?? [];
-    return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
-}
+    $validation = check_validation($request->all(), $validationRules);
+    if ($validation[0] == 1) {
+        $errors = $validation[1]->getData(true)['data'] ?? [];
+        return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+    }
 
     DB::beginTransaction();
     try {
-
         $monthly->update([
             'target_quantitative' => $request->target_quantitative,
             'target_notes' => $request->target_notes,
+            'updated_by' => auth()->id(),
         ]);
 
         DB::commit();
 
-        $monthly->load('header.uploads');
-        $result = clean_monthly_data($monthly->toArray());
-        $monthlyUploads = $monthly->header->uploads ? $monthly->header->uploads->where('risk_monthly_id', $monthly->id) : collect([]);
+        // Refresh data
+        $monthly->load('header.createdBy', 'header.uploads');
 
-        $result['uploaded_files'] = $monthlyUploads->count() > 0
-            ? $monthlyUploads->map(function ($file) {
-                return [
-                     'id' => $file->id,
-                    'filepath' => $file->filepath,
-                    'domain' => $file->domain,
-                ];
-            })->toArray()
-            : [];
-        if (isset($result['header']['uploads'])) {
-            unset($result['header']['uploads']);
-        }
+        // Bersihkan string pada response
+        $cleanedData = [
+            'id' => $monthly->id,
+            'header_id' => $monthly->header_id,
+            'month' => $monthly->month,
+            'risk_code' => clean_string($monthly->risk_code),
+            'target_quantitative' => $monthly->target_quantitative,
+            'target_notes' => clean_string($monthly->target_notes),
+            'status_risiko' => clean_string($monthly->status_risiko),
+            'is_finalize' => $monthly->is_finalize,
+            'created_at' => clean_string($monthly->created_at),
+            'updated_at' => clean_string($monthly->updated_at),
+            'header' => [
+                'id' => $monthly->header->id,
+                'year' => $monthly->header->year,
+                'created_by' => $monthly->header->created_by,
+                'created_at' => clean_string($monthly->header->created_at),
+                'updated_at' => clean_string($monthly->header->updated_at),
+                'created_by_name' => get_decrypted_username($monthly->header->createdBy ?? null),
+            ],
+            'uploaded_files' => $monthly->header->uploads
+                ->filter(fn($file) => $file->risk_monthly_id == $monthly->id)
+                ->map(fn($file) => [
+                    'id' => $file->id,
+                    'filepath' => clean_string($file->filepath),
+                    'domain' => clean_string($file->domain),
+                ])->values()->toArray(),
+        ];
 
-        return json(200, true, 'Berhasil Diupdate', 'Data target kuantitatif berhasil diupdate.', $result);
+        return json(200, true, 'Berhasil Diupdate', 'Data target kuantitatif berhasil diupdate.', $cleanedData);
 
     } catch (\Throwable $e) {
         DB::rollBack();
-        return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan pada sistem.', $e->getMessage());
+        return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan pada sistem.', ['error' => $e->getMessage()]);
     }
 }
 
@@ -730,9 +786,9 @@ if ($validation[0] == 1) {
         }
     }
 
-    public function bulkUpdateQuantitative(Request $request, $headerId)
+   public function bulkUpdateQuantitative(Request $request, $headerId)
 {
-   $header = TrRiskHeader::find($headerId);
+    $header = TrRiskHeader::find($headerId);
     if (!$header) {
         return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', ['header_id' => $headerId]);
     }
@@ -782,12 +838,11 @@ if ($validation[0] == 1) {
         }
     }
 
-   $validation = check_validation($request->all(), $validationRules);
-if ($validation[0] == 1) {
-    $errors = $validation[1]->getData(true)['data'] ?? [];
-    return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
-}
-
+    $validation = check_validation($request->all(), $validationRules);
+    if ($validation[0] == 1) {
+        $errors = $validation[1]->getData(true)['data'] ?? [];
+        return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+    }
 
     $updateMode = $request->update_mode ?? 'complete';
     $processedData = process_bulk_monthly_data($request->monthly_data, $hasMonthField);
@@ -819,30 +874,60 @@ if ($validation[0] == 1) {
             $processedData['monthly_data'],
             $existingMonthly,
             $header,
-            $updateMode
+            $updateMode,
+            auth()->id()
         );
 
         // Load uploads untuk header ini
         $header->load('uploads');
 
-        // Add uploaded_files to each item in updated_data berdasarkan risk_monthly_id
+        // Ambil semua id monthly yang diupdate atau dibuat
+        $idsToLoad = [];
+        if (isset($result['updated_data']) && is_array($result['updated_data'])) {
+            $idsToLoad = array_merge($idsToLoad, array_column($result['updated_data'], 'id'));
+        }
+        if (isset($result['created_data']) && is_array($result['created_data'])) {
+            $idsToLoad = array_merge($idsToLoad, array_column($result['created_data'], 'id'));
+        }
+
+        // Load TrRiskMonthly dengan relasi createdBy dan updatedBy untuk semua id tersebut
+        $monthlyRecords = TrRiskMonthly::with(['createdBy', 'updatedBy'])->whereIn('id', $idsToLoad)->get()->keyBy('id');
+
+        // Nama pembuat header, fallback jika createdBy monthly gak ada
+        $headerCreatorName = $header->createdBy ? get_decrypted_username($header->createdBy) : 'Unknown User';
+
+        // Tambahkan uploaded_files dan created_by_name / updated_by_name ke updated_data
         if (isset($result['updated_data']) && is_array($result['updated_data'])) {
             foreach ($result['updated_data'] as &$item) {
-                // Filter uploads berdasarkan risk_monthly_id yang sesuai dengan item
                 $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
 
                 $item['uploaded_files'] = $monthlyUploads->count() > 0
                     ? $monthlyUploads->map(function ($file) {
                         return [
                             'id' => $file->id,
-                            'filepath' => $file->filepath,
-                            'domain' => $file->domain,
+                            'filepath' => clean_string($file->filepath),
+                            'domain' => clean_string($file->domain),
                         ];
                     })->values()->toArray()
                     : [];
+
+                $monthlyModel = $monthlyRecords->get($item['id']);
+
+                if ($monthlyModel) {
+                    if ($monthlyModel->updatedBy) {
+                        $item['updated_by_name'] = get_decrypted_username($monthlyModel->updatedBy);
+                    } elseif ($monthlyModel->createdBy) {
+                        $item['created_by_name'] = get_decrypted_username($monthlyModel->createdBy);
+                    } else {
+                        $item['created_by_name'] = $headerCreatorName;
+                    }
+                } else {
+                    $item['created_by_name'] = $headerCreatorName;
+                }
             }
         }
 
+        // Tambahkan uploaded_files dan created_by_name / updated_by_name ke created_data
         if (isset($result['created_data']) && is_array($result['created_data'])) {
             foreach ($result['created_data'] as &$item) {
                 $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
@@ -850,11 +935,25 @@ if ($validation[0] == 1) {
                 $item['uploaded_files'] = $monthlyUploads->count() > 0
                     ? $monthlyUploads->map(function ($file) {
                         return [
-                            'filepath' => $file->filepath,
-                            'domain' => $file->domain,
+                            'filepath' => clean_string($file->filepath),
+                            'domain' => clean_string($file->domain),
                         ];
                     })->values()->toArray()
                     : [];
+
+                $monthlyModel = $monthlyRecords->get($item['id']);
+
+                if ($monthlyModel) {
+                    if ($monthlyModel->updatedBy) {
+                        $item['updated_by_name'] = get_decrypted_username($monthlyModel->updatedBy);
+                    } elseif ($monthlyModel->createdBy) {
+                        $item['created_by_name'] = get_decrypted_username($monthlyModel->createdBy);
+                    } else {
+                        $item['created_by_name'] = $headerCreatorName;
+                    }
+                } else {
+                    $item['created_by_name'] = $headerCreatorName;
+                }
             }
         }
 

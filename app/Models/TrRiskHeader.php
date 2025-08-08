@@ -36,6 +36,8 @@ class TrRiskHeader extends Model
         'residual_target_level_risiko',
         'department_id',
         'year',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [
@@ -105,6 +107,16 @@ class TrRiskHeader extends Model
     // =====================================
     // RELATIONS
     // =====================================
+
+        public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 
     public function riskCode(): BelongsTo
     {

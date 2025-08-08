@@ -276,10 +276,11 @@ class TrRiskMonthlyController extends Controller
         'residual_risk_satutahun_level_kemungkinan' => 'nullable|exists:mst_heatmap_kemungkinan,id',
     ];
 
-    $validation = check_validation($request->all(), $validationRules);
-    if ($validation[0] == 1) {
-        return $validation[1];
-    }
+   $validation = check_validation($request->all(), $validationRules);
+if ($validation[0] == 1) {
+    $errors = $validation[1]->getData(true)['data'] ?? [];
+    return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+}
 
     $dateValidation = validate_risk_monthly_dates($request, $data->header->year, $data->month);
     if (!$dateValidation['valid']) {
@@ -444,12 +445,11 @@ class TrRiskMonthlyController extends Controller
         'residual_risk_satutahun_level_dampak' => 'nullable|exists:mst_heatmap_dampak,id',
         'residual_risk_satutahun_level_kemungkinan' => 'nullable|exists:mst_heatmap_kemungkinan,id',
     ];
-
-    $validation = check_validation($request->all(), $validationRules);
-    if ($validation[0] == 1) {
-        return $validation[1];
-    }
-
+   $validation = check_validation($request->all(), $validationRules);
+if ($validation[0] == 1) {
+    $errors = $validation[1]->getData(true)['data'] ?? [];
+    return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+}
     // Validasi tanggal sesuai tahun & bulan
     $dateValidation = validate_risk_monthly_dates($request, $data->header->year, $data->month);
     if (!$dateValidation['valid']) {
@@ -577,10 +577,11 @@ class TrRiskMonthlyController extends Controller
     ];
 
 
-    $validation = check_validation($request->all(), $validationRules);
-    if ($validation[0] == 1) {
-        return $validation[1];
-    }
+   $validation = check_validation($request->all(), $validationRules);
+if ($validation[0] == 1) {
+    $errors = $validation[1]->getData(true)['data'] ?? [];
+    return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+}
 
     DB::beginTransaction();
     try {
@@ -781,10 +782,12 @@ class TrRiskMonthlyController extends Controller
         }
     }
 
-    $validation = check_validation($request->all(), $validationRules);
-    if ($validation[0] == 1) {
-        return $validation[1];
-    }
+   $validation = check_validation($request->all(), $validationRules);
+if ($validation[0] == 1) {
+    $errors = $validation[1]->getData(true)['data'] ?? [];
+    return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+}
+
 
     $updateMode = $request->update_mode ?? 'complete';
     $processedData = process_bulk_monthly_data($request->monthly_data, $hasMonthField);

@@ -18,56 +18,70 @@ use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
-    public function index()
-    {
-        $users = User::with(['role:id,name', 'department:id,name'])
-            ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
-            ->orderBy('id', 'asc')
-            ->get();
+     public function index(Request $request)
+{
+    $search = $request->input('search');
 
-        $result = [];
+    $users = User::with(['role:id,name', 'department:id,name'])
+        ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
+        ->where('status',[1, 2])
+        ->orderBy('id', 'asc')
+        ->get();
 
-        foreach ($users as $user) {
-            try {
-                $name = encrypt_decrypt_db('dec', $user->name, $user->id);
-            } catch (\Throwable $e) {
-                \Log::warning("Gagal decrypt name user ID {$user->id}: {$e->getMessage()}");
-                $name = null;
-            }
+    $result = [];
 
-            try {
-                $username = encrypt_decrypt_db('dec', $user->username, $user->id);
-            } catch (\Throwable $e) {
-                \Log::warning("Gagal decrypt username user ID {$user->id}: {$e->getMessage()}");
-                $username = null;
-            }
-
-            try {
-                $email = encrypt_decrypt_db('dec', $user->email, $user->id);
-            } catch (\Throwable $e) {
-                \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
-                $email = null;
-            }
-
-            $result[] = [
-                'id' => encrypt_decrypt_md5('enc', $user->id), // Enkripsi ID menggunakan MD5
-                'name' => $name,
-                'username' => $username,
-                'email' => $email,
-                'role_id' => $user->role_id,
-                'department_id' => $user->department_id,
-                'status' => $user->status,
-                'role_name' => $user->role?->name,
-                'department_name' => $user->department?->name,
-            ];
+    foreach ($users as $user) {
+        try {
+            $name = encrypt_decrypt_db('dec', $user->name, $user->id);
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt name user ID {$user->id}: {$e->getMessage()}");
+            $name = null;
         }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'List data user.',
-            'data' => $result
-        ]);
+        try {
+            $username = encrypt_decrypt_db('dec', $user->username, $user->id);
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt username user ID {$user->id}: {$e->getMessage()}");
+            $username = null;
+        }
+
+        try {
+            $email = encrypt_decrypt_db('dec', $user->email, $user->id);
+        } catch (\Throwable $e) {
+            \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+            $email = null;
+        }
+
+        // Filter berdasarkan search jika ada
+        if ($search) {
+            $searchLower = strtolower($search);
+            if (
+                (is_string($name) && strpos(strtolower($name), $searchLower) === false) &&
+                (is_string($username) && strpos(strtolower($username), $searchLower) === false)
+            ) {
+                continue; // skip kalau data tidak ada
+            }
+        }
+
+        $result[] = [
+            'id' => encrypt_decrypt_md5('enc', $user->id),
+            'name' => $name,
+            'username' => $username,
+            'email' => $email,
+            'role_id' => $user->role_id,
+            'department_id' => $user->department_id,
+            'status' => $user->status,
+            'role_name' => $user->role?->name,
+            'department_name' => $user->department?->name,
+        ];
     }
+
+    return response()->json([
+        'status' => true,
+        'message' => 'List data user.',
+        'data' => $result
+    ]);
+}
 
     public function show(Request $request, $id)
     {
@@ -345,8 +359,10 @@ class UserController extends Controller
         return json(200, 'true', 'success', 'User berhasil ditolak.', []);
     }
 
-    public function getPendingUsers()
+    public function getPendingUsers(Request $request)
 {
+    $search = $request->input('search');
+
     $users = User::with('role:id,name')
         ->select('id', 'name', 'username', 'email', 'role_id', 'status')
         ->where('status', 0)
@@ -389,6 +405,22 @@ class UserController extends Controller
             $email = null;
         }
 
+        // Skip jika name null
+        if (is_null($name) || $name === '') {
+            continue;
+        }
+
+        // Filter berdasarkan search jika ada
+        if ($search) {
+            $searchLower = strtolower($search);
+            if (
+                (is_string($name) && strpos(strtolower($name), $searchLower) === false) &&
+                (is_string($username) && strpos(strtolower($username), $searchLower) === false)
+            ) {
+                continue;
+            }
+        }
+
         $result[] = [
             'id' => encrypt_decrypt_md5('enc', $user->id),
             'name' => $name,
@@ -399,10 +431,8 @@ class UserController extends Controller
             'role_name' => $user->role->name ?? '-',
         ];
     }
-
     return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $result);
 }
-
 
     public function updateProfile(Request $request)
 {

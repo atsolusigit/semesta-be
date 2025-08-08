@@ -8,12 +8,23 @@ use Illuminate\Support\Facades\Validator;
 
 class MstOptionController extends Controller
 {
-    public function index()
-    {
-        $data = MstOption::orderBy('id', 'asc')->get();
-        return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $data);
+  public function index(Request $request)
+{
+    $query = MstOption::query()->orderBy('id', 'asc');
+
+    // Search filter
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('position', 'like', "%{$search}%");
+        });
     }
 
+    $data = $query->get();
+
+    return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $data);
+}
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [

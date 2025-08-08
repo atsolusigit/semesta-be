@@ -9,12 +9,23 @@ use Illuminate\Support\Facades\Validator;
 class MstRiskCodeController extends Controller
 {
     // Ambil semua data jenis risiko
-    public function index()
-    {
-        $data = MstRiskCode::orderBy('id', 'asc')->get();
-        return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $data);
+   public function index(Request $request)
+{
+    $query = MstRiskCode::query()->orderBy('id', 'asc');
+
+    // Search filter (code dan name)
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('code', 'like', "%{$search}%")
+              ->orWhere('name', 'like', "%{$search}%");
+        });
     }
 
+    $data = $query->get();
+
+    return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $data);
+}
     // Tambah data jenis risiko
     public function store(Request $request)
     {

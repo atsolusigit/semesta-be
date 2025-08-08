@@ -14,17 +14,25 @@ use Illuminate\Support\Arr;
 class MstDepartmentController extends Controller
 {
     public function index(Request $request)
-    {
-        $query = MstDepartment::query()->select('id', 'name', 'abbreviation');
+{
+    $query = MstDepartment::select('id', 'name', 'abbreviation');
 
-        if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
-        }
-
-        $departments = $query->orderBy('id')->get();
-
-        return json(200, 'success', 'Success', 'Daftar departemen yang tersedia.', $departments);
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('abbreviation', 'like', "%{$search}%");
+        });
     }
+
+    $departments = $query->orderBy('id')->get();
+
+    if ($departments->isEmpty()) {
+        return json(404, false, 'Not Found', 'Data departemen tidak ditemukan.', []);
+    }
+
+    return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $departments);
+}
 
     public function show($id)
     {

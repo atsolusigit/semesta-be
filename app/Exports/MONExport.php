@@ -21,10 +21,11 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     protected $year;
     protected $totalRows;
     protected $colorMap = [];
+    protected $triwulan;
 
     // Constants for better maintainability
-    private const HEADER_ROWS = 8;
-    private const DATA_START_ROW = 9;
+    private const HEADER_ROWS = 10;
+    private const DATA_START_ROW = 11;
     private const DEFAULT_DEPARTMENT = 'TIDAK DIKETAHUI';
     private const COMPANY_NAME = 'PT. KAWASAN BERIKAT NUSANTARA';
     private const DOCUMENT_TITLE = 'KERTAS KERJA MONITORING RISIKO';
@@ -52,19 +53,19 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         'A' => 5,   // NO
         'B' => 12,  // KODE RISIKO
         'C' => 15,  // JENIS RISIKO
-        'D' => 20,  // PERISTIWA RISIKO (NEW COLUMN)
-        'E' => 25,  // PENYEBAB RISIKO (moved from D to E)
-        'F' => 15,  // TARGET BULANAN (moved from E to F)
-        'G' => 15,  // REALISASI BULANAN (moved from F to G)
-        'H' => 15,  // TARGET TAHUNAN (moved from G to H)
-        'I' => 15,  // REALISASI BULANAN (moved from H to I)
-        'J' => 12,  // % BULANAN (moved from I to J)
-        'K' => 12,  // % TAHUNAN (moved from J to K)
-        'L' => 18,  // BIAYA (moved from K to L)
-        'M' => 12,  // LEVEL DAMPAK (moved from L to M)
-        'N' => 15,  // LEVEL KEMUNGKINAN (moved from M to N)
-        'O' => 12,  // POSISI RISIKO (moved from N to O)
-        'P' => 12,  // LEVEL RISIKO (moved from O to P)
+        'D' => 25,  // PENYEBAB RISIKO
+        'E' => 25,  // TARGET BULANAN
+        'F' => 15,  // REALISASI BULANAN
+        'G' => 15,  // TARGET TAHUNAN
+        'H' => 15,  // REALISASI BULANAN
+        'I' => 12,  // % BULANAN
+        'J' => 12,  // % TAHUNAN
+        'K' => 12,  // BIAYA
+        'L' => 18,  // LEVEL DAMPAK
+        'M' => 15,  // LEVEL KEMUNGKINAN
+        'N' => 15,  // POSISI RISIKO
+        'O' => 12,  // LEVEL RISIKO
+        'p' => 12
     ];
 
     /**
@@ -76,8 +77,32 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         $this->monthName = $monthName ?? 'SEMUA_BULAN';
         $this->year = $year ?? date('Y');
         $this->totalRows = $this->headers->count() + self::HEADER_ROWS;
+        $this->triwulan = $this->get_triwulan($monthName);
+
 
         $this->loadColorMapping();
+    }
+
+    private function get_triwulan($monthName){
+        switch (true) {
+            case in_array($monthName, ['JANUARI', 'FEBRUARI', 'MARET']):
+                $triwulan = 'PERTAMA';
+                break;
+            case in_array($monthName, ['APRIL', 'MEI', 'JUNI']):
+                $triwulan = 'KEDUA';
+                break;
+            case in_array($monthName, ['JULI', 'AGUSTUS', 'SEPTEMBER']):
+                $triwulan = 'KETIGA';
+                break;
+            case in_array($monthName, ['OKTOBER', 'NOVEMBER', 'DESEMBER']):
+                $triwulan = 'KEEMPAT';
+                break;
+            default:
+                $triwulan = 'PERTAMA';
+                break;
+        }
+
+        return $triwulan;
     }
 
     /**
@@ -169,25 +194,27 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             [self::COMPANY_NAME],
             ['UNIT KERJA : ' . $departmentName],
             ["PERIODE : BULAN {$this->monthName} {$this->year}"],
-            [], // Empty row
-            [
-
-                '', '', '', '', '',
-                'WAKTU PELAKSANAAN', '', '', '', '', '', '',
-                'RESIDUAL TARGET RISK', '', '', ''
-            ],
-            [
-
-                '', '', '', '', '',
-                "TAHUN {$this->year}", '', '', '', '', '', '',
-                '', '', '', ''
-            ],
+            [''], // Empty row
+            [''], // Empty row
+            [''], // Empty row
+            [''], // Empty row
+            [''], // Empty row
+            // [
+            //     '', '', '', '',
+            //     'WAKTU PELAKSANAAN', '', '', '', '', '', '',
+            //     'RESIDUAL TARGET RISK', '', '', ''
+            // ],
+            // [
+            //     '', '', '', '',
+            //     "TAHUN {$this->year}", '', '', '', '', '', '',
+            //     '', '', '', ''
+            // ],
             $this->buildColumnHeaders()
         ];
     }
 
     /**
-     * Build column headers - MODIFIED: Added PERISTIWA RISIKO column
+     * Build column headers
      */
     private function buildColumnHeaders(): array
     {
@@ -197,10 +224,10 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             'JENIS RISIKO',
             'PERISTIWA RISIKO',
             'PENYEBAB RISIKO',
-            "TARGET BULAN {$this->monthName}",
-            "REALISASI BULAN {$this->monthName}",
+            "TARGET s/d BULAN {$this->monthName}",
+            "REALISASI s/d BULAN {$this->monthName}",
             'TARGET 1 TAHUN',
-            "REALISASI BULAN {$this->monthName}",
+            "REALISASI s/d BULAN {$this->monthName}",
             "BULAN {$this->monthName} %",
             'TARGET TAHUN %',
             'BIAYA PERLAKUAN RISIKO',
@@ -241,7 +268,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $targetBulanan,                                                  // 6. TARGET BULAN
                 $realisasiBulanan,                                               // 7. REALISASI BULAN
                 $targetTahunan,                                                  // 8. TARGET 1 TAHUN
-                $realisasiBulanan,                                               // 9. REALISASI BULAN
+                $realisasiBulanan,                                               // 9. REALISASI BULAN (duplikasi)
                 $percentageBulanan . '%',                                        // 10. BULAN %
                 $percentageTahunan . '%',                                        // 11. TARGET TAHUN %
                 $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),     // 12. BIAYA PERLAKUAN
@@ -281,11 +308,11 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             4 => $this->getHeaderStyle(11),
 
             // Sub headers with background
-            6 => $this->getSubHeaderStyle(),
-            7 => $this->getSubHeaderStyle(),
+            10 => $this->getSubHeaderStyle(),
+            // 7 => $this->getSubHeaderStyle(),
 
             // Column headers
-            8 => $this->getColumnHeaderStyle()
+            // 7 => $this->getColumnHeaderStyle()
         ];
     }
 
@@ -296,7 +323,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     {
         return [
             'font' => ['bold' => true, 'size' => $fontSize],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ];
     }
 
@@ -307,10 +334,20 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     {
         return [
             'font' => ['bold' => true],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true
+            ],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'E6E6FA']
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['rgb' => '000000']
+                ]
             ]
         ];
     }
@@ -326,10 +363,6 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
                 'vertical' => Alignment::VERTICAL_CENTER,
                 'wrapText' => true
-            ],
-            'fill' => [
-                'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => 'D3D3D3']
             ],
             'borders' => [
                 'allBorders' => [
@@ -371,19 +404,128 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     private function mergeCells(Worksheet $sheet): void
     {
         $mergeRanges = [
-            'A1:P1', // KERTAS KERJA MONITORING RISIKO (updated from O to P)
-            'A2:P2', // PT. KAWASAN BERIKAT NUSANTARA (updated from O to P)
-            'A3:P3', // UNIT KERJA (updated from O to P)
-            'A4:P4', // PERIODE (updated from O to P)
-            'F6:L6', // WAKTU PELAKSANAAN (updated from E6:K6 to F6:L6)
-            'F7:L7', // TAHUN (updated from E7:K7 to F7:L7)
-            'M6:P6', // RESIDUAL TARGET RISK (updated from L6:O6 to M6:P6)
-            'M7:P7'  // Empty cell untuk RESIDUAL TARGET RISK (updated from L7:O7 to M7:P7)
+            'A1:O1', // KERTAS KERJA MONITORING RISIKO
+            'A2:O2', // PT. KAWASAN BERIKAT NUSANTARA
+            'A3:O3', // UNIT KERJA
+            'A4:O4', // PERIODE
+            // 'E6:K6', // WAKTU PELAKSANAAN
+            // 'E7:K7', // TAHUN
+            // 'L6:O6', // RESIDUAL TARGET RISK
+            // 'L7:O7'  // Empty cell untuk RESIDUAL TARGET RISK
         ];
 
         foreach ($mergeRanges as $range) {
             $sheet->mergeCells($range);
         }
+
+        //merge header horizontal (for inherent risk, residual risk and residual target)
+        $mergeHorizontal = array(
+            [
+                "range_start" => "F6",
+                "range_end" => "I6",
+                "name" => "WAKTU PELAKSANAAN"
+            ],
+            [
+                "range_start" => "F7",
+                "range_end" => "I7",
+                "name" => "TAHUN ".$this->year
+            ],
+            [
+                "range_start" => "F8",
+                "range_end" => "I8",
+                "name" => "TRIWULAN ".$this->triwulan
+            ],
+            [
+                "range_start" => "F9",
+                "range_end" => "I9",
+                "name" => "BULAN ".$this->monthName
+            ],
+            [
+                "range_start" => "M6",
+                "range_end" => "P7",
+                "name" => "RESIDUAL TARGET RISK"
+            ],
+        );
+
+        foreach ($mergeHorizontal as $value) {
+            $sheet->mergeCells($value['range_start'].':'.$value['range_end']);
+            $sheet->setCellValue($value['range_start'], $value['name']);
+
+            $this->setHeaderHorizontalStyle($sheet, $value['range_start'].':'.$value['range_end'], 'FFE6E6FA', 8, true);
+        }
+        //merge header horizontal (for inherent risk, residual risk and residual target)
+
+        //merge header vertical
+        $mergeVertical = array(
+            [
+                "column" => "A",
+                "name" => "NO",
+                "start_row" => "6"
+            ],
+            [
+                "column" => "B",
+                "name" => "KODE RISIKO",
+                "start_row" => "6"
+            ],
+            [
+                "column" => "C",
+                "name" => "JENIS RISIKO",
+                "start_row" => "6"
+            ],
+            [
+                "column" => "D",
+                "name" => "PERISTIWA RISIKO",
+                "start_row" => "6"
+            ],
+            [
+                "column" => "E",
+                "name" => "PENYEBAB RISIKO",
+                "start_row" => "6"
+            ],
+            [
+                "column" => "J",
+                "name" => "BULAN ".$this->monthName." %",
+                "start_row" => "6"
+            ],
+            [
+                "column" => "K",
+                "name" => "TARGET TAHUN %",
+                "start_row" => "6"
+            ],
+            [
+                "column" => "L",
+                "name" => "BIAYA PERLAKUAN RISIKO",
+                "start_row" => "6"
+            ],
+            [
+                "column" => "M",
+                "name" => "LEVEL DAMPAK",
+                "start_row" => "8"
+            ],
+            [
+                "column" => "N",
+                "name" => "LEVEL KEMUNGKINAN",
+                "start_row" => "8"
+            ],
+            [
+                "column" => "O",
+                "name" => "POSISI RISIKO",
+                "start_row" => "8"
+            ],
+            [
+                "column" => "P",
+                "name" => "LEVEL RISIKO",
+                "start_row" => "8"
+            ],
+        );
+
+        foreach ($mergeVertical as $value) {
+            $sheet->mergeCells($value['column'].$value['start_row'].':'.$value['column'].'10');
+            $sheet->setCellValue($value['column'].$value['start_row'], $value['name']);
+
+            $this->setHeaderHorizontalStyle($sheet, $value['column'].$value['start_row'].':'.$value['column'].'10', 'FFE6E6FA', 8, true);
+        }
+        //merge header vertical
     }
 
     /**
@@ -397,12 +539,12 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
-     * Apply styling to data rows - MODIFIED: Updated range from O to P
+     * Apply styling to data rows
      */
     private function applyDataRowStyling(Worksheet $sheet): void
     {
         $lastRow = self::HEADER_ROWS + $this->headers->count();
-        $dataRange = "A" . self::DATA_START_ROW . ":P{$lastRow}"; // Updated from O to P
+        $dataRange = "A" . self::DATA_START_ROW . ":P{$lastRow}";
 
         $sheet->getStyle($dataRange)->applyFromArray([
             'borders' => [
@@ -426,14 +568,14 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         $lastRow = self::HEADER_ROWS + $this->headers->count();
 
         // Center alignment untuk nomor, kode, target, realisasi, persentase, dan level
-        $centerColumns = ['A', 'B', 'F', 'G', 'H', 'I', 'J', 'K', 'M', 'N', 'O', 'P'];
+        $centerColumns = ['A', 'B', 'E', 'F', 'G', 'H', 'I', 'J', 'L', 'M', 'N', 'O', 'P'];
         foreach ($centerColumns as $col) {
             $range = "{$col}" . self::DATA_START_ROW . ":{$col}{$lastRow}";
             $sheet->getStyle($range)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
 
         // Left alignment untuk kolom text yang panjang
-        $leftColumns = ['C', 'D', 'E']; // Updated: C=Jenis, D=Peristiwa (NEW), E=Penyebab Risiko
+        $leftColumns = ['C', 'D', 'E']; // Jenis dan Penyebab Risiko
         foreach ($leftColumns as $col) {
             $range = "{$col}" . self::DATA_START_ROW . ":{$col}{$lastRow}";
             $sheet->getStyle($range)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
@@ -454,6 +596,8 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         foreach ($this->headers as $header) {
             $levelRisiko = $header->residual_target_level_risiko ?? '';
             $color = $this->getRiskColor($levelRisiko);
+
+            // Apply color ke kolom O (Level Risiko)
             $sheet->getStyle("P{$rowIndex}")->applyFromArray([
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -478,5 +622,29 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         for ($row = self::DATA_START_ROW; $row <= $lastRow; $row++) {
             $sheet->getRowDimension($row)->setRowHeight(40);
         }
+    }
+
+    function setHeaderHorizontalStyle($sheet, $range, $bgColor = '4472C4', $fontSize = 8, $bold = true)
+    {
+        $sheet->getStyle($range)->applyFromArray([
+            'font' => [
+                'bold' => $bold
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => $bgColor]
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['rgb' => '000000']
+                ]
+            ]
+        ]);
     }
 }

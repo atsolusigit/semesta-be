@@ -136,10 +136,10 @@ class KnowledgeBaseController extends Controller
 
     $array_validation = [
         'title' => 'required|string|max:255',
-        'img_path' => 'required|string|max:255',
-        'doc_path' => 'nullable|string|max:255',
-        'description' => 'nullable|string|max:500',
-        'long_description' => 'nullable|string|max:1000',
+        'img_path' => 'required|string',
+        'doc_path' => 'nullable|string',
+        'description' => 'nullable|string',
+        'long_description' => 'nullable|string',
         'type' => 'required|in:1,2,3,4,5',
     ];
 
@@ -200,10 +200,10 @@ class KnowledgeBaseController extends Controller
 
     $array_validation = [
         'title' => 'nullable|string|max:255',
-        'img_path' => 'nullable|string|max:255',
-        'doc_path' => 'nullable|string|max:255',
-        'description' => 'nullable|string|max:500',
-        'long_description' => 'nullable|string|max:1000',
+        'img_path' => 'nullable|string',
+        'doc_path' => 'nullable|string',
+        'description' => 'nullable|string',
+        'long_description' => 'nullable|string',
         'type' => 'nullable|in:1,2,3,4,5',
     ];
 

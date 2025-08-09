@@ -84,6 +84,20 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
         return '#FF0000';                           // High - Red
     }
 
+    private function getRiskLevelName($riskScore)
+    {
+        if (isset($this->colorMap[$riskScore])) {
+            return $this->colorMap[$riskScore]['name'];
+        }
+
+        // Fallback names sesuai gambar
+        if ($riskScore <= 5) return 'Low';
+        if ($riskScore <= 11) return 'Low to Moderate';
+        if ($riskScore <= 15) return 'Moderate';
+        if ($riskScore <= 19) return 'Moderate to High';
+        return 'High';
+    }
+
     private function countRisksByLevel($riskType)
     {
         $counts = [];
@@ -142,13 +156,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
         // Baris 5: Header dengan DAMPAK di tengah
         $data[] = ['', '','', '', '', '', '', '', 'LEVEL RISIKO', 'POSISI RISIKO'];
 
-        // Baris 6: Level dampak
-        // $data[] = ['', 'Sangat rendah', 'Rendah', 'Menengah', 'Tinggi', 'Sangat tinggi', '', '', ''];
-
-        // Baris 7: Angka dampak
-        // $data[] = ['', '1', '2', '3', '4', '5', '', '', ''];
-
-        // Baris 8-12: Data heatmap dengan kemungkinan di kiri
+        // Baris 6-10: Data heatmap dengan kemungkinan di kiri
         $kemungkinanLabels = [
             ['Hampir pasti terjadi', '5'],
             ['Sangat mungkin terjadi', '4'],
@@ -196,7 +204,6 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
         // Spacing dan halaman
         $data[] = [];
         $data[] = [];
-        // $data[] = ['', '', '', '', '', '', '', '', '', '', 'Halaman 3'];
 
         // Keterangan
         $data[] = [''];
@@ -270,11 +277,6 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $sheet->mergeCells('A2:J2'); // PT. KBN GRAHA MEDIKA
                 $sheet->mergeCells('A3:J3'); // PERIODE
 
-                // Merge DAMPAK header - sesuai gambar
-                // $sheet->mergeCells('B5:F5'); // DAMPAK
-
-                // KEMUNGKINAN vertikal merge - akan ditambahkan manual
-
                 // Set column widths sesuai gambar
                 $columnWidths = [
                     'A' => 5,  // Kemungkinan descriptions
@@ -299,7 +301,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                     $heatmapMatrix[$item->kemungkinan][$item->dampak] = $item->result;
                 }
 
-                // Apply heatmap data dan styling (B8:F12)
+                // Apply heatmap data dan styling (C5:G9)
                 $cellMapping = [
                     5 => ['C5', 'D5', 'E5', 'F5', 'G5'], // Hampir pasti
                     4 => ['C6', 'D6', 'E6', 'F6', 'G6'], // Sangat mungkin
@@ -313,8 +315,12 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                         $impact = $index + 1;
                         $riskScore = $heatmapMatrix[$kemungkinan][$impact] ?? 0;
 
-                        // Set risk score
-                        $sheet->setCellValue($cellRef, $riskScore);
+                        // Get risk level name
+                        $riskLevelName = $this->getRiskLevelName($riskScore);
+
+                        // Set risk level name and score
+                        $cellValue = $riskLevelName . "\n" . $riskScore;
+                        $sheet->setCellValue($cellRef, $cellValue);
 
                         // Apply color
                         $color = $this->getRiskColor($riskScore);
@@ -331,14 +337,15 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                             ],
                             'alignment' => [
                                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                                'vertical' => Alignment::VERTICAL_CENTER
+                                'vertical' => Alignment::VERTICAL_CENTER,
+                                'wrapText' => true
                             ],
-                            'font' => ['bold' => true, 'size' => 11]
+                            'font' => ['bold' => true, 'size' => 10]
                         ]);
                     }
                 }
 
-                // Apply colors to legend (H8:H12)
+                // Apply colors to legend (I5:I9)
                 $legendCells = ['I5', 'I6', 'I7', 'I8', 'I9'];
                 $legendScores = [4, 7, 13, 17, 22]; // Representative scores
 
@@ -386,7 +393,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
 
                 // Set row heights
                 for ($row = 5; $row <= 9; $row++) {
-                    $sheet->getRowDimension($row)->setRowHeight(50);
+                    $sheet->getRowDimension($row)->setRowHeight(60); // Increased height untuk text
                 }
 
                 $sheet->getRowDimension(10)->setRowHeight(30);
@@ -492,7 +499,6 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                     'font' => ['bold' => true, 'size' => 11]
                 ]);
                 $sheet->getRowDimension(11)->setRowHeight(20);
-                // dampak & kemungkinan section
 
                 //heading level & posisi risiko
                 $sheet->getStyle('I4')->applyFromArray([
@@ -522,10 +528,8 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                     ],
                     'font' => ['bold' => true, 'size' => 11]
                 ]);
-                //heading level & posisi risiko
 
-
-                // Merge KEMUNGKINAN vertically (A5:A12)
+                // Merge KEMUNGKINAN vertically (A5:A9)
                 $sheet->mergeCells('A5:A9');
 
                 // Add risk counts/dots

@@ -13,8 +13,9 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Font;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\WithTitle;
 
-class HMExport implements FromArray, WithStyles, WithEvents
+class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
 {
     protected $headers;
     protected $monthName;
@@ -123,6 +124,11 @@ class HMExport implements FromArray, WithStyles, WithEvents
         return $counts;
     }
 
+    public function title(): string
+    {
+        return 'Heat Map '. strtoupper($this->monthName) . ' ' . $this->year;
+    }
+
     public function array(): array
     {
         $data = [];
@@ -134,13 +140,13 @@ class HMExport implements FromArray, WithStyles, WithEvents
         $data[] = []; // Empty row
 
         // Baris 5: Header dengan DAMPAK di tengah
-        $data[] = ['', '', 'DAMPAK', '', '', '', '', 'LEVEL RISIKO', 'POSISI RISIKO'];
+        $data[] = ['', '','', '', '', '', '', '', 'LEVEL RISIKO', 'POSISI RISIKO'];
 
         // Baris 6: Level dampak
-        $data[] = ['', 'Sangat rendah', 'Rendah', 'Menengah', 'Tinggi', 'Sangat tinggi', '', '', ''];
+        // $data[] = ['', 'Sangat rendah', 'Rendah', 'Menengah', 'Tinggi', 'Sangat tinggi', '', '', ''];
 
         // Baris 7: Angka dampak
-        $data[] = ['', '1', '2', '3', '4', '5', '', '', ''];
+        // $data[] = ['', '1', '2', '3', '4', '5', '', '', ''];
 
         // Baris 8-12: Data heatmap dengan kemungkinan di kiri
         $kemungkinanLabels = [
@@ -171,7 +177,8 @@ class HMExport implements FromArray, WithStyles, WithEvents
                 $row[] = ''; // Akan diisi di registerEvents
             }
 
-            // Kolom G: Kosong
+            // Kolom H: Kosong
+            $row[] = '';
             $row[] = '';
 
             // Kolom H-I: Legend
@@ -189,10 +196,11 @@ class HMExport implements FromArray, WithStyles, WithEvents
         // Spacing dan halaman
         $data[] = [];
         $data[] = [];
-        $data[] = ['', '', '', '', '', '', '', '', '', '', 'Halaman 3'];
+        // $data[] = ['', '', '', '', '', '', '', '', '', '', 'Halaman 3'];
 
         // Keterangan
-        $data[] = [];
+        $data[] = [''];
+        $data[] = [''];
         $data[] = ['Keterangan :'];
         $data[] = ['', ': Inherent Risk'];
         $data[] = ['', ": Residual Current Risk s.d. 31 {$this->monthName} {$this->year}"];
@@ -222,18 +230,26 @@ class HMExport implements FromArray, WithStyles, WithEvents
             5 => [
                 'font' => ['bold' => true],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'color' => ['rgb' => 'E6E6FA']
-                ]
             ],
             6 => [
                 'font' => ['bold' => true],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
             ],
             7 => [
                 'font' => ['bold' => true],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            ],
+            8 => [
+                'font' => ['bold' => true],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            ],
+            9 => [
+                'font' => ['bold' => true],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            ],
+            10 => [
+                'font' => ['bold' => true],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
             ],
 
             // Keterangan
@@ -250,26 +266,27 @@ class HMExport implements FromArray, WithStyles, WithEvents
                 $sheet = $event->sheet->getDelegate();
 
                 // Merge cells untuk header
-                $sheet->mergeCells('A1:I1'); // PETA RISIKO
-                $sheet->mergeCells('A2:I2'); // PT. KBN GRAHA MEDIKA
-                $sheet->mergeCells('A3:I3'); // PERIODE
+                $sheet->mergeCells('A1:J1'); // PETA RISIKO
+                $sheet->mergeCells('A2:J2'); // PT. KBN GRAHA MEDIKA
+                $sheet->mergeCells('A3:J3'); // PERIODE
 
                 // Merge DAMPAK header - sesuai gambar
-                $sheet->mergeCells('B5:F5'); // DAMPAK
+                // $sheet->mergeCells('B5:F5'); // DAMPAK
 
                 // KEMUNGKINAN vertikal merge - akan ditambahkan manual
 
                 // Set column widths sesuai gambar
                 $columnWidths = [
-                    'A' => 25,  // Kemungkinan descriptions
-                    'B' => 12,  // Level 1
-                    'C' => 12,  // Level 2
-                    'D' => 12,  // Level 3
-                    'E' => 12,  // Level 4
-                    'F' => 12,  // Level 5
-                    'G' => 3,   // Spacing
-                    'H' => 18,  // Legend Level
-                    'I' => 12,  // Legend Range
+                    'A' => 5,  // Kemungkinan descriptions
+                    'B' => 25,  // Spacing
+                    'C' => 18,  // Level 1
+                    'D' => 18,  // Level 2
+                    'E' => 18,  // Level 3
+                    'F' => 18,  // Level 4
+                    'G' => 18,   // level 5
+                    'H' => 3,   // Spacing
+                    'I' => 18,  // Legend Level
+                    'J' => 18,  // Legend Range
                 ];
 
                 foreach ($columnWidths as $column => $width) {
@@ -284,11 +301,11 @@ class HMExport implements FromArray, WithStyles, WithEvents
 
                 // Apply heatmap data dan styling (B8:F12)
                 $cellMapping = [
-                    5 => ['B8', 'C8', 'D8', 'E8', 'F8'], // Hampir pasti
-                    4 => ['B9', 'C9', 'D9', 'E9', 'F9'], // Sangat mungkin
-                    3 => ['B10', 'C10', 'D10', 'E10', 'F10'], // Bisa terjadi
-                    2 => ['B11', 'C11', 'D11', 'E11', 'F11'], // Jarang
-                    1 => ['B12', 'C12', 'D12', 'E12', 'F12'], // Sangat jarang
+                    5 => ['C5', 'D5', 'E5', 'F5', 'G5'], // Hampir pasti
+                    4 => ['C6', 'D6', 'E6', 'F6', 'G6'], // Sangat mungkin
+                    3 => ['C7', 'D7', 'E7', 'F7', 'G7'], // Bisa terjadi
+                    2 => ['C8', 'D8', 'E8', 'F8', 'G8'], // Jarang
+                    1 => ['C9', 'D9', 'E9', 'F9', 'G9'], // Sangat jarang
                 ];
 
                 foreach ($cellMapping as $kemungkinan => $cells) {
@@ -322,7 +339,7 @@ class HMExport implements FromArray, WithStyles, WithEvents
                 }
 
                 // Apply colors to legend (H8:H12)
-                $legendCells = ['H8', 'H9', 'H10', 'H11', 'H12'];
+                $legendCells = ['I5', 'I6', 'I7', 'I8', 'I9'];
                 $legendScores = [4, 7, 13, 17, 22]; // Representative scores
 
                 foreach ($legendCells as $index => $cell) {
@@ -342,7 +359,7 @@ class HMExport implements FromArray, WithStyles, WithEvents
                 }
 
                 // Apply borders ke seluruh tabel
-                $sheet->getStyle('A5:F12')->applyFromArray([
+                $sheet->getStyle('A5:G9')->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => Border::BORDER_THIN,
@@ -352,7 +369,7 @@ class HMExport implements FromArray, WithStyles, WithEvents
                 ]);
 
                 // Legend table borders
-                $sheet->getStyle('H5:I12')->applyFromArray([
+                $sheet->getStyle('I5:J9')->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => Border::BORDER_THIN,
@@ -362,14 +379,34 @@ class HMExport implements FromArray, WithStyles, WithEvents
                 ]);
 
                 // Center alignment
-                $sheet->getStyle('B5:F12')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('B5:F12')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $sheet->getStyle('H5:I12')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('H5:I12')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('C5:G9')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('C5:G9')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('I5:J9')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('I5:J9')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
                 // Set row heights
-                for ($row = 8; $row <= 12; $row++) {
+                for ($row = 5; $row <= 9; $row++) {
                     $sheet->getRowDimension($row)->setRowHeight(50);
+                }
+
+                $sheet->getRowDimension(10)->setRowHeight(30);
+
+                //dampak style
+                $dampakColumn = ['C10', 'D10', 'E10', 'F10', 'G10'];
+                foreach ($dampakColumn as $key => $value) {
+                    $sheet->getStyle($value)->applyFromArray([
+                            'borders' => [
+                                'allBorders' => [
+                                    'borderStyle' => Border::BORDER_THIN,
+                                    'color' => ['argb' => 'FF000000'],
+                                ],
+                            ],
+                            'alignment' => [
+                                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                                'vertical' => Alignment::VERTICAL_CENTER
+                            ],
+                            'font' => ['bold' => true, 'size' => 11]
+                        ]);
                 }
 
                 // Add KEMUNGKINAN label manually di sebelah kiri
@@ -387,8 +424,109 @@ class HMExport implements FromArray, WithStyles, WithEvents
                     ]
                 ]);
 
+                // dampak & kemungkinan section
+                $dampakArr = array(
+                    [
+                        "column" => "C10",
+                        "name" => "Sangat Rendah [1]",
+                    ],
+                    [
+                        "column" => "D10",
+                        "name" => "Rendah [2]",
+                    ],
+                    [
+                        "column" => "E10",
+                        "name" => "Menengah [3]",
+                    ],
+                    [
+                        "column" => "F10",
+                        "name" => "Tinggi [4]",
+                    ],
+                    [
+                        "column" => "G10",
+                        "name" => "Sangat Tinggi [5]",
+                    ],
+                    [
+                        "column" => "B5",
+                        "name" => "Hampir pasti terjadi [5]",
+                    ],
+                    [
+                        "column" => "B6",
+                        "name" => "Sangat mungkin terjadi [4]",
+                    ],
+                    [
+                        "column" => "B7",
+                        "name" => "Bisa terjadi [3]",
+                    ],
+                    [
+                        "column" => "B8",
+                        "name" => "Jarang terjadi [2]",
+                    ],
+                    [
+                        "column" => "B9",
+                        "name" => "Sangat jarang terjadi [1]",
+                    ],
+                );
+
+                foreach ($dampakArr as $value) {
+                    $sheet->setCellValue($value['column'], $value['name']);
+                }
+
+                $sheet->mergeCells('C11:G11');
+                $sheet->setCellValue('C11', 'DAMPAK');
+                $sheet->getStyle('C11:G11')->applyFromArray([
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'color' => ['rgb' => 'E6E6FA']
+                    ],
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['argb' => 'FF000000'],
+                        ],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ],
+                    'font' => ['bold' => true, 'size' => 11]
+                ]);
+                $sheet->getRowDimension(11)->setRowHeight(20);
+                // dampak & kemungkinan section
+
+                //heading level & posisi risiko
+                $sheet->getStyle('I4')->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['argb' => 'FF000000'],
+                        ],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ],
+                    'font' => ['bold' => true, 'size' => 11]
+                ]);
+
+                $sheet->getStyle('J4')->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['argb' => 'FF000000'],
+                        ],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ],
+                    'font' => ['bold' => true, 'size' => 11]
+                ]);
+                //heading level & posisi risiko
+
+
                 // Merge KEMUNGKINAN vertically (A5:A12)
-                $sheet->mergeCells('A5:A12');
+                $sheet->mergeCells('A5:A9');
 
                 // Add risk counts/dots
                 $this->addRiskCounts($sheet);
@@ -406,11 +544,11 @@ class HMExport implements FromArray, WithStyles, WithEvents
         $residualTargetCounts = $this->countRisksByLevel('residual_target');
 
         $cellMapping = [
-            5 => [1 => 'B8', 2 => 'C8', 3 => 'D8', 4 => 'E8', 5 => 'F8'],
-            4 => [1 => 'B9', 2 => 'C9', 3 => 'D9', 4 => 'E9', 5 => 'F9'],
-            3 => [1 => 'B10', 2 => 'C10', 3 => 'D10', 4 => 'E10', 5 => 'F10'],
-            2 => [1 => 'B11', 2 => 'C11', 3 => 'D11', 4 => 'E11', 5 => 'F11'],
-            1 => [1 => 'B12', 2 => 'C12', 3 => 'D12', 4 => 'E12', 5 => 'F12'],
+            5 => [1 => 'C5', 2 => 'D5', 3 => 'E5', 4 => 'F5', 5 => 'G5'],
+            4 => [1 => 'C6', 2 => 'D6', 3 => 'E6', 4 => 'F6', 5 => 'G6'],
+            3 => [1 => 'C7', 2 => 'D7', 3 => 'E7', 4 => 'F7', 5 => 'G7'],
+            2 => [1 => 'C8', 2 => 'D8', 3 => 'E8', 4 => 'F8', 5 => 'G8'],
+            1 => [1 => 'C9', 2 => 'D9', 3 => 'E9', 4 => 'F9', 5 => 'G9'],
         ];
 
         foreach ($cellMapping as $kemungkinan => $impacts) {
@@ -449,15 +587,15 @@ class HMExport implements FromArray, WithStyles, WithEvents
     private function addLegendSymbols($sheet)
     {
         // Blue dot untuk inherent
-        $sheet->setCellValue('A17', '●');
-        $sheet->getStyle('A17')->getFont()->getColor()->setARGB('FF0070C0');
+        $sheet->setCellValue('A13', '●');
+        $sheet->getStyle('A13')->getFont()->getColor()->setARGB('FF0070C0');
 
         // Gray dot untuk residual current
-        $sheet->setCellValue('A18', '●');
-        $sheet->getStyle('A18')->getFont()->getColor()->setARGB('FF7F7F7F');
+        $sheet->setCellValue('A14', '●');
+        $sheet->getStyle('A14')->getFont()->getColor()->setARGB('FF7F7F7F');
 
         // Purple dot untuk residual target
-        $sheet->setCellValue('A19', '●');
-        $sheet->getStyle('A19')->getFont()->getColor()->setARGB('FF7030A0');
+        $sheet->setCellValue('A15', '●');
+        $sheet->getStyle('A15')->getFont()->getColor()->setARGB('FF7030A0');
     }
 }

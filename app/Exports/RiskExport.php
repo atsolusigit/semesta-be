@@ -4,7 +4,7 @@ namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+// use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -16,7 +16,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use Illuminate\Support\Facades\DB;
 
-class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, WithStyles, WithEvents
+class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, WithEvents
 {
     protected $headers;
     protected $monthName;

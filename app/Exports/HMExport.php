@@ -14,7 +14,7 @@ use PhpOffice\PhpSpreadsheet\Style\Font;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use Illuminate\Support\Facades\DB;
 
-class Export3 implements FromArray, WithStyles, WithEvents
+class HMExport implements FromArray, WithStyles, WithEvents
 {
     protected $headers;
     protected $monthName;

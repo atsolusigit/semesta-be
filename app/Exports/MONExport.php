@@ -14,7 +14,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
-class Export2 implements FromArray, WithStyles, WithEvents, WithTitle
+class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
 {
     protected $headers;
     protected $monthName;

@@ -30,11 +30,11 @@ class MultiSheetRiskExport implements WithMultipleSheets
         // Sheet 1: Risk Register (RiskExport)
         $sheets[] = new RiskExport($this->headers, $this->monthName, $this->year);
 
-        // Sheet 2: Monitoring Risiko (Export2)
-        $sheets[] = new Export2($this->headers, $this->monthName, $this->year);
+        // Sheet 2: Monitoring Risiko (MONExport)
+        $sheets[] = new MONExport($this->headers, $this->monthName, $this->year);
 
-        // Sheet 3: Peta Risiko (Export3)
-        $sheets[] = new Export3($this->headers, $this->monthName, $this->year);
+        // Sheet 3: Peta Risiko (HMExport)
+        $sheets[] = new HMExport($this->headers, $this->monthName, $this->year);
 
         return $sheets;
     }

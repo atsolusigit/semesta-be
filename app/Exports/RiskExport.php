@@ -4,7 +4,6 @@ namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -16,7 +15,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use Illuminate\Support\Facades\DB;
 
-class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, WithStyles, WithEvents
+class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, WithEvents
 {
     protected $headers;
     protected $monthName;
@@ -109,8 +108,8 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
 
             $data[] = [
                 // DEBUG COLUMNS - Keep for now
-                $header->id, // Header ID
-                $monthlyData->id ?? 'NO_MONTHLY', // Monthly ID
+                // $header->id, // Header ID
+                // $monthlyData->id ?? 'NO_MONTHLY', // Monthly ID
 
                 $no++, // No
                 $header->risk_code ?? '', // Kode Risiko
@@ -173,11 +172,11 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
             ['UNIT KERJA : ' . $departmentName],
             ['PERIODE : BULAN ' . strtoupper($this->monthName) . ' ' . $this->year],
             [], // baris kosong
+            [], // baris kosong
             [
                 // DEBUG COLUMNS - Keep for now
-                'Header ID',
-                'Monthly ID',
-
+                // 'Header ID',
+                // 'Monthly ID',
                 'NO',
                 'KODE RISIKO',
                 'JENIS RISIKO',
@@ -233,14 +232,32 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
             ],
             3 => [
                 'font' => ['bold' => true],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT]
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]
             ],
             4 => [
                 'font' => ['bold' => true],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT]
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]
             ],
             // Table header
             6 => [
+                'font' => ['bold' => true, 'size' => 8], // Font lebih kecil untuk header
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['argb' => 'FFE6E6FA'],
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['argb' => 'FF000000'],
+                    ],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                    'wrapText' => true
+                ]
+            ],
+            7 => [
                 'font' => ['bold' => true, 'size' => 8], // Font lebih kecil untuk header
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -268,81 +285,187 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
                 $sheet = $event->sheet->getDelegate();
 
                 // Merge cells untuk header
-                $sheet->mergeCells('A1:AJ1'); // KERTAS KERJA RISK REGISTER (updated untuk include debug columns)
-                $sheet->mergeCells('A2:AJ2'); // PT. KAWASAN BERIKAT NUSANTARA
+                $sheet->mergeCells('A1:AH1'); // KERTAS KERJA RISK REGISTER (updated untuk include debug columns)
+                $sheet->mergeCells('A2:AH2'); // PT. KAWASAN BERIKAT NUSANTARA
+                $sheet->mergeCells('A3:AH3'); // unit kerja
+                $sheet->mergeCells('A4:AH4'); // periode
+
+                //merge header horizontal (for inherent risk, residual risk and residual target)
+                $mergeHorizontal = array(
+                    [
+                        "range_start" => "H",
+                        "range_end" => "K",
+                        "name" => "INHERENT RISK"
+                    ],
+                    [
+                        "range_start" => "P",
+                        "range_end" => "S",
+                        "name" => "RESIDUAL RISK"
+                    ],
+                    [
+                        "range_start" => "V",
+                        "range_end" => "Y",
+                        "name" => "RESIDUAL RISK"
+                    ],
+                    [
+                        "range_start" => "AB",
+                        "range_end" => "AE",
+                        "name" => "RESIDUAL TARGET"
+                    ],
+                );
+
+                foreach ($mergeHorizontal as $value) {
+                    $sheet->mergeCells($value['range_start'].'6:'.$value['range_end'].'6');
+                    $sheet->setCellValue($value['range_start'].'6', $value['name']);
+
+                    $this->setHeaderStyle($sheet, $value['range_start'].'6:'.$value['range_end'].'6', 'FFE6E6FA', 8, true);
+                }
+                //merge header horizontal (for inherent risk, residual risk and residual target)
+
+                //merge header vertical
+                $mergeVertical = array(
+                    [
+                        "column" => "A",
+                        "name" => "NO"
+                    ],
+                    [
+                        "column" => "B",
+                        "name" => "KODE RISIKO"
+                    ],
+                    [
+                        "column" => "C",
+                        "name" => "JENIS RISIKO"
+                    ],
+                    [
+                        "column" => "D",
+                        "name" => "SASARAN"
+                    ],
+                    [
+                        "column" => "E",
+                        "name" => "PERISTIWA RISIKO"
+                    ],
+                    [
+                        "column" => "F",
+                        "name" => "PENYEBAB RISIKO"
+                    ],
+                    [
+                        "column" => "G",
+                        "name" => "DAMPAK RISIKO"
+                    ],
+                    [
+                        "column" => "L",
+                        "name" => "INTERNAL CONTROL"
+                    ],
+                    [
+                        "column" => "M",
+                        "name" => "TARGET s/d BULAN " . strtoupper($this->monthName)
+                    ],
+                    [
+                        "column" => "N",
+                        "name" => "REALISASI s/d BULAN " . strtoupper($this->monthName)
+                    ],
+                    [
+                        "column" => "O",
+                        "name" => "%"
+                    ],
+                    [
+                        "column" => "T",
+                        "name" => "TARGET 1 TAHUN"
+                    ],
+                    [
+                        "column" => "U",
+                        "name" => "REALISASI s/d BULAN " . strtoupper($this->monthName)
+                    ],
+                    [
+                        "column" => "Z",
+                        "name" => "PERLAKUAN RISIKO (MITIGASI)"
+                    ],
+                    [
+                        "column" => "AA",
+                        "name" => "BIAYA PERLAKUAN RISIKO"
+                    ],
+                    [
+                        "column" => "AF",
+                        "name" => "STATUS RISIKO"
+                    ],
+                );
+
+                foreach ($mergeVertical as $value) {
+                    $sheet->mergeCells($value['column'].'6:'.$value['column'].'7');
+                    $sheet->setCellValue($value['column'].'6', $value['name']);
+
+                    $this->setHeaderStyle($sheet, $value['column'].'6:'.$value['column'].'7', 'FFE6E6FA', 8, true);
+                }
+                //merge header vertical
 
                 // Set column widths - disesuaikan dengan gambar
                 $columnWidths = [
-                    // DEBUG COLUMNS
-                    'A' => 8,   // Header ID
-                    'B' => 10,  // Monthly ID
-
                     // MAIN COLUMNS
-                    'C' => 4,   // NO (lebih kecil)
-                    'D' => 6,   // KODE RISIKO (lebih kecil)
-                    'E' => 10,  // JENIS RISIKO
-                    'F' => 25,  // SASARAN (lebih lebar)
-                    'G' => 25,  // PERISTIWA RISIKO (lebih lebar)
-                    'H' => 25,  // PENYEBAB RISIKO (lebih lebar)
-                    'I' => 25,  // DAMPAK RISIKO (lebih lebar)
+                    'A' => 4,   // NO (lebih kecil)
+                    'B' => 6,   // KODE RISIKO (lebih kecil)
+                    'C' => 20,  // JENIS RISIKO
+                    'D' => 25,  // SASARAN (lebih lebar)
+                    'E' => 25,  // PERISTIWA RISIKO (lebih lebar)
+                    'F' => 25,  // PENYEBAB RISIKO (lebih lebar)
+                    'G' => 25,  // DAMPAK RISIKO (lebih lebar)
 
                     // INHERENT RISK
-                    'J' => 6,   // DAMPAK
-                    'K' => 8,   // KEMUNGKINAN
-                    'L' => 6,   // POSISI
-                    'M' => 8,   // LEVEL
+                    'H' => 6,   // DAMPAK
+                    'I' => 8,   // KEMUNGKINAN
+                    'J' => 6,   // POSISI
+                    'K' => 8,   // LEVEL
 
-                    'N' => 30,  // INTERNAL CONTROL (lebih lebar)
-                    'O' => 12,  // TARGET BULAN
-                    'P' => 12,  // REALISASI BULAN
-                    'Q' => 5,   // % (lebih kecil)
+                    'L' => 30,  // INTERNAL CONTROL (lebih lebar)
+                    'M' => 12,  // TARGET BULAN
+                    'N' => 12,  // REALISASI BULAN
+                    'O' => 5,   // % (lebih kecil)
 
                     // RESIDUAL RISK SAAT INI
-                    'R' => 6,   // DAMPAK
-                    'S' => 8,   // KEMUNGKINAN
-                    'T' => 6,   // POSISI
-                    'U' => 8,   // LEVEL
+                    'P' => 6,   // DAMPAK
+                    'Q' => 8,   // KEMUNGKINAN
+                    'R' => 6,   // POSISI
+                    'S' => 8,   // LEVEL
 
-                    'V' => 12,  // TARGET 1 TAHUN
-                    'W' => 12,  // REALISASI
+                    'T' => 12,  // TARGET 1 TAHUN
+                    'U' => 12,  // REALISASI
 
                     // RESIDUAL TARGET RISK
-                    'X' => 6,   // DAMPAK
-                    'Y' => 8,   // KEMUNGKINAN
-                    'Z' => 6,   // POSISI
-                    'AA' => 8,  // LEVEL
+                    'V' => 6,   // DAMPAK
+                    'W' => 8,   // KEMUNGKINAN
+                    'X' => 6,   // POSISI
+                    'Y' => 8,  // LEVEL
 
-                    'AB' => 35, // PERLAKUAN RISIKO (sangat lebar untuk wrap text)
-                    'AC' => 12, // BIAYA PERLAKUAN
+                    'Z' => 35, // PERLAKUAN RISIKO (sangat lebar untuk wrap text)
+                    'AA' => 12, // BIAYA PERLAKUAN
 
                     // RESIDUAL TARGET RISK (duplicate)
-                    'AD' => 6,  // DAMPAK
-                    'AE' => 8,  // KEMUNGKINAN
-                    'AF' => 6,  // POSISI
-                    'AG' => 8,  // LEVEL
+                    'AB' => 6,  // DAMPAK
+                    'AC' => 8,  // KEMUNGKINAN
+                    'AD' => 6,  // POSISI
+                    'AE' => 8,  // LEVEL
 
-                    'AH' => 12, // STATUS RISIKO
+                    'AF' => 12, // STATUS RISIKO
                 ];
+
 
                 foreach ($columnWidths as $column => $width) {
                     $sheet->getColumnDimension($column)->setWidth($width);
                 }
 
                 // Apply colors to risk level cells (update column references)
-                $dataStartRow = 7;
+                $dataStartRow = 8;
                 $totalRows = count($this->headers) + $dataStartRow - 1;
-
                 for ($row = $dataStartRow; $row <= $totalRows; $row++) {
                     $dataIndex = $row - $dataStartRow;
                     if (isset($this->headers[$dataIndex])) {
                         $header = $this->headers[$dataIndex];
                         $monthly = $header->monthlyData->first();
 
-                        // Color Inherent Risk Level (column M - adjusted for debug columns)
+                        // Color Inherent Risk Level (column K - adjusted for debug columns)
                         $inherentLevel = $header->inherent_risk_level_risiko ?? '';
                         if ($inherentLevel) {
                             $color = $this->getRiskColor($inherentLevel);
-                            $sheet->getStyle('M' . $row)->applyFromArray([
+                            $sheet->getStyle('K' . $row)->applyFromArray([
                                 'fill' => [
                                     'fillType' => Fill::FILL_SOLID,
                                     'startColor' => ['argb' => 'FF' . ltrim($color, '#')],
@@ -350,12 +473,12 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
                             ]);
                         }
 
-                        // Color Residual Risk Level Saat Ini (column U - adjusted for debug columns)
+                        // Color Residual Risk Level Saat Ini (column S - adjusted for debug columns)
                         if ($monthly) {
                             $residualLevel = $monthly->residual_risk_level_risiko ?? '';
                             if ($residualLevel) {
                                 $color = $this->getRiskColor($residualLevel);
-                                $sheet->getStyle('U' . $row)->applyFromArray([
+                                $sheet->getStyle('S' . $row)->applyFromArray([
                                     'fill' => [
                                         'fillType' => Fill::FILL_SOLID,
                                         'startColor' => ['argb' => 'FF' . ltrim($color, '#')],
@@ -364,17 +487,17 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
                             }
                         }
 
-                        // Color Residual Target Risk (column AA & AG - adjusted for debug columns)
+                        // Color Residual Target Risk (column Y & AE - adjusted for debug columns)
                         $targetLevel = $header->residual_target_level_risiko ?? '';
                         if ($targetLevel) {
                             $color = $this->getRiskColor($targetLevel);
-                            $sheet->getStyle('AA' . $row)->applyFromArray([
+                            $sheet->getStyle('Y' . $row)->applyFromArray([
                                 'fill' => [
                                     'fillType' => Fill::FILL_SOLID,
                                     'startColor' => ['argb' => 'FF' . ltrim($color, '#')],
                                 ],
                             ]);
-                            $sheet->getStyle('AG' . $row)->applyFromArray([
+                            $sheet->getStyle('AE' . $row)->applyFromArray([
                                 'fill' => [
                                     'fillType' => Fill::FILL_SOLID,
                                     'startColor' => ['argb' => 'FF' . ltrim($color, '#')],
@@ -385,7 +508,15 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
                 }
 
                 // Apply borders to all data (update range for debug columns)
-                $sheet->getStyle('A6:AH' . $totalRows)->applyFromArray([
+                $sheet->getStyle('A6:AF' . $totalRows)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['argb' => 'FF000000'],
+                        ],
+                    ],
+                ]);
+                $sheet->getStyle('A7:AF' . $totalRows)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => Border::BORDER_THIN,
@@ -395,7 +526,7 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
                 ]);
 
                 // Set text alignment for data rows with STRONG wrap text setting
-                $sheet->getStyle('A' . $dataStartRow . ':AH' . $totalRows)->applyFromArray([
+                $sheet->getStyle('A' . $dataStartRow . ':AF' . $totalRows)->applyFromArray([
                     'alignment' => [
                         'vertical' => Alignment::VERTICAL_TOP,
                         'horizontal' => Alignment::HORIZONTAL_LEFT,
@@ -424,11 +555,36 @@ class RiskExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle, 
                 }
 
                 // Set row heights
-                $sheet->getRowDimension(6)->setRowHeight(50); // Header row lebih tinggi
+                $sheet->getRowDimension(7)->setRowHeight(50); // Header row lebih tinggi
                 for ($row = $dataStartRow; $row <= $totalRows; $row++) {
                     $sheet->getRowDimension($row)->setRowHeight(60); // Set minimum height untuk wrap text
                 }
             }
         ];
+    }
+
+    function setHeaderStyle($sheet, $range, $bgColor = '4472C4', $fontSize = 8, $bold = true)
+    {
+        $sheet->getStyle($range)->applyFromArray([
+            'font' => [
+                'bold' => $bold,
+                'size' => $fontSize
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => $bgColor]
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['rgb' => '000000']
+                ]
+            ]
+        ]);
     }
 }

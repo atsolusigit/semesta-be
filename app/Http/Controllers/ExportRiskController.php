@@ -4,148 +4,122 @@ namespace App\Http\Controllers;
 
 use App\Models\TrRiskHeader;
 use Illuminate\Http\Request;
-use Barryvdh\DomPDF\Facade\Pdf;
-use App\Exports\RiskExport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\MultiSheetRiskExport;
 
 class ExportRiskController extends Controller
 {
-    public function export($format, Request $request = null)
+    public function export(Request $request, $format)
     {
-        $request = $request ?? request();
-
-        $allowedFormats = ['pdf', 'excel'];
-
-        if (!in_array(strtolower($format), $allowedFormats)) {
+        // Hanya handle format excel untuk multi-sheet export
+        if ($format !== 'excel') {
             return response()->json([
                 'status' => 400,
                 'success' => false,
-                'message' => 'Format Tidak Didukung',
-                'data' => 'Format export yang diminta tidak tersedia.'
+                'message' => 'Format tidak didukung untuk multi-sheet export',
+                'data' => 'Gunakan format excel untuk export multi-sheet'
             ], 400);
         }
-
-        // Ambil filter tahun & bulan dari request
         $filterYear  = $request->get('year');
         $filterMonth = $request->get('month');
 
+        // Normalisasi filter bulan
+        if (is_array($filterMonth) && isset($filterMonth['month'])) {
+            $filterMonth = (int) $filterMonth['month'];
+        } elseif (!is_null($filterMonth)) {
+            $filterMonth = (int) $filterMonth;
+        }
+
+        // Ambil data header dengan semua field yang diperlukan untuk semua export
+        $headers = TrRiskHeader::with([
+            'riskCode:id,name',
+            'department:id,name',
+            'monthlyData' => function ($q) use ($filterYear, $filterMonth) {
+                $q->select([
+                    'id',
+                    'header_id',
+                    'target_quantitative',
+                    'realization_quantitative',
+                    'residual_risk_level_dampak',
+                    'residual_risk_level_kemungkinan',
+                    'residual_risk_posisi_risiko',
+                    'residual_risk_level_risiko',
+                    'realization_note',
+                    'status_risiko',
+                    'start_date',
+                    'month'
+                ]);
+
+                if (!empty($filterYear)) {
+                    $q->whereYear('start_date', $filterYear);
+                }
+                if (!empty($filterMonth)) {
+                    $q->where('month', $filterMonth);
+                }
+            },
+        ])
+        ->select([
+            'id',
+            'risk_code',
+            'jenis_risiko',
+            'sasaran',
+            'peristiwa_risiko',
+            'penyebab_risiko',
+            'dampak_risiko',
+            // Inherent risk fields
+            'inherent_risk_level_dampak',
+            'inherent_risk_level_kemungkinan',
+            'inherent_risk_posisi_risiko',
+            'inherent_risk_level_risiko',
+            // Residual target risk fields
+            'residual_target_level_dampak',
+            'residual_target_level_kemungkinan',
+            'residual_target_posisi_risiko',
+            'residual_target_level_risiko',
+            // Other fields
+            'internal_control',
+            'target_quantitative_satu_tahun',
+            'biaya_perlakuan_risiko'
+        ])
+        ->when(!empty($filterYear) || !empty($filterMonth), function ($query) use ($filterYear, $filterMonth) {
+            $query->whereHas('monthlyData', function ($q) use ($filterYear, $filterMonth) {
+                if (!empty($filterYear)) {
+                    $q->whereYear('start_date', $filterYear);
+                }
+                if (!empty($filterMonth)) {
+                    $q->where('month', $filterMonth);
+                }
+            });
+        })
+        ->orderBy('risk_code')
+        ->get();
+
+        // Kalau tidak ada data
+        if ($headers->isEmpty()) {
+            return response()->json([
+                'status' => 404,
+                'success' => false,
+                'message' => 'Data Tidak Ditemukan',
+                'data' => 'Data risiko untuk filter tersebut tidak ditemukan.'
+            ], 404);
+        }
+
+        // Nama file dengan format yang sesuai
+        $monthName = $this->getMonthName($filterMonth);
+        $filename = "Risk_Report_Complete_{$monthName}_{$filterYear}_".time().".xlsx";
+
+        // Export menggunakan MultiSheetRiskExport (3 sheets dalam 1 file)
         try {
-            $headers = TrRiskHeader::with([
-                'riskCode:id,name',
-                'department:id,name',
-                'optionTargetSatuTahun:id,name',
-                'monthlyData' => function ($q) use ($filterYear, $filterMonth) {
-                    $q->select('*')
-                      ->orderBy('month', 'asc');
-
-                    if (!empty($filterYear)) {
-                        $q->whereYear('start_date', $filterYear);
-                    }
-
-                    if (!empty($filterMonth)) {
-                        $q->where('month', $filterMonth);
-                    }
-                },
-            ])
-            // Filter header berdasarkan monthlyData yang ada atau tampilkan semua jika tidak ada filter
-            ->when(!empty($filterYear) || !empty($filterMonth), function ($query) use ($filterYear, $filterMonth) {
-                $query->whereHas('monthlyData', function ($q) use ($filterYear, $filterMonth) {
-                    if (!empty($filterYear)) {
-                        $q->whereYear('start_date', $filterYear);
-                    }
-
-                    if (!empty($filterMonth)) {
-                        $q->where('month', $filterMonth);
-                    }
-                });
-            })
-            ->orderBy('risk_code')
-            ->get();
-
-            if ($headers->isEmpty()) {
-                return response()->json([
-                    'status' => 404,
-                    'success' => false,
-                    'message' => 'Data Tidak Ditemukan',
-                    'data' => 'Data risiko untuk filter tersebut tidak ditemukan.'
-                ], 404);
-            }
-
-            $unixTime = time();
-
-            // Untuk nama file
-            $fileIdentifier = '';
-            if (!empty($filterYear) && !empty($filterMonth)) {
-                $monthNames = [
-                    1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr',
-                    5 => 'Mei', 6 => 'Jun', 7 => 'Jul', 8 => 'Agu',
-                    9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des'
-                ];
-                $monthName = $monthNames[$filterMonth] ?? 'Unknown';
-                $fileIdentifier = "{$monthName}_{$filterYear}";
-            } elseif (!empty($filterYear)) {
-                $fileIdentifier = "Tahun_{$filterYear}";
-            } else {
-                $fileIdentifier = 'Semua_Data';
-            }
-
-            if ($format === 'pdf') {
-                $filename = "Risk_Register_{$fileIdentifier}_{$unixTime}.pdf";
-
-                // Siapkan data untuk PDF view
-                $data = [
-                    'headers' => $headers,
-                    'monthName' => $this->getMonthName($filterMonth),
-                    'year' => $filterYear ?? date('Y'),
-                    'filterMonth' => $filterMonth,
-                    'filterYear' => $filterYear
-                ];
-
-                $pdf = Pdf::loadView('exports.risk_pdf', $data)
-                    ->setPaper('a3', 'landscape') // Gunakan A3 untuk layout yang lebih luas
-                    ->setOptions([
-                        'isHtml5ParserEnabled' => true,
-                        'isPhpEnabled' => true,
-                        'defaultFont' => 'Arial'
-                    ]);
-
-                return $pdf->download($filename);
-            }
-
-            if ($format === 'excel') {
-                $filename = "Risk_Register_{$fileIdentifier}_{$unixTime}.xlsx";
-
-                // Ambil nama bulan untuk export
-                $monthName = $this->getMonthName($filterMonth);
-
-                return Excel::download(
-                    new RiskExport($headers, $monthName, $filterYear ?? date('Y')),
-                    $filename,
-                    \Maatwebsite\Excel\Excel::XLSX,
-                    [
-                        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                        'Cache-Control' => 'max-age=0',
-                    ]
-                );
-            }
-
+            return Excel::download(
+                new MultiSheetRiskExport($headers, $monthName, $filterYear ?? date('Y')),
+                $filename
+            );
         } catch (\Exception $e) {
-            \Log::error('Export Error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'format' => $format,
-                'filters' => ['year' => $filterYear, 'month' => $filterMonth]
-            ]);
-
             return response()->json([
                 'status' => 500,
                 'success' => false,
-                'message' => 'Export Gagal',
-                'data' => [
-                    'error' => config('app.debug') ? $e->getMessage() : 'Terjadi kesalahan sistem.',
-                    'line' => config('app.debug') ? $e->getLine() : null,
-                    'file' => config('app.debug') ? $e->getFile() : null
-                ]
+                'message' => 'Gagal melakukan export',
+                'data' => ['error' => $e->getMessage()]
             ], 500);
         }
     }
@@ -153,32 +127,52 @@ class ExportRiskController extends Controller
     private function getMonthName($month)
     {
         if (empty($month)) {
-            return 'Semua Bulan';
+            return 'SEMUA_BULAN';
         }
 
         $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret',
-            4 => 'April', 5 => 'Mei', 6 => 'Juni',
-            7 => 'Juli', 8 => 'Agustus', 9 => 'September',
-            10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+            1 => 'JANUARI', 2 => 'FEBRUARI', 3 => 'MARET',
+            4 => 'APRIL', 5 => 'MEI', 6 => 'JUNI',
+            7 => 'JULI', 8 => 'AGUSTUS', 9 => 'SEPTEMBER',
+            10 => 'OKTOBER', 11 => 'NOVEMBER', 12 => 'DESEMBER'
         ];
 
-        return $monthNames[$month] ?? 'Bulan Tidak Valid';
+        return $monthNames[$month] ?? 'BULAN_TIDAK_VALID';
     }
 
     /**
-     * Method untuk preview data sebelum export (opsional)
+     * Method untuk preview data sebelum export
      */
-    public function preview(Request $request)
+    public function preview(Request $request, $id)
     {
         $filterYear  = $request->get('year');
         $filterMonth = $request->get('month');
+
+        // Normalisasi filter bulan
+        if (is_array($filterMonth) && isset($filterMonth['month'])) {
+            $filterMonth = (int) $filterMonth['month'];
+        } elseif (!is_null($filterMonth)) {
+            $filterMonth = (int) $filterMonth;
+        }
 
         try {
             $headers = TrRiskHeader::with([
                 'riskCode:id,name',
                 'department:id,name',
                 'monthlyData' => function ($q) use ($filterYear, $filterMonth) {
+                    $q->select([
+                        'id',
+                        'header_id',
+                        'target_quantitative',
+                        'realization_quantitative',
+                        'residual_risk_level_dampak',
+                        'residual_risk_level_kemungkinan',
+                        'residual_risk_posisi_risiko',
+                        'residual_risk_level_risiko',
+                        'start_date',
+                        'month'
+                    ]);
+
                     if (!empty($filterYear)) {
                         $q->whereYear('start_date', $filterYear);
                     }
@@ -186,6 +180,25 @@ class ExportRiskController extends Controller
                         $q->where('month', $filterMonth);
                     }
                 },
+            ])
+            ->select([
+                'id',
+                'risk_code',
+                'jenis_risiko',
+                'penyebab_risiko',
+                // Field untuk inherent risk
+                'inherent_risk_level_dampak',
+                'inherent_risk_level_kemungkinan',
+                'inherent_risk_posisi_risiko',
+                'inherent_risk_level_risiko',
+                // Field untuk residual target risk
+                'residual_target_level_dampak',
+                'residual_target_level_kemungkinan',
+                'residual_target_posisi_risiko',
+                'residual_target_level_risiko',
+                // Field tambahan
+                'target_quantitative_satu_tahun',
+                'biaya_perlakuan_risiko'
             ])
             ->when(!empty($filterYear) || !empty($filterMonth), function ($query) use ($filterYear, $filterMonth) {
                 $query->whereHas('monthlyData', function ($q) use ($filterYear, $filterMonth) {
@@ -197,7 +210,13 @@ class ExportRiskController extends Controller
                     }
                 });
             })
-            ->limit(5) // Preview hanya 5 data pertama
+            // Jika ada ID specific, filter berdasarkan ID tersebut
+            ->when($id, function ($query) use ($id) {
+                if ($id > 0) {
+                    $query->where('id', $id);
+                }
+            })
+            ->limit(10)
             ->get();
 
             return response()->json([
@@ -205,9 +224,16 @@ class ExportRiskController extends Controller
                 'success' => true,
                 'message' => 'Preview data berhasil',
                 'data' => [
-                    'total_records' => $headers->count(),
+                    'total_records' => TrRiskHeader::count(),
+                    'filtered_records' => $headers->count(),
                     'preview_data' => $headers,
+                    'sheets_info' => [
+                        'risk_register' => 'Sheet 1: Data lengkap risk register',
+                        'monitoring' => 'Sheet 2: Data monitoring risiko',
+                        'peta_risiko' => 'Sheet 3: Peta risiko (heatmap)'
+                    ],
                     'filters' => [
+                        'id' => $id,
                         'year' => $filterYear,
                         'month' => $filterMonth,
                         'month_name' => $this->getMonthName($filterMonth)

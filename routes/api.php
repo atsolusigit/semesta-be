@@ -105,14 +105,19 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group
 // ============================
 //  Role Management (Super Admin Only)
 // ============================
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,6'])->group(function () {
-    Route::get('/roles', [RoleController::class, 'index']);
-    Route::post('/roles', [RoleController::class, 'store']);
-    Route::get('/roles/{id}', [RoleController::class, 'show']);
-    Route::put('/roles/{id}', [RoleController::class, 'update']);
-    Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
-});
+// Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->group(function () {
+//     Route::get('/roles', [RoleController::class, 'index']);
+//     Route::post('/roles', [RoleController::class, 'store']);
+//     Route::get('/roles/{id}', [RoleController::class, 'show']);
+//     Route::put('/roles/{id}', [RoleController::class, 'update']);
+//     Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
+// });
 
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->get('/roles', [RoleController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/roles', [RoleController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->get('/roles/{id}', [RoleController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/roles/{id}', [RoleController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/roles/{id}', [RoleController::class, 'destroy']);
 
 // ============================
 //  Page & Role-Page Access Management
@@ -278,7 +283,7 @@ Route::middleware(['auth:api'])->group(function () {
 });
 
 // ===================== Export File =====================
-    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->group(function () {
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->group(function () {
     Route::get('/export-risk/{format}', [ExportRiskController::class, 'export'])
         ->where(['format' => 'pdf|excel']);
 

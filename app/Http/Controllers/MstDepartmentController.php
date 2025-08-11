@@ -13,9 +13,17 @@ use Illuminate\Support\Arr;
 
 class MstDepartmentController extends Controller
 {
-    public function index(Request $request)
+public function index(Request $request)
 {
     $query = MstDepartment::select('id', 'name', 'abbreviation');
+
+    // Cek role user yang sedang login
+    $user = auth()->user();
+
+    // Jika user memiliki role 3, batasi hanya departemennya saja
+    if ($user && $user->role->id == 3) {
+        $query->where('id', $user->department_id);
+    }
 
     if ($request->filled('search')) {
         $search = $request->search;

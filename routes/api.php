@@ -94,12 +94,15 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group
     Route::put('/knowledge-base/{id}', [KnowledgeBaseController::class, 'update']);
 
     //  Departmentss
-    Route::get('/departments', [MstDepartmentController::class, 'index']);
-    Route::get('/departments/{id}', [MstDepartmentController::class, 'show']);
+    // Route::get('/departments', [MstDepartmentController::class, 'index']);
+    // Route::get('/departments/{id}', [MstDepartmentController::class, 'show']);
     Route::post('/departments', [MstDepartmentController::class, 'store']);
     Route::put('/departments/{id}', [MstDepartmentController::class, 'update']);
 
 });
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/departments', [MstDepartmentController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/departments/{id}', [MstDepartmentController::class, 'show']);
+
 
 
 // ============================

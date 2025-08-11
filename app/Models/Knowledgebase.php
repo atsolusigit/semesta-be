@@ -22,4 +22,11 @@ class Knowledgebase extends Model
     {
         return $this->belongsTo(User::class, 'creator_id');
     }
+
+    public function updater()
+{
+    return $this->belongsTo(User::class, 'updated_by');
+}
+
+
 }

@@ -38,6 +38,24 @@ class TrRiskMonthlyController extends Controller
     $cleaned = $data->map(function ($item) {
         $arr = collect($item)->toArray();
 
+  // Format angka pada level monthly
+        if (isset($arr['realization_quantitative']) && $arr['realization_quantitative']) {
+            $arr['realization_quantitative'] = number_format((float)$arr['realization_quantitative'], 0, ',', '.');
+        }
+        if (isset($arr['target_quantitative']) && $arr['target_quantitative']) {
+            $arr['target_quantitative'] = number_format((float)$arr['target_quantitative'], 0, ',', '.');
+        }
+
+        // Format angka pada header jika ada
+        if (isset($arr['header'])) {
+            if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
+                $arr['header']['target_quantitative_satu_tahun'] = number_format((float)$arr['header']['target_quantitative_satu_tahun'], 0, ',', '.');
+            }
+            if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
+                $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 0, ',', '.');
+            }
+        }
+
         // Remove null optional fields
         if (is_null($arr['target_option_position'] ?? null)) {
             unset($arr['target_option_position']);
@@ -121,6 +139,24 @@ public function show($id)
 
     $arr = collect($data)->toArray();
 
+  // Format angka pada level monthly
+        if (isset($arr['realization_quantitative']) && $arr['realization_quantitative']) {
+            $arr['realization_quantitative'] = number_format((float)$arr['realization_quantitative'], 0, ',', '.');
+        }
+        if (isset($arr['target_quantitative']) && $arr['target_quantitative']) {
+            $arr['target_quantitative'] = number_format((float)$arr['target_quantitative'], 0, ',', '.');
+        }
+
+        // Format angka pada header jika ada
+        if (isset($arr['header'])) {
+            if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
+                $arr['header']['target_quantitative_satu_tahun'] = number_format((float)$arr['header']['target_quantitative_satu_tahun'], 0, ',', '.');
+            }
+            if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
+                $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 0, ',', '.');
+            }
+        }
+
     // Bersihkan field opsional jika null
     if (is_null($arr['target_option_position'] ?? null)) {
         unset($arr['target_option_position']);
@@ -196,6 +232,25 @@ public function getByHeader($headerId)
     $cleaned = $data->map(function ($item) {
         $arr = collect($item)->toArray();
 
+        // Format angka pada header jika ada
+        if (isset($arr['header'])) {
+            if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
+                $arr['header']['target_quantitative_satu_tahun'] = number_format((float)str_replace(',', '', $arr['header']['target_quantitative_satu_tahun']), 0, ',', '.');
+            }
+            if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
+                $arr['header']['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $arr['header']['biaya_perlakuan_risiko']), 0, ',', '.');
+            }
+        }
+
+        // Format angka pada level monthly
+        if (isset($arr['realization_quantitative']) && $arr['realization_quantitative']) {
+            $arr['realization_quantitative'] = number_format((float)str_replace(',', '', $arr['realization_quantitative']), 0, ',', '.');
+        }
+        if (isset($arr['target_quantitative']) && $arr['target_quantitative']) {
+            $arr['target_quantitative'] = number_format((float)str_replace(',', '', $arr['target_quantitative']), 0, ',', '.');
+        }
+
+
         if (is_null($arr['target_option_position'] ?? null)) {
             unset($arr['target_option_position']);
         }
@@ -252,8 +307,17 @@ public function getByHeader($headerId)
     // Bersihkan seluruh data
     $cleaned = clean_recursive($cleaned->toArray());
 
+    // Convert header ke array dan format angka
+    $headerArray = $header->toArray();
+    if (isset($headerArray['target_quantitative_satu_tahun']) && $headerArray['target_quantitative_satu_tahun']) {
+        $headerArray['target_quantitative_satu_tahun'] = number_format((float)str_replace(',', '', $headerArray['target_quantitative_satu_tahun']), 0, ',', '.');
+    }
+    if (isset($headerArray['biaya_perlakuan_risiko']) && $headerArray['biaya_perlakuan_risiko']) {
+        $headerArray['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $headerArray['biaya_perlakuan_risiko']), 0, ',', '.');
+    }
+
     return json(200, true, 'Data Ditemukan', 'Data monthly untuk header berhasil diambil.', [
-        'header' => $header,
+        'header' => $headerArray,
         'monthly_data' => $cleaned,
     ]);
 }
@@ -399,9 +463,9 @@ public function getByHeader($headerId)
             'process_code' => clean_string($data->process_code),
             'start_date' => clean_string($data->start_date),
             'expired_date' => clean_string($data->expired_date),
-            'realization_quantitative' => $data->realization_quantitative,
+            'realization_quantitative' => $data->realization_quantitative ? number_format((float)$data->realization_quantitative, 0, ',', '.') : '0',
             'realization_note' => clean_string($data->realization_note),
-            'target_quantitative' => $data->target_quantitative,
+            'target_quantitative' => $data->target_quantitative ? number_format((float)$data->target_quantitative, 0, ',', '.') : '0',
             'target_notes' => clean_string($data->target_notes),
             'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
             'residual_risk_level_kemungkinan' => $data->residual_risk_level_kemungkinan,
@@ -559,9 +623,9 @@ public function getByHeader($headerId)
             'process_code' => clean_string($data->process_code),
             'start_date' => clean_string($data->start_date),
             'expired_date' => clean_string($data->expired_date),
-            'realization_quantitative' => $data->realization_quantitative,
+            'realization_quantitative' => $data->realization_quantitative ? number_format((float)$data->realization_quantitative, 0, ',', '.') : '0',
             'realization_note' => clean_string($data->realization_note),
-            'target_quantitative' => $data->target_quantitative,
+            'target_quantitative' => $data->target_quantitative ? number_format((float)$data->target_quantitative, 0, ',', '.') : '0',
             'target_notes' => clean_string($data->target_notes),
             'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
             'residual_risk_level_kemungkinan' => $data->residual_risk_level_kemungkinan,
@@ -643,7 +707,7 @@ public function getByHeader($headerId)
             'header_id' => $monthly->header_id,
             'month' => $monthly->month,
             'risk_code' => clean_string($monthly->risk_code),
-            'target_quantitative' => $monthly->target_quantitative,
+            'target_quantitative' => $monthly->target_quantitative ? number_format((float)$monthly->target_quantitative, 0, ',', '.') : '0',
             'target_notes' => clean_string($monthly->target_notes),
             'status_risiko' => clean_string($monthly->status_risiko),
             'is_finalize' => $monthly->is_finalize,
@@ -896,9 +960,24 @@ public function getByHeader($headerId)
         // Nama pembuat header, fallback jika createdBy monthly gak ada
         $headerCreatorName = $header->createdBy ? get_decrypted_username($header->createdBy) : 'Unknown User';
 
-        // Tambahkan uploaded_files dan created_by_name / updated_by_name ke updated_data
+        // Format angka pada updated_data
         if (isset($result['updated_data']) && is_array($result['updated_data'])) {
             foreach ($result['updated_data'] as &$item) {
+                // Format target_quantitative
+                if (isset($item['target_quantitative'])) {
+                    $item['target_quantitative'] = $item['target_quantitative'] ? number_format((float)$item['target_quantitative'], 0, ',', '.') : '0';
+                }
+
+                // Format data dalam header jika ada
+                if (isset($item['header'])) {
+                    if (isset($item['header']['target_quantitative_satu_tahun'])) {
+                        $item['header']['target_quantitative_satu_tahun'] = $item['header']['target_quantitative_satu_tahun'] ? number_format((float)$item['header']['target_quantitative_satu_tahun'], 0, ',', '.') : '0';
+                    }
+                    if (isset($item['header']['biaya_perlakuan_risiko'])) {
+                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko'] ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.') : '0';
+                    }
+                }
+
                 $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
 
                 $item['uploaded_files'] = $monthlyUploads->count() > 0
@@ -927,9 +1006,24 @@ public function getByHeader($headerId)
             }
         }
 
-        // Tambahkan uploaded_files dan created_by_name / updated_by_name ke created_data
+        // Format angka pada created_data
         if (isset($result['created_data']) && is_array($result['created_data'])) {
             foreach ($result['created_data'] as &$item) {
+                // Format target_quantitative
+                if (isset($item['target_quantitative'])) {
+                    $item['target_quantitative'] = $item['target_quantitative'] ? number_format((float)$item['target_quantitative'], 0, ',', '.') : '0';
+                }
+
+                // Format data dalam header jika ada
+                if (isset($item['header'])) {
+                    if (isset($item['header']['target_quantitative_satu_tahun'])) {
+                        $item['header']['target_quantitative_satu_tahun'] = $item['header']['target_quantitative_satu_tahun'] ? number_format((float)$item['header']['target_quantitative_satu_tahun'], 0, ',', '.') : '0';
+                    }
+                    if (isset($item['header']['biaya_perlakuan_risiko'])) {
+                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko'] ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.') : '0';
+                    }
+                }
+
                 $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
 
                 $item['uploaded_files'] = $monthlyUploads->count() > 0

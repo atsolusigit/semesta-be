@@ -21,17 +21,18 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
     protected $monthName;
     protected $year;
     protected $colorMap = [];
+    protected $departmentName;
 
-    public function __construct($headers, $monthName = 'Semua Bulan', $year = 2025)
+    public function __construct($headers, $monthName = 'Semua Bulan', $year = 2025, $departmentName = null)
     {
         $this->headers = $headers;
         $this->monthName = $monthName;
         $this->year = $year;
+        $this->departmentName = $departmentName;
 
         // Load color mapping dari database
         $this->loadColorMapping();
     }
-
     private function loadColorMapping()
     {
         // Ambil mapping warna dari tabel mst_heatmap_risk_range
@@ -75,6 +76,11 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
 
         return $fallbackColors[$riskLevel] ?? '#FFFFFF';
     }
+
+    private function formatCurrency($value)
+{
+    return 'Rp.' . number_format($value, 0, ',', '.');
+}
 
     public function array(): array
     {
@@ -126,8 +132,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $header->inherent_risk_level_risiko ?? '',
 
                 $header->internal_control ?? '', // Internal Control
-                $target, // Target Bulan
-                $realization, // Realisasi Bulan
+                $this->formatCurrency($target),           // Target Bulan
+                $this->formatCurrency($realization),      // Realisasi Bulan
                 $percentage . '%', // Persentase Bulan
 
                 // Residual Risk Saat Ini (4 kolom)
@@ -136,8 +142,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $monthlyData->residual_risk_posisi_risiko ?? '',
                 $monthlyData->residual_risk_level_risiko ?? '',
 
-                $header->target_quantitative_satu_tahun ?? 0, // Target 1 Tahun
-                $realization, // Realisasi (duplicate)
+                $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0), // Target 1 Tahun
+                $this->formatCurrency($realization),                                // Realisasi (duplicate)
 
                 // Residual Target Risk (4 kolom)
                 $header->residual_target_level_dampak ?? '',
@@ -146,7 +152,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $header->residual_target_level_risiko ?? '',
 
                 $monthlyData->realization_note ?? '', // Perlakuan Risiko
-                $header->biaya_perlakuan_risiko ?? 0, // Biaya Perlakuan
+                $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),         // Biaya Perlakuan
+
 
                 // Residual Target Risk (duplicate - 4 kolom)
                 $header->residual_target_level_dampak ?? '',
@@ -213,10 +220,12 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
         ];
     }
 
-    public function title(): string
-    {
-        return 'Risk Register ' . strtoupper($this->monthName) . ' ' . $this->year;
-    }
+   public function title(): string
+{
+    $deptName = $this->departmentName ? strtoupper(str_replace(' ', '_', $this->departmentName)) : 'ALL_DEPT';
+    return 'Risk Register ' . strtoupper($this->monthName) . ' ' . $this->year. ' - ' . $deptName;
+}
+
 
     public function styles(Worksheet $sheet)
     {

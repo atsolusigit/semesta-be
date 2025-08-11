@@ -20,10 +20,10 @@ public function index(Request $request)
     // Cek role user yang sedang login
     $user = auth()->user();
 
-    // Jika user memiliki role 3, batasi hanya departemennya saja
-    if ($user && $user->role->id == 3) {
-        $query->where('id', $user->department_id);
-    }
+    // Jika user memiliki role 2 atau 3, batasi hanya departemennya saja
+if ($user && in_array($user->role->id, [2, 3])) {
+    $query->where('id', $user->department_id);
+}
 
     if ($request->filled('search')) {
         $search = $request->search;

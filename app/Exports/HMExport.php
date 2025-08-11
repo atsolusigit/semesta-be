@@ -23,12 +23,14 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
     protected $heatmapData;
     protected $colorMap = [];
     protected $riskLevelMap = [];
+    protected $departmentName;
 
-    public function __construct($headers, $monthName = null, $year = null)
+    public function __construct($headers, $monthName = null, $year = null, $departmentName = null)
     {
         $this->headers = $headers;
         $this->monthName = $monthName ?? 'MARET';
         $this->year = $year ?? date('Y');
+        $this->departmentName = $departmentName;
 
         $this->loadHeatmapData();
         $this->loadColorMapping();
@@ -138,10 +140,11 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
         return $counts;
     }
 
-    public function title(): string
-    {
-        return 'Heat Map '. strtoupper($this->monthName) . ' ' . $this->year;
-    }
+   public function title(): string
+{
+    $deptName = $this->departmentName ? strtoupper(str_replace(' ', '_', $this->departmentName)) : 'ALL_DEPT';
+    return 'Heat Map '. strtoupper($this->monthName) . ' ' . $this->year . ' - ' . $deptName;
+}
 
     public function array(): array
     {

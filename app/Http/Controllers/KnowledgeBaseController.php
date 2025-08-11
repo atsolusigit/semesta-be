@@ -13,16 +13,96 @@ use Carbon\Carbon;
 class KnowledgeBaseController extends Controller
 {
     public function index(Request $request)
-    {
-        $query = Knowledgebase::query();
+{
+    // Eager load relasi creator & updater
+    $query = Knowledgebase::with(['creator', 'updater']);
 
-        if ($request->has('type')) {
-            $query->where('type', $request->type);
+    if ($request->has('type')) {
+        $query->where('type', $request->type);
+    }
+
+    $data = $query->latest()->get();
+
+    $typeMap = [
+        1 => 'NEWS',
+        2 => 'PERDIR',
+        3 => 'SOP',
+        4 => 'SURAT KEPUTUSAN',
+        5 => 'REGULASI',
+    ];
+
+    $data->transform(function ($item) use ($typeMap) {
+        // Enkripsi creator_id
+        $item->creator_id = encrypt_decrypt_md5('enc', $item->creator_id);
+
+        // Mapping type label
+        $item->type_label = $typeMap[$item->type] ?? 'TIDAK DIKETAHUI';
+
+        // created_by_name & updated_by_name
+        $item->created_by_name = get_decrypted_username($item->creator ?? null);
+        $item->updated_by_name = get_decrypted_username($item->updater ?? null);
+
+        // Hapus relasi supaya tidak ikut di JSON
+        unset($item->creator, $item->updater);
+
+        return clean_recursive($item);
+    });
+
+    $perLoad = $request->input('per_load', 6);
+
+    return json(200, true, 'success', 'Data berhasil diambil', [
+        'per_load' => $perLoad,
+        'data' => $data
+    ]);
+}
+    public function show($id)
+{
+    try {
+        \Log::info('Starting show function for ID: ' . $id);
+
+        // Ambil data dengan relasi creator & updater
+        $data = Knowledgebase::with(['creator', 'updater'])->find($id);
+        if (!$data) {
+            return json(404, false, 'not_found', 'Data tidak ditemukan', null);
         }
 
-        $data = $query->latest()->paginate(10);
+        \Log::info('Basic data loaded successfully');
 
-        // Mapping tipe dokumen
+        // Cek dan validasi encoding field tertentu
+        $fieldsToCheck = ['title', 'description', 'long_description', 'img_path'];
+        foreach ($fieldsToCheck as $field) {
+            try {
+                $value = $data->$field;
+                if ($value !== null) {
+                    $encoding = mb_detect_encoding($value, ['UTF-8', 'ISO-8859-1', 'Windows-1252'], true);
+                    $isValidUtf8 = mb_check_encoding($value, 'UTF-8');
+
+                    \Log::info("Field $field check:", [
+                        'value_length' => strlen($value),
+                        'detected_encoding' => $encoding,
+                        'is_valid_utf8' => $isValidUtf8,
+                        'first_50_chars' => substr($value, 0, 50)
+                    ]);
+
+                    if (!$isValidUtf8) {
+                        \Log::error("Invalid UTF-8 detected in field: $field");
+
+                        if ($encoding) {
+                            $data->$field = mb_convert_encoding($value, 'UTF-8', $encoding);
+                        } else {
+                            $data->$field = null;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                \Log::error("Error checking field $field: " . $e->getMessage());
+                $data->$field = null;
+            }
+        }
+
+        \Log::info('Field validation completed');
+
+        // Mapping type label
         $typeMap = [
             1 => 'NEWS',
             2 => 'PERDIR',
@@ -30,102 +110,46 @@ class KnowledgeBaseController extends Controller
             4 => 'SURAT KEPUTUSAN',
             5 => 'REGULASI',
         ];
+        $data->type_label = $typeMap[$data->type] ?? 'TIDAK DIKETAHUI';
 
-        // Enkripsi creator_id dan tambahkan label type
-        $data->getCollection()->transform(function ($item) use ($typeMap) {
-            $item->creator_id = encrypt_decrypt_md5('enc', $item->creator_id);
-            $item->type_label = $typeMap[$item->type] ?? 'TIDAK DIKETAHUI';
-            return $item;
-        });
+        \Log::info('Type label added');
 
-        return json(200, true, 'success', 'Data berhasil diambil', $data);
+        // Tambahkan created_by_name dan updated_by_name
+        $data->created_by_name = get_decrypted_username($data->creator ?? null);
+        $data->updated_by_name = get_decrypted_username($data->updater ?? null);
+
+        // Siapkan response
+        $responseData = [
+            'id' => $data->id,
+            'title' => $data->title,
+            'description' => $data->description,
+            'long_description' => $data->long_description,
+            'img_path' => $data->img_path,
+            'doc_path' => $data->doc_path,
+            'type' => $data->type,
+            'type_label' => $data->type_label,
+            'creator_id' => encrypt_decrypt_md5('enc', $data->creator_id),
+            'created_by_name' => $data->created_by_name,
+            'updated_by_name' => $data->updated_by_name,
+            'created_at' => $data->created_at,
+            'updated_at' => $data->updated_at,
+        ];
+
+        \Log::info('Response data prepared:', $responseData);
+
+        return json(200, true, 'success', 'Detail Data', $responseData);
+
+    } catch (\Exception $e) {
+        \Log::error('Show function failed at step:', [
+            'error' => $e->getMessage(),
+            'line' => $e->getLine(),
+            'file' => $e->getFile(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return json(500, false, 'error', 'Gagal mengambil data: ' . $e->getMessage(), null);
     }
-
-    public function show($id)
-    {
-        try {
-            \Log::info('Starting show function for ID: ' . $id);
-
-            $data = Knowledgebase::find($id);
-            if (!$data) {
-                return json(404, false, 'not_found', 'Data tidak ditemukan', null);
-            }
-
-            \Log::info('Basic data loaded successfully');
-
-            $fieldsToCheck = ['title', 'description', 'long_description', 'img_path'];
-            foreach ($fieldsToCheck as $field) {
-                try {
-                    $value = $data->$field;
-                    if ($value !== null) {
-                        $encoding = mb_detect_encoding($value, ['UTF-8', 'ISO-8859-1', 'Windows-1252'], true);
-                        $isValidUtf8 = mb_check_encoding($value, 'UTF-8');
-
-                        \Log::info("Field $field check:", [
-                            'value_length' => strlen($value),
-                            'detected_encoding' => $encoding,
-                            'is_valid_utf8' => $isValidUtf8,
-                            'first_50_chars' => substr($value, 0, 50)
-                        ]);
-
-                        if (!$isValidUtf8) {
-                            \Log::error("Invalid UTF-8 detected in field: $field");
-
-                            if ($encoding) {
-                                $data->$field = mb_convert_encoding($value, 'UTF-8', $encoding);
-                            } else {
-                                $data->$field = null;
-                            }
-                        }
-                    }
-                } catch (\Exception $e) {
-                    \Log::error("Error checking field $field: " . $e->getMessage());
-                    $data->$field = null;
-                }
-            }
-
-            \Log::info('Field validation completed');
-
-            $typeMap = [
-                1 => 'NEWS',
-                2 => 'PERDIR',
-                3 => 'SOP',
-                4 => 'SURAT KEPUTUSAN',
-                5 => 'REGULASI',
-            ];
-            $data->type_label = $typeMap[$data->type] ?? 'TIDAK DIKETAHUI';
-
-            \Log::info('Type label added');
-
-            $responseData = [
-                'id' => $data->id,
-                'title' => $data->title,
-                'description' => $data->description,
-                'long_description' => $data->long_description,
-                'img_path' => $data->img_path,
-                'doc_path' => $data->doc_path,
-                'type' => $data->type,
-                'type_label' => $data->type_label,
-                'creator_id' => $data->creator_id,
-                'created_at' => $data->created_at,
-                'updated_at' => $data->updated_at,
-            ];
-
-            \Log::info('Response data prepared:', $responseData);
-
-            return json(200, true, 'success', 'Detail Data', $responseData);
-
-        } catch (\Exception $e) {
-            \Log::error('Show function failed at step:', [
-                'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return json(500, false, 'error', 'Gagal mengambil data: ' . $e->getMessage(), null);
-        }
-    }
+}
 
     public function store(Request $request)
 {

@@ -46,11 +46,10 @@ class TrRiskHeaderController extends Controller
         'updatedBy:id,username,id',
     ])
 
-      ->when($user->role_id == 3, function ($query) use ($user) {
-        // Jika role_id = 3, batasi department yang terlihat sesuai department user
-        $query->where('department_id', $user->department_id);
-    })
-
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+    // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+    $query->where('department_id', $user->department_id);
+})
     ->when($request->peristiwa, function ($query) use ($request) {
         $query->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
     })
@@ -62,7 +61,7 @@ class TrRiskHeaderController extends Controller
     ->when($request->tahun, function ($query) use ($request) {
         $query->where('year', $request->tahun);
     })
-    ->orderBy('id', 'asc');
+    ->orderBy('id', 'desc');
 
     // Pagination, ambil data per halaman
     $data = $query->paginate($perPage);
@@ -193,9 +192,9 @@ class TrRiskHeaderController extends Controller
             'target_satu_tahun_option_name' => $item->optionTargetSatuTahun->name ?? '',
             'target_satu_tahun_notes' => $item->target_satu_tahun_notes ?? '',
             'target_satu_tahun_position' => $item->optionTargetSatuTahun->position ?? 0,
-            'target_quantitative_satu_tahun' => $item->target_quantitative_satu_tahun ?? 0,
+            'target_quantitative_satu_tahun' => number_format($item->target_quantitative_satu_tahun, 0, ',', '.'),
 
-            'biaya_perlakuan_risiko' => $item->biaya_perlakuan_risiko ?? 0,
+            'biaya_perlakuan_risiko' => number_format($item->biaya_perlakuan_risiko, 0, ',', '.'),
             'residual_target_level_dampak' => $item->residual_target_level_dampak ?? 0,
             'residual_target_level_kemungkinan' => $item->residual_target_level_kemungkinan ?? 0,
             'residual_target_posisi_risiko' => $item->residual_target_posisi_risiko ?? '',
@@ -421,9 +420,9 @@ class TrRiskHeaderController extends Controller
         'target_satu_tahun_option_name' => $data->optionTargetSatuTahun->name ?? '',
         'target_satu_tahun_notes' => $data->target_satu_tahun_notes ?? '',
         'target_satu_tahun_position' => $data->optionTargetSatuTahun->position ?? 0,
-        'target_quantitative_satu_tahun' => $data->target_quantitative_satu_tahun ?? 0,
+        'target_quantitative_satu_tahun' => number_format($data->target_quantitative_satu_tahun, 0, ',', '.'),
 
-        'biaya_perlakuan_risiko' => $data->biaya_perlakuan_risiko ?? 0,
+        'biaya_perlakuan_risiko' => number_format($data->biaya_perlakuan_risiko, 0, ',', '.'),
         'residual_target_level_dampak' => $data->residual_target_level_dampak ?? 0,
         'residual_target_level_kemungkinan' => $data->residual_target_level_kemungkinan ?? 0,
         'residual_target_posisi_risiko' => $data->residual_target_posisi_risiko ?? '',
@@ -564,8 +563,8 @@ public function store(Request $request)
             'internal_control' => clean_string($riskHeader->internal_control),
             'target_satu_tahun_option' => $riskHeader->target_satu_tahun_option,
             'target_satu_tahun_notes' => clean_string($riskHeader->target_satu_tahun_notes),
-            'target_quantitative_satu_tahun' => $riskHeader->target_quantitative_satu_tahun,
-            'biaya_perlakuan_risiko' => $riskHeader->biaya_perlakuan_risiko,
+            'target_quantitative_satu_tahun' => number_format($riskHeader->target_quantitative_satu_tahun, 0, ',', '.'),
+            'biaya_perlakuan_risiko' => number_format($riskHeader->biaya_perlakuan_risiko, 0, ',', '.'),
             'department_id' => $riskHeader->department_id,
             'year' => $riskHeader->year,
             'target_satu_tahun_position' => clean_string($riskHeader->target_satu_tahun_position),
@@ -803,8 +802,8 @@ public function update(Request $request, $id)
             'target_satu_tahun_option_name' => $data->optionTargetSatuTahun ? clean_string($data->optionTargetSatuTahun->name) : null,
             'target_satu_tahun_position' => clean_string($data->target_satu_tahun_position),
             'target_satu_tahun_notes' => clean_string($data->target_satu_tahun_notes),
-            'target_quantitative_satu_tahun' => $data->target_quantitative_satu_tahun,
-            'biaya_perlakuan_risiko' => $data->biaya_perlakuan_risiko,
+            'target_quantitative_satu_tahun' => number_format($data->target_quantitative_satu_tahun, 0, ',', '.'),
+            'biaya_perlakuan_risiko' => number_format($data->biaya_perlakuan_risiko, 0, ',', '.'),
             'department_id' => $data->department_id,
             'year' => $data->year,
             'inherent_risk_posisi_risiko' => $data->inherent_risk_posisi_risiko,
@@ -952,10 +951,10 @@ public function monitoring(Request $request)
         'updatedBy:id,username,id',
     ])
 
-      ->when($user->role_id == 3, function ($query) use ($user) {
-        // Jika role_id = 3, batasi department yang terlihat sesuai department user
-        $query->where('department_id', $user->department_id);
-    })
+      ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+    // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+    $query->where('department_id', $user->department_id);
+})
 
     ->when($request->peristiwa, function ($query) use ($request) {
         $query->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
@@ -1099,9 +1098,9 @@ public function monitoring(Request $request)
             'target_satu_tahun_option_name' => $item->optionTargetSatuTahun->name ?? '',
             'target_satu_tahun_notes' => $item->target_satu_tahun_notes ?? '',
             'target_satu_tahun_position' => $item->optionTargetSatuTahun->position ?? 0,
-            'target_quantitative_satu_tahun' => $item->target_quantitative_satu_tahun ?? 0,
+            'target_quantitative_satu_tahun' => number_format($item->target_quantitative_satu_tahun, 0, ',', '.'),
 
-            'biaya_perlakuan_risiko' => $item->biaya_perlakuan_risiko ?? 0,
+            'biaya_perlakuan_risiko' => number_format($item->biaya_perlakuan_risiko, 0, ',', '.'),
             'residual_target_level_dampak' => $item->residual_target_level_dampak ?? 0,
             'residual_target_level_kemungkinan' => $item->residual_target_level_kemungkinan ?? 0,
             'residual_target_posisi_risiko' => $item->residual_target_posisi_risiko ?? '',

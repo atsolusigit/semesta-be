@@ -156,7 +156,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
         // Baris 5: Header dengan DAMPAK di tengah
         $data[] = ['', '','', '', '', '', '', '', 'LEVEL RISIKO', 'POSISI RISIKO'];
 
-        // Baris 6-10: Data heatmap dengan kemungkinan di kiri
+        // Baris 6-10: Data heatmap dengan probabilitas di kiri
         $kemungkinanLabels = [
             ['Hampir pasti terjadi', '5'],
             ['Sangat mungkin terjadi', '4'],
@@ -177,7 +177,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
         foreach ($kemungkinanLabels as $index => $prob) {
             $row = [];
 
-            // Kolom A: Label kemungkinan
+            // Kolom A: Label probabilitas
             $row[] = $prob[0];
 
             // Kolom B-F: Cells heatmap (akan diisi dengan risk score dan dots)
@@ -279,7 +279,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
 
                 // Set column widths sesuai gambar
                 $columnWidths = [
-                    'A' => 5,  // Kemungkinan descriptions
+                    'A' => 5,  // Probabilitas descriptions
                     'B' => 25,  // Spacing
                     'C' => 18,  // Level 1
                     'D' => 18,  // Level 2
@@ -416,14 +416,14 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                         ]);
                 }
 
-                // Add KEMUNGKINAN label manually di sebelah kiri
-                $sheet->setCellValue('A5', 'KEMUNGKINAN');
+                // PERUBAHAN: Ganti nama KEMUNGKINAN menjadi PROBABILITAS
+                $sheet->setCellValue('A5', 'PROBABILITAS');
                 $sheet->getStyle('A5')->getAlignment()->setTextRotation(90);
                 $sheet->getStyle('A5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle('A5')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                 $sheet->getStyle('A5')->getFont()->setBold(true);
 
-                // Apply background untuk KEMUNGKINAN label
+                // Apply background untuk PROBABILITAS label
                 $sheet->getStyle('A5')->applyFromArray([
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
@@ -431,7 +431,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                     ]
                 ]);
 
-                // dampak & kemungkinan section
+                // dampak & probabilitas section
                 $dampakArr = array(
                     [
                         "column" => "C10",
@@ -529,7 +529,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                     'font' => ['bold' => true, 'size' => 11]
                 ]);
 
-                // Merge KEMUNGKINAN vertically (A5:A9)
+                // Merge PROBABILITAS vertically (A5:A9) - PERUBAHAN: comment disesuaikan
                 $sheet->mergeCells('A5:A9');
 
                 // Add risk counts/dots
@@ -564,29 +564,95 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $targetCount = $residualTargetCounts[$key] ?? 0;
 
                 $currentValue = $sheet->getCell($cellRef)->getValue();
-                $displayText = $currentValue;
 
                 if ($inherentCount > 0 || $currentCount > 0 || $targetCount > 0) {
-                    $displayText .= "\n";
-
-                    if ($inherentCount > 0) {
-                        $displayText .= str_repeat('●', min($inherentCount, 10)) . " ";
-                    }
-
-                    if ($currentCount > 0) {
-                        $displayText .= str_repeat('●', min($currentCount, 10)) . " ";
-                    }
-
-                    if ($targetCount > 0) {
-                        $displayText .= str_repeat('●', min($targetCount, 10));
-                    }
+                    // Gunakan RichText untuk mengatur warna dots berbeda
+                    $this->applyColoredDotsToCell($sheet, $cellRef, $currentValue, $inherentCount, $currentCount, $targetCount);
+                } else {
+                    // Jika tidak ada dots, tetap set value biasa
+                    $sheet->setCellValue($cellRef, $currentValue);
                 }
 
-                $sheet->setCellValue($cellRef, trim($displayText));
                 $sheet->getStyle($cellRef)->getAlignment()->setWrapText(true);
             }
         }
     }
+
+    private function applyColoredDotsToCell($sheet, $cellRef, $currentValue, $inherentCount, $currentCount, $targetCount)
+{
+    $richText = new \PhpOffice\PhpSpreadsheet\RichText\RichText();
+
+    // Add risk info part (nama level dan score)
+    $riskPart = $richText->createTextRun($currentValue . "\n");
+    $riskPart->getFont()->setBold(true)->setSize(10);
+
+    $hasContent = false;
+
+    // Inherent Risk dengan angka dalam lingkaran - Blue (#0070C0)
+    if ($inherentCount > 0) {
+        // Gunakan karakter Unicode untuk lingkaran dengan angka
+        $inherentText = $this->createNumberedCircle($inherentCount, 'blue');
+        $inherentPart = $richText->createTextRun($inherentText);
+        $inherentPart->getFont()->getColor()->setARGB('FF0070C0');
+        $inherentPart->getFont()->setSize(12)->setBold(true);
+        $hasContent = true;
+    }
+
+    // Spasi jika ada konten sebelumnya dan akan ada konten berikutnya
+    if ($hasContent && ($currentCount > 0 || $targetCount > 0)) {
+        $spacePart = $richText->createTextRun(' ');
+    }
+
+    // Residual Current Risk dengan angka dalam lingkaran - Gray (#7F7F7F)
+    if ($currentCount > 0) {
+        $currentText = $this->createNumberedCircle($currentCount, 'gray');
+        $currentPart = $richText->createTextRun($currentText);
+        $currentPart->getFont()->getColor()->setARGB('FF7F7F7F');
+        $currentPart->getFont()->setSize(12)->setBold(true);
+        $hasContent = true;
+    }
+
+    // Spasi jika ada konten sebelumnya dan akan ada konten berikutnya
+    if ($hasContent && $targetCount > 0) {
+        $spacePart = $richText->createTextRun(' ');
+    }
+
+    // Residual Target Risk dengan angka dalam lingkaran - Purple (#7030A0)
+    if ($targetCount > 0) {
+        $targetText = $this->createNumberedCircle($targetCount, 'purple');
+        $targetPart = $richText->createTextRun($targetText);
+        $targetPart->getFont()->getColor()->setARGB('FF7030A0');
+        $targetPart->getFont()->setSize(12)->setBold(true);
+    }
+
+    $sheet->getCell($cellRef)->setValue($richText);
+}
+
+private function createNumberedCircle($number, $color)
+{
+    // Batasi angka maksimal 99 untuk tampilan yang baik
+    $displayNumber = min($number, 99);
+
+    // Untuk tampilan yang lebih mirip gambar contoh, gunakan format berikut:
+    // Opsi 1: Unicode circled numbers (untuk angka 1-20)
+    $unicodeCircledNumbers = [
+        1 => '①', 2 => '②', 3 => '③', 4 => '④', 5 => '⑤',
+        6 => '⑥', 7 => '⑦', 8 => '⑧', 9 => '⑨', 10 => '⑩',
+        11 => '⑪', 12 => '⑫', 13 => '⑬', 14 => '⑭', 15 => '⑮',
+        16 => '⑯', 17 => '⑰', 18 => '⑱', 19 => '⑲', 20 => '⑳'
+    ];
+
+    if ($displayNumber <= 20 && isset($unicodeCircledNumbers[$displayNumber])) {
+        return $unicodeCircledNumbers[$displayNumber];
+    }
+
+    // Opsi 2: Untuk angka > 20 atau tampilan alternatif yang lebih mirip gambar
+    // Gunakan kombinasi simbol lingkaran dengan angka
+    return '●' . $displayNumber;
+
+    // Opsi 3: Jika ingin format kurung (lebih kompatible)
+    // return '(' . $displayNumber . ')';
+}
 
     private function addLegendSymbols($sheet)
     {

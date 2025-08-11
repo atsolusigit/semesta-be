@@ -6,6 +6,7 @@ use App\Models\TrRiskHeader;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\MultiSheetRiskExport;
+use Illuminate\Support\Facades\Auth;
 
 class ExportRiskController extends Controller
 {
@@ -20,14 +21,21 @@ class ExportRiskController extends Controller
                 'data' => 'Gunakan format excel untuk export multi-sheet'
             ], 400);
         }
+
         $filterYear  = $request->get('year');
         $filterMonth = $request->get('month');
+        $filterDepartment = $request->get('department_id'); // Tambah filter department
 
         // Normalisasi filter bulan
         if (is_array($filterMonth) && isset($filterMonth['month'])) {
             $filterMonth = (int) $filterMonth['month'];
         } elseif (!is_null($filterMonth)) {
             $filterMonth = (int) $filterMonth;
+        }
+
+        // Normalisasi filter department
+        if (!is_null($filterDepartment)) {
+            $filterDepartment = (int) $filterDepartment;
         }
 
         // Ambil data header dengan semua field yang diperlukan untuk semua export
@@ -66,6 +74,7 @@ class ExportRiskController extends Controller
             'peristiwa_risiko',
             'penyebab_risiko',
             'dampak_risiko',
+            'department_id', // Pastikan department_id di-select
             // Inherent risk fields
             'inherent_risk_level_dampak',
             'inherent_risk_level_kemungkinan',
@@ -81,6 +90,14 @@ class ExportRiskController extends Controller
             'target_quantitative_satu_tahun',
             'biaya_perlakuan_risiko'
         ])
+        // Filter berdasarkan department jika ada
+        ->when(!is_null($filterDepartment), function ($query) use ($filterDepartment) {
+            $query->where('department_id', $filterDepartment);
+        })
+        // Filter berdasarkan department user jika bukan admin (opsional)
+        ->when($this->shouldFilterByUserDepartment(), function ($query) {
+            $query->where('department_id', Auth::user()->department_id);
+        })
         ->when(!empty($filterYear) || !empty($filterMonth), function ($query) use ($filterYear, $filterMonth) {
             $query->whereHas('monthlyData', function ($q) use ($filterYear, $filterMonth) {
                 if (!empty($filterYear)) {
@@ -106,7 +123,8 @@ class ExportRiskController extends Controller
 
         // Nama file dengan format yang sesuai
         $monthName = $this->getMonthName($filterMonth);
-        $filename = "Risk_Report_Complete_{$monthName}_{$filterYear}_".time().".xlsx";
+        $departmentName = $this->getDepartmentName($filterDepartment);
+        $filename = "Risk_Report_Complete_{$departmentName}_{$monthName}_{$filterYear}_".time().".xlsx";
 
         // Export menggunakan MultiSheetRiskExport (3 sheets dalam 1 file)
         try {
@@ -140,6 +158,31 @@ class ExportRiskController extends Controller
         return $monthNames[$month] ?? 'BULAN_TIDAK_VALID';
     }
 
+    private function getDepartmentName($departmentId)
+    {
+        if (empty($departmentId)) {
+            return 'SEMUA_DEPT';
+        }
+
+        // Ambil nama department dari database atau cache
+        $department = \App\Models\Department::find($departmentId);
+        return $department ? strtoupper(str_replace(' ', '_', $department->name)) : 'DEPT_' . $departmentId;
+    }
+
+    /**
+     * Cek apakah perlu filter berdasarkan department user
+     * Misalnya jika user bukan admin, hanya bisa lihat data departmentnya
+     */
+    private function shouldFilterByUserDepartment()
+    {
+        $user = Auth::user();
+
+        // Contoh logic: jika user bukan admin/super admin, filter by department
+        return $user &&
+               !in_array($user->role, ['admin', 'super_admin']) &&
+               $user->department_id;
+    }
+
     /**
      * Method untuk preview data sebelum export
      */
@@ -147,12 +190,18 @@ class ExportRiskController extends Controller
     {
         $filterYear  = $request->get('year');
         $filterMonth = $request->get('month');
+        $filterDepartment = $request->get('department_id'); // Tambah filter department
 
         // Normalisasi filter bulan
         if (is_array($filterMonth) && isset($filterMonth['month'])) {
             $filterMonth = (int) $filterMonth['month'];
         } elseif (!is_null($filterMonth)) {
             $filterMonth = (int) $filterMonth;
+        }
+
+        // Normalisasi filter department
+        if (!is_null($filterDepartment)) {
+            $filterDepartment = (int) $filterDepartment;
         }
 
         try {
@@ -186,6 +235,7 @@ class ExportRiskController extends Controller
                 'risk_code',
                 'jenis_risiko',
                 'penyebab_risiko',
+                'department_id', // Pastikan department_id di-select
                 // Field untuk inherent risk
                 'inherent_risk_level_dampak',
                 'inherent_risk_level_kemungkinan',
@@ -200,6 +250,14 @@ class ExportRiskController extends Controller
                 'target_quantitative_satu_tahun',
                 'biaya_perlakuan_risiko'
             ])
+            // Filter berdasarkan department jika ada
+            ->when(!is_null($filterDepartment), function ($query) use ($filterDepartment) {
+                $query->where('department_id', $filterDepartment);
+            })
+            // Filter berdasarkan department user jika bukan admin (opsional)
+            ->when($this->shouldFilterByUserDepartment(), function ($query) {
+                $query->where('department_id', Auth::user()->department_id);
+            })
             ->when(!empty($filterYear) || !empty($filterMonth), function ($query) use ($filterYear, $filterMonth) {
                 $query->whereHas('monthlyData', function ($q) use ($filterYear, $filterMonth) {
                     if (!empty($filterYear)) {
@@ -236,7 +294,9 @@ class ExportRiskController extends Controller
                         'id' => $id,
                         'year' => $filterYear,
                         'month' => $filterMonth,
-                        'month_name' => $this->getMonthName($filterMonth)
+                        'month_name' => $this->getMonthName($filterMonth),
+                        'department_id' => $filterDepartment,
+                        'department_name' => $this->getDepartmentName($filterDepartment)
                     ]
                 ]
             ]);

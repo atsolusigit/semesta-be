@@ -114,9 +114,9 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,6,7'])->group
 // });
 
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->get('/roles', [RoleController::class, 'index']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/roles', [RoleController::class, 'store']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->get('/roles/{id}', [RoleController::class, 'show']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/roles/{id}', [RoleController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->post('/roles', [RoleController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->get('/roles/{id}', [RoleController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->put('/roles/{id}', [RoleController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/roles/{id}', [RoleController::class, 'destroy']);
 
 // ============================

@@ -22,6 +22,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     protected $totalRows;
     protected $colorMap = [];
     protected $triwulan;
+    protected $departmentName;
 
     // Constants for better maintainability
     private const HEADER_ROWS = 10;
@@ -71,14 +72,14 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     /**
      * Constructor
      */
-    public function __construct($headers, $monthName = null, $year = null)
+   public function __construct($headers, $monthName = null, $year = null, $departmentName = null)
     {
         $this->headers = collect($headers); // Convert to collection for consistency
         $this->monthName = $monthName ?? 'SEMUA_BULAN';
         $this->year = $year ?? date('Y');
         $this->totalRows = $this->headers->count() + self::HEADER_ROWS;
         $this->triwulan = $this->get_triwulan($monthName);
-
+        $this->departmentName = $departmentName;
 
         $this->loadColorMapping();
     }
@@ -109,9 +110,11 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
      * Sheet title
      */
     public function title(): string
-    {
-        return 'Monitoring ' . strtoupper($this->monthName) . ' ' . $this->year;
-    }
+{
+    $deptName = $this->departmentName ? strtoupper(str_replace(' ', '_', $this->departmentName)) : 'ALL_DEPT';
+    return 'Monitoring ' . strtoupper($this->monthName) . ' ' . $this->year . ' - ' . $deptName;
+}
+
 
     /**
      * Load color mapping from database
@@ -179,7 +182,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
      */
     private function formatCurrency(float $amount): string
     {
-        return 'Rp ' . number_format($amount, 0, ',', '.');
+        return 'Rp.' . number_format($amount, 0, ',', '.');
     }
 
     /**
@@ -254,7 +257,6 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             $targetBulanan = (float)($monthly->target_quantitative ?? 0);
             $realisasiBulanan = (float)($monthly->realization_quantitative ?? 0);
             $targetTahunan = (float)($header->target_quantitative_satu_tahun ?? 0);
-
             // Calculate percentages
             $percentageBulanan = $this->calculatePercentage($realisasiBulanan, $targetBulanan);
             $percentageTahunan = $this->calculatePercentage($realisasiBulanan, $targetTahunan);
@@ -265,9 +267,9 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $header->jenis_risiko ?? '',                                     // 3. JENIS RISIKO
                 $header->peristiwa_risiko ?? '',                                 // 4. PERISTIWA RISIKO
                 $header->penyebab_risiko ?? '',                                  // 5. PENYEBAB RISIKO
-                $targetBulanan,                                                  // 6. TARGET BULAN
-                $realisasiBulanan,                                               // 7. REALISASI BULAN
-                $targetTahunan,                                                  // 8. TARGET 1 TAHUN
+                $this->formatCurrency($monthly->target_quantitative ?? 0),                                                  // 6. TARGET BULAN
+                $this->formatCurrency($monthly->realization_quantitative ?? 0),                                               // 7. REALISASI BULAN
+                $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0),                                                  // 8. TARGET 1 TAHUN
                 $realisasiBulanan,                                               // 9. REALISASI BULAN (duplikasi)
                 $percentageBulanan . '%',                                        // 10. BULAN %
                 $percentageTahunan . '%',                                        // 11. TARGET TAHUN %

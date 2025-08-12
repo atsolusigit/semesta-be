@@ -185,37 +185,37 @@ Route::prefix('/upload')->group(function () {
 
 // ===================== HEAT LABEL =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/HeatLabel', [HeatmapLabelController::class, 'index']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/HeatLabel', [HeatmapLabelController::class, 'store']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/HeatLabel/{type}/{id}', [HeatmapLabelController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,'])->post('/HeatLabel', [HeatmapLabelController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,'])->put('/HeatLabel/{type}/{id}', [HeatmapLabelController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/HeatLabel/{type}/{id}', [HeatmapLabelController::class, 'destroy']);
 
 // ===================== HEATMAP RISK RANGE =====================
 Route::prefix('heatmap-risk-range')->group(function () {
     Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/', [HeatmapRiskRangeController::class, 'index']);
-    Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/', [HeatmapRiskRangeController::class, 'store']);
-    Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/{id}', [HeatmapRiskRangeController::class, 'update']);
+    Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->post('/', [HeatmapRiskRangeController::class, 'store']);
+    Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->put('/{id}', [HeatmapRiskRangeController::class, 'update']);
     Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/{id}', [HeatmapRiskRangeController::class, 'destroy']);
 });
 
 // ===================== HEATMAP =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/heatmap', [MstHeatmapController::class, 'index']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/heatmap', [MstHeatmapController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->post('/heatmap', [MstHeatmapController::class, 'store']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/heatmap/{id}', [MstHeatmapController::class, 'show']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/heatmap/{id}', [MstHeatmapController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->put('/heatmap/{id}', [MstHeatmapController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/heatmap/{id}', [MstHeatmapController::class, 'destroy']);
 
 // ===================== RISK CODE =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-code', [MstRiskCodeController::class, 'index']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/risk-code', [MstRiskCodeController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->post('/risk-code', [MstRiskCodeController::class, 'store']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-code/{id}', [MstRiskCodeController::class, 'show']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-code/{id}', [MstRiskCodeController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->put('/risk-code/{id}', [MstRiskCodeController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-code/{id}', [MstRiskCodeController::class, 'destroy']);
 
 // ===================== OPTION =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/option', [MstOptionController::class, 'index']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/option', [MstOptionController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->post('/option', [MstOptionController::class, 'store']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/option/{id}', [MstOptionController::class, 'show']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/option/{id}', [MstOptionController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->put('/option/{id}', [MstOptionController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/option/{id}', [MstOptionController::class, 'destroy']);
 
 // ===================== RISK HEADER =====================

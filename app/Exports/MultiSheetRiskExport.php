@@ -12,12 +12,14 @@ class MultiSheetRiskExport implements WithMultipleSheets
     protected $headers;
     protected $monthName;
     protected $year;
+    protected $departmentName;
 
-    public function __construct($headers, $monthName = 'Semua Bulan', $year = 2025)
+    public function __construct($headers, $monthName = 'Semua Bulan', $year = 2025, $departmentName = null)
     {
         $this->headers = $headers;
         $this->monthName = $monthName;
         $this->year = $year;
+        $this->departmentName = $departmentName;
     }
 
     /**
@@ -28,13 +30,13 @@ class MultiSheetRiskExport implements WithMultipleSheets
         $sheets = [];
 
         // Sheet 1: Risk Register (RiskExport)
-        $sheets[] = new RiskExport($this->headers, $this->monthName, $this->year);
+        $sheets[] = new RiskExport($this->headers, $this->monthName, $this->year, $this->departmentName);
 
         // Sheet 2: Monitoring Risiko (MONExport)
-        $sheets[] = new MONExport($this->headers, $this->monthName, $this->year);
+        $sheets[] = new MONExport($this->headers, $this->monthName, $this->year, $this->departmentName);
 
         // Sheet 3: Peta Risiko (HMExport)
-        $sheets[] = new HMExport($this->headers, $this->monthName, $this->year);
+        $sheets[] = new HMExport($this->headers, $this->monthName, $this->year, $this->departmentName);
 
         return $sheets;
     }

@@ -123,13 +123,16 @@ class ExportRiskController extends Controller
 
         // Nama file dengan format yang sesuai
         $monthName = $this->getMonthName($filterMonth);
-        $departmentName = $this->getDepartmentName($filterDepartment);
+
+        // PERBAIKAN: Ambil department name dari data yang sudah di-load, bukan dari filter
+        $departmentName = $this->getDepartmentNameFromHeaders($headers, $filterDepartment);
+
         $filename = "Risk_Report_Complete_{$departmentName}_{$monthName}_{$filterYear}_".time().".xlsx";
 
         // Export menggunakan MultiSheetRiskExport (3 sheets dalam 1 file)
         try {
             return Excel::download(
-                new MultiSheetRiskExport($headers, $monthName, $filterYear ?? date('Y')),
+                new MultiSheetRiskExport($headers, $monthName, $filterYear ?? date('Y'), $departmentName),
                 $filename
             );
         } catch (\Exception $e) {
@@ -167,6 +170,29 @@ class ExportRiskController extends Controller
         // Ambil nama department dari database atau cache
         $department = \App\Models\Department::find($departmentId);
         return $department ? strtoupper(str_replace(' ', '_', $department->name)) : 'DEPT_' . $departmentId;
+    }
+
+    /**
+     * PERBAIKAN: Method baru untuk mengambil department name dari headers yang sudah di-load
+     */
+    private function getDepartmentNameFromHeaders($headers, $filterDepartment = null)
+    {
+        // Jika ada filter department spesifik, gunakan itu
+        if (!is_null($filterDepartment)) {
+            return $this->getDepartmentName($filterDepartment);
+        }
+
+        // Jika tidak ada filter, cek dari data headers
+        if ($headers->isNotEmpty()) {
+            // Ambil department dari record pertama
+            $firstHeader = $headers->first();
+            if ($firstHeader && $firstHeader->department) {
+                return strtoupper(str_replace(' ', '_', $firstHeader->department->name));
+            }
+        }
+
+        // Fallback jika tidak ada data department
+        return 'SEMUA_DEPT';
     }
 
     /**
@@ -296,7 +322,7 @@ class ExportRiskController extends Controller
                         'month' => $filterMonth,
                         'month_name' => $this->getMonthName($filterMonth),
                         'department_id' => $filterDepartment,
-                        'department_name' => $this->getDepartmentName($filterDepartment)
+                        'department_name' => $this->getDepartmentNameFromHeaders($headers, $filterDepartment)
                     ]
                 ]
             ]);

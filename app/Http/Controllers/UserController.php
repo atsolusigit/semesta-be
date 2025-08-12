@@ -18,61 +18,68 @@ use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
-     public function index(Request $request)
+    public function index(Request $request)
 {
     $search = $request->input('search');
+    $authUser = auth()->user();
 
-    $users = User::with(['role:id,name', 'department:id,name'])
+    $usersQuery = User::with(['role:id,name', 'department:id,name'])
         ->select('id', 'name', 'username', 'email', 'role_id', 'status', 'department_id')
-        ->where('status',[1, 2])
-        ->orderBy('id', 'asc')
-        ->get();
+        ->whereIn('status', [1, 2])
+        ->orderBy('id', 'asc');
+
+    // Batasi data untuk role 2 & 3
+    if ($authUser && in_array((int) $authUser->role_id, [2, 3])) {
+        $usersQuery->where('department_id', $authUser->department_id);
+    }
+
+    $users = $usersQuery->get();
 
     $result = [];
 
-    foreach ($users as $user) {
+    foreach ($users as $userData) {
         try {
-            $name = encrypt_decrypt_db('dec', $user->name, $user->id);
+            $name = encrypt_decrypt_db('dec', $userData->name, $userData->id);
         } catch (\Throwable $e) {
-            \Log::warning("Gagal decrypt name user ID {$user->id}: {$e->getMessage()}");
+            \Log::warning("Gagal decrypt name user ID {$userData->id}: {$e->getMessage()}");
             $name = null;
         }
 
         try {
-            $username = encrypt_decrypt_db('dec', $user->username, $user->id);
+            $username = encrypt_decrypt_db('dec', $userData->username, $userData->id);
         } catch (\Throwable $e) {
-            \Log::warning("Gagal decrypt username user ID {$user->id}: {$e->getMessage()}");
+            \Log::warning("Gagal decrypt username user ID {$userData->id}: {$e->getMessage()}");
             $username = null;
         }
 
         try {
-            $email = encrypt_decrypt_db('dec', $user->email, $user->id);
+            $email = encrypt_decrypt_db('dec', $userData->email, $userData->id);
         } catch (\Throwable $e) {
-            \Log::warning("Gagal decrypt email user ID {$user->id}: {$e->getMessage()}");
+            \Log::warning("Gagal decrypt email user ID {$userData->id}: {$e->getMessage()}");
             $email = null;
         }
 
-        // Filter berdasarkan search jika ada
+        // Filter search manual
         if ($search) {
             $searchLower = strtolower($search);
             if (
                 (is_string($name) && strpos(strtolower($name), $searchLower) === false) &&
                 (is_string($username) && strpos(strtolower($username), $searchLower) === false)
             ) {
-                continue; // skip kalau data tidak ada
+                continue;
             }
         }
 
         $result[] = [
-            'id' => encrypt_decrypt_md5('enc', $user->id),
+            'id' => encrypt_decrypt_md5('enc', $userData->id),
             'name' => $name,
             'username' => $username,
             'email' => $email,
-            'role_id' => $user->role_id,
-            'department_id' => $user->department_id,
-            'status' => $user->status,
-            'role_name' => $user->role?->name,
-            'department_name' => $user->department?->name,
+            'role_id' => $userData->role_id,
+            'department_id' => $userData->department_id,
+            'status' => $userData->status,
+            'role_name' => $userData->role?->name,
+            'department_name' => $userData->department?->name,
         ];
     }
 
@@ -82,6 +89,7 @@ class UserController extends Controller
         'data' => $result
     ]);
 }
+
 
     public function show(Request $request, $id)
     {
@@ -329,10 +337,17 @@ class UserController extends Controller
             return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
         }
 
+        $authUser = auth()->user(); // User yang login
+        $user = User::find($id);
+
         $user = User::find($id);
         if (!$user) {
             return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
         }
+
+          if ($authUser->role_id == 2 && $authUser->department_id != $user->department_id) {
+        return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menyetujui user di departemen ini.', []);
+    }
 
         $user->status = 1;
         $user->save();
@@ -348,10 +363,16 @@ class UserController extends Controller
             return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
         }
 
+        $authUser = auth()->user();
+
         $user = User::find($id);
         if (!$user) {
             return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
         }
+
+   if ($authUser->role_id == 2 && $authUser->department_id != $user->department_id) {
+        return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menolak user di departemen ini.', []);
+    }
 
         $user->status = 2;
         $user->save();
@@ -368,6 +389,12 @@ class UserController extends Controller
         ->where('status', 0)
         ->latest('id')
         ->get();
+
+          if ($authUser && in_array((int) $authUser->role_id, [2, 3])) {
+        $usersQuery->where('department_id', $authUser->department_id);
+    }
+
+    $users = $usersQuery->get();
 
     $result = [];
 

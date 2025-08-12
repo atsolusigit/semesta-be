@@ -223,77 +223,105 @@ class UserController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
-    {
-        try {
-            $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
-        } catch (\Throwable $e) {
-            return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
+   public function update(Request $request, $id)
+{
+    try {
+        $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
+    } catch (\Throwable $e) {
+        return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
+    }
+
+    $user = User::find($id);
+    if (!$user) {
+        return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
+    }
+
+    // Mendapatkan role ID dari user yang sedang login
+    $currentUserRoleId = auth()->user()->role_id;
+    $currentUserDepartmentId = auth()->user()->department_id;
+
+    // Validasi akses berdasarkan role
+    if ($currentUserRoleId == 2) {
+        // Role 2 (admin) hanya bisa update user dengan role_id 2 atau 3 dan dari department yang sama
+        if (!in_array($user->role_id, [2, 3])) {
+            return json(400, 'false', 'forbidden', 'Anda tidak memiliki izin untuk mengubah user dengan role ini.', []);
         }
-
-        $user = User::find($id);
-        if (!$user) {
-            return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
-        }
-
-        $array_validation = [
-            'name' => 'required|string|max:255',
-            'username' => 'required|string|max:100|unique:users,username,' . $id,
-            'email' => 'required|email|unique:users,email,' . $id,
-            'role_id' => 'required|exists:mst_role,id',
-            'department_id' => 'required|exists:mst_department,id',
-            'status' => ['required', Rule::in(['aktif', 'pasif'])],
-            'password' => 'nullable|string|min:6',
-        ];
-
-        $validation = check_validation($request->all(), $array_validation);
-        if ($validation[0] != 0) {
-            return $validation[1];
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $user->role_id = $request->role_id;
-            $user->department_id = $request->department_id;
-            $user->status = $request->status === 'aktif' ? 1 : 0;
-
-            // Update password jika dikirim
-            if (!empty($request->password)) {
-                $user->password = bcrypt($request->password);
-            }
-
-            $user->save();
-
-            // Enkripsi dan update data yang terenkripsi menggunakan encrypt_decrypt_db
-            try {
-                $encryptedName = encrypt_decrypt_db('enc', $request->name, $user->id);
-                $encryptedUsername = encrypt_decrypt_db('enc', $request->username, $user->id);
-                $encryptedEmail = encrypt_decrypt_db('enc', $request->email, $user->id);
-
-                DB::table('users')->where('id', $user->id)->update([
-                    'name' => DB::raw($encryptedName),
-                    'username' => DB::raw($encryptedUsername),
-                    'email' => DB::raw($encryptedEmail)
-                ]);
-            } catch (\Throwable $e) {
-                Log::error("Gagal enkripsi data user ID {$user->id}: {$e->getMessage()}");
-                DB::rollback();
-                return json(500, 'false', 'encrypt_error', 'Gagal mengenkripsi data.', []);
-            }
-
-            DB::commit();
-
-            return json(200, 'true', 'success', 'User berhasil diperbarui.', []);
-        } catch (\Exception $e) {
-            DB::rollback();
-            Log::error("Update user gagal ID {$user->id}: {$e->getMessage()}");
-
-            return json(500, 'false', 'server_error', 'Terjadi kesalahan saat memperbarui user.', [
-                'error' => $e->getMessage()
-            ]);
+        if ($user->department_id != $currentUserDepartmentId) {
+            return json(400, 'false', 'forbidden', 'Anda tidak memiliki izin untuk mengubah user dari department lain.', []);
         }
     }
+    // Role 1 bebas mengupdate siapa saja (tidak ada batasan)
+
+    $array_validation = [
+        'name' => 'required|string|max:255',
+        'username' => 'required|string|max:100|unique:users,username,' . $id,
+        'email' => 'required|email|unique:users,email,' . $id,
+        'role_id' => 'required|exists:mst_role,id',
+        'department_id' => 'required|exists:mst_department,id',
+        'status' => ['required', Rule::in(['aktif', 'pasif'])],
+        'password' => 'nullable|string|min:6',
+    ];
+
+    // Validasi tambahan untuk role 2
+    if ($currentUserRoleId == 2) {
+        // Role 2 hanya bisa mengubah ke role_id 2 atau 3
+        if (!in_array($request->role_id, [2, 3])) {
+            return json(400, 'false', 'forbidden', 'Anda hanya dapat mengubah user menjadi role admin atau role 3.', []);
+        }
+        // Role 2 hanya bisa mengubah ke department yang sama dengan dirinya
+        if ($request->department_id != $currentUserDepartmentId) {
+            return json(400, 'false', 'forbidden', 'Anda hanya dapat mengubah user ke department yang sama dengan Anda.', []);
+        }
+    }
+
+    $validation = check_validation($request->all(), $array_validation);
+    if ($validation[0] != 0) {
+        return $validation[1];
+    }
+
+    try {
+        DB::beginTransaction();
+
+        $user->role_id = $request->role_id;
+        $user->department_id = $request->department_id;
+        $user->status = $request->status === 'aktif' ? 1 : 0;
+
+        // Update password jika dikirim
+        if (!empty($request->password)) {
+            $user->password = bcrypt($request->password);
+        }
+
+        $user->save();
+
+        // Enkripsi dan update data yang terenkripsi menggunakan encrypt_decrypt_db
+        try {
+            $encryptedName = encrypt_decrypt_db('enc', $request->name, $user->id);
+            $encryptedUsername = encrypt_decrypt_db('enc', $request->username, $user->id);
+            $encryptedEmail = encrypt_decrypt_db('enc', $request->email, $user->id);
+
+            DB::table('users')->where('id', $user->id)->update([
+                'name' => DB::raw($encryptedName),
+                'username' => DB::raw($encryptedUsername),
+                'email' => DB::raw($encryptedEmail)
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Gagal enkripsi data user ID {$user->id}: {$e->getMessage()}");
+            DB::rollback();
+            return json(500, 'false', 'encrypt_error', 'Gagal mengenkripsi data.', []);
+        }
+
+        DB::commit();
+
+        return json(200, 'true', 'success', 'User berhasil diperbarui.', []);
+    } catch (\Exception $e) {
+        DB::rollback();
+        Log::error("Update user gagal ID {$user->id}: {$e->getMessage()}");
+
+        return json(500, 'false', 'server_error', 'Terjadi kesalahan saat memperbarui user.', [
+            'error' => $e->getMessage()
+        ]);
+    }
+}
 
     public function destroy(Request $request, $id)
     {
@@ -346,7 +374,7 @@ class UserController extends Controller
         }
 
           if ($authUser->role_id == 2 && $authUser->department_id != $user->department_id) {
-        return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menyetujui user di departemen ini.', []);
+        return json(400, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menyetujui user di departemen ini.', []);
     }
 
         $user->status = 1;
@@ -371,7 +399,7 @@ class UserController extends Controller
         }
 
    if ($authUser->role_id == 2 && $authUser->department_id != $user->department_id) {
-        return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menolak user di departemen ini.', []);
+        return json(400, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menolak user di departemen ini.', []);
     }
 
         $user->status = 2;

@@ -380,25 +380,38 @@ class UserController extends Controller
         return json(200, 'true', 'success', 'User berhasil ditolak.', []);
     }
 
-    public function getPendingUsers(Request $request)
+   public function getPendingUsers(Request $request)
 {
+    // Ambil user yang sedang login untuk keperluan pembatasan data berdasarkan role dan departement
+    $authUser = auth()->user();
+
+    // Ambil kata kunci pencarian (search) dari request jika ada
     $search = $request->input('search');
 
-    $users = User::with('role:id,name')
-        ->select('id', 'name', 'username', 'email', 'role_id', 'status')
+    // Query awal: ambil user yang berstatus pending (status = 0)
+    // Sertakan relasi role (id & name) dan department (id & name) untuk ditampilkan di hasil
+    $usersQuery = User::with([
+            'role:id,name',
+            'department:id,name' // relasi untuk ambil nama department
+        ])
+        ->select('id', 'name', 'username', 'email', 'role_id', 'department_id', 'status')
         ->where('status', 0)
-        ->latest('id')
-        ->get();
+        ->latest('id'); // urutkan dari ID terbaru
 
-          if ($authUser && in_array((int) $authUser->role_id, [2, 3])) {
+    // Jika role user adalah 2 atau 3 → hanya bisa melihat user dari departement yang sama
+    // Role lain (misalnya role 1) bisa melihat semua data
+    if ($authUser && in_array((int) $authUser->role_id, [2, 3])) {
         $usersQuery->where('department_id', $authUser->department_id);
     }
 
+    // Eksekusi query dan ambil hasilnya
     $users = $usersQuery->get();
 
+    // Array penampung hasil akhir
     $result = [];
 
     foreach ($users as $user) {
+        // Dekripsi name (jika gagal atau encoding tidak valid → null)
         try {
             $name = encrypt_decrypt_db('dec', $user->name, $user->id);
             if (!mb_check_encoding($name, 'UTF-8')) {
@@ -410,6 +423,7 @@ class UserController extends Controller
             $name = null;
         }
 
+        // Dekripsi username (jika gagal atau encoding tidak valid → null)
         try {
             $username = encrypt_decrypt_db('dec', $user->username, $user->id);
             if (!mb_check_encoding($username, 'UTF-8')) {
@@ -421,6 +435,7 @@ class UserController extends Controller
             $username = null;
         }
 
+        // Dekripsi email (jika gagal atau encoding tidak valid → null)
         try {
             $email = encrypt_decrypt_db('dec', $user->email, $user->id);
             if (!mb_check_encoding($email, 'UTF-8')) {
@@ -432,32 +447,37 @@ class UserController extends Controller
             $email = null;
         }
 
-        // Skip jika name null
+        // Lewati user jika name kosong atau null
         if (is_null($name) || $name === '') {
             continue;
         }
 
         // Filter berdasarkan search jika ada
+        // Pencarian dilakukan di kolom name dan username yang sudah didekripsi
         if ($search) {
             $searchLower = strtolower($search);
             if (
                 (is_string($name) && strpos(strtolower($name), $searchLower) === false) &&
                 (is_string($username) && strpos(strtolower($username), $searchLower) === false)
             ) {
-                continue;
+                continue; // skip user jika tidak cocok dengan search
             }
         }
 
         $result[] = [
-            'id' => encrypt_decrypt_md5('enc', $user->id),
-            'name' => $name,
-            'username' => $username,
-            'email' => $email,
-            'role_id' => $user->role_id,
-            'status' => $user->status,
-            'role_name' => $user->role->name ?? '-',
+            'id'              => encrypt_decrypt_md5('enc', $user->id),
+            'name'            => $name,
+            'username'        => $username,
+            'email'           => $email,
+            'role_id'         => $user->role_id,
+            'role_name'       => $user->role->name ?? '-',
+            'department_id'   => $user->department_id,
+            'department_name' => $user->department->name ?? '-',
+            'status'          => $user->status,
         ];
     }
+
+    // Kirim response JSON sukses berisi data user pending
     return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $result);
 }
 

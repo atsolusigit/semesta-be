@@ -270,7 +270,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $this->formatCurrency($monthly->target_quantitative ?? 0),                                                  // 6. TARGET BULAN
                 $this->formatCurrency($monthly->realization_quantitative ?? 0),                                               // 7. REALISASI BULAN
                 $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0),                                                  // 8. TARGET 1 TAHUN
-                $realisasiBulanan,                                               // 9. REALISASI BULAN (duplikasi)
+                $this->formatCurrency($monthly->realization_quantitative ?? 0),                                               // 9. REALISASI BULAN (duplikasi)
                 $percentageBulanan . '%',                                        // 10. BULAN %
                 $percentageTahunan . '%',                                        // 11. TARGET TAHUN %
                 $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),     // 12. BIAYA PERLAKUAN

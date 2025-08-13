@@ -7,24 +7,25 @@ use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\MultiSheetRiskExport;
 use Illuminate\Support\Facades\Auth;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ExportRiskController extends Controller
 {
     public function export(Request $request, $format)
     {
-        // Hanya handle format excel untuk multi-sheet export
-        if ($format !== 'excel') {
+        // Validasi format yang didukung
+        if (!in_array($format, ['excel', 'pdf'])) {
             return response()->json([
                 'status' => 400,
                 'success' => false,
-                'message' => 'Format tidak didukung untuk multi-sheet export',
-                'data' => 'Gunakan format excel untuk export multi-sheet'
+                'message' => 'Format tidak didukung',
+                'data' => 'Format yang didukung: excel, pdf'
             ], 400);
         }
 
         $filterYear  = $request->get('year');
         $filterMonth = $request->get('month');
-        $filterDepartment = $request->get('department_id'); // Tambah filter department
+        $filterDepartment = $request->get('department_id');
 
         // Normalisasi filter bulan
         if (is_array($filterMonth) && isset($filterMonth['month'])) {
@@ -74,7 +75,7 @@ class ExportRiskController extends Controller
             'peristiwa_risiko',
             'penyebab_risiko',
             'dampak_risiko',
-            'department_id', // Pastikan department_id di-select
+            'department_id',
             // Inherent risk fields
             'inherent_risk_level_dampak',
             'inherent_risk_level_kemungkinan',
@@ -123,18 +124,14 @@ class ExportRiskController extends Controller
 
         // Nama file dengan format yang sesuai
         $monthName = $this->getMonthName($filterMonth);
-
-        // PERBAIKAN: Ambil department name dari data yang sudah di-load, bukan dari filter
         $departmentName = $this->getDepartmentNameFromHeaders($headers, $filterDepartment);
 
-        $filename = "Risk_Report_Complete_{$departmentName}_{$monthName}_{$filterYear}_".time().".xlsx";
-
-        // Export menggunakan MultiSheetRiskExport (3 sheets dalam 1 file)
         try {
-            return Excel::download(
-                new MultiSheetRiskExport($headers, $monthName, $filterYear ?? date('Y'), $departmentName),
-                $filename
-            );
+            if ($format === 'excel') {
+                return $this->exportExcel($headers, $monthName, $filterYear, $departmentName);
+            } else {
+                return $this->exportPdf($headers, $monthName, $filterYear, $departmentName);
+            }
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 500,
@@ -143,6 +140,267 @@ class ExportRiskController extends Controller
                 'data' => ['error' => $e->getMessage()]
             ], 500);
         }
+    }
+
+    /**
+     * Export ke Excel (Multi-sheet)
+     */
+    private function exportExcel($headers, $monthName, $filterYear, $departmentName)
+    {
+        $filename = "Risk_Report_Complete_{$departmentName}_{$monthName}_{$filterYear}_".time().".xlsx";
+
+        return Excel::download(
+            new MultiSheetRiskExport($headers, $monthName, $filterYear ?? date('Y'), $departmentName),
+            $filename
+        );
+    }
+
+    /**
+     * Export ke PDF (Multi-halaman)
+     */
+   private function exportPdf($headers, $monthName, $filterYear, $departmentName)
+{
+    $filename = "Risk_Report_Complete_{$departmentName}_{$monthName}_{$filterYear}_" . time() . ".pdf";
+
+    // Pastikan dapat angka bulan
+    if (is_numeric($monthName)) {
+        $monthNumber = (int)$monthName;
+    } else {
+        try {
+            $monthNumber = \Carbon\Carbon::parse("1 {$monthName} {$filterYear}")->month;
+        } catch (\Exception $e) {
+            $monthNumber = 1; // default Januari
+        }
+    }
+
+    // Load data untuk 3 halaman PDF
+    $riskExportData = $this->getRiskRegisterData($headers, $monthName, $filterYear);
+    $monitoringData = $this->getMonitoringData($headers, $monthName, $filterYear);
+    $heatmapData = $this->getHeatmapData($headers, $monthName, $filterYear);
+
+    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.risk_pdf', [
+        'headers' => $headers,
+        'monthName' => $monthName,
+        'monthNumber' => $monthNumber,
+        'year' => $filterYear ?? date('Y'),
+        'departmentName' => $departmentName,
+        'riskRegisterData' => $riskExportData,
+        'monitoringData' => $monitoringData,
+        'heatmapData' => $heatmapData
+    ]);
+
+    $pdf->setPaper('A4', 'landscape');
+
+    return $pdf->download($filename);
+}
+    /**
+     * Prepare data untuk Risk Register PDF
+     */
+    private function getRiskRegisterData($headers, $monthName, $year)
+    {
+        $data = [];
+        $no = 1;
+
+        foreach ($headers as $header) {
+            $monthly = $header->monthlyData->first();
+
+            if (!$monthly) {
+                $target = 0;
+                $realization = 0;
+                $percentage = 0;
+                $monthlyData = (object) [
+                    'target_quantitative' => 0,
+                    'realization_quantitative' => 0,
+                    'residual_risk_level_dampak' => '',
+                    'residual_risk_level_kemungkinan' => '',
+                    'residual_risk_posisi_risiko' => '',
+                    'residual_risk_level_risiko' => '',
+                    'realization_note' => '',
+                    'status_risiko' => '',
+                ];
+            } else {
+                $target = $monthly->target_quantitative ?? 0;
+                $realization = $monthly->realization_quantitative ?? 0;
+                $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+                $monthlyData = $monthly;
+            }
+
+            $data[] = [
+                'no' => $no++,
+                'risk_code' => $header->risk_code ?? '',
+                'jenis_risiko' => $header->jenis_risiko ?? '',
+                'sasaran' => $header->sasaran ?? '',
+                'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
+                'penyebab_risiko' => $header->penyebab_risiko ?? '',
+                'dampak_risiko' => $header->dampak_risiko ?? '',
+                'inherent_risk_level_dampak' => $header->inherent_risk_level_dampak ?? '',
+                'inherent_risk_level_kemungkinan' => $header->inherent_risk_level_kemungkinan ?? '',
+                'inherent_risk_posisi_risiko' => $header->inherent_risk_posisi_risiko ?? '',
+                'inherent_risk_level_risiko' => $header->inherent_risk_level_risiko ?? '',
+                'internal_control' => $header->internal_control ?? '',
+                'target_bulan' => $this->formatCurrency($target),
+                'realisasi_bulan' => $this->formatCurrency($realization),
+                'percentage' => $percentage . '%',
+                'residual_risk_level_dampak' => $monthlyData->residual_risk_level_dampak ?? '',
+                'residual_risk_level_kemungkinan' => $monthlyData->residual_risk_level_kemungkinan ?? '',
+                'residual_risk_posisi_risiko' => $monthlyData->residual_risk_posisi_risiko ?? '',
+                'residual_risk_level_risiko' => $monthlyData->residual_risk_level_risiko ?? '',
+                'target_1_tahun' => $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0),
+                'realisasi_duplicate' => $this->formatCurrency($realization),
+                'residual_target_level_dampak' => $header->residual_target_level_dampak ?? '',
+                'residual_target_level_kemungkinan' => $header->residual_target_level_kemungkinan ?? '',
+                'residual_target_posisi_risiko' => $header->residual_target_posisi_risiko ?? '',
+                'residual_target_level_risiko' => $header->residual_target_level_risiko ?? '',
+                'perlakuan_risiko' => $monthlyData->realization_note ?? '',
+                'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
+                'status_risiko' => $monthlyData->status_risiko ?? '',
+            ];
+        }
+
+        return $data;
+    }
+
+    /**
+     * Prepare data untuk Monitoring PDF
+     */
+    private function getMonitoringData($headers, $monthName, $year)
+    {
+        $data = [];
+        $no = 1;
+
+        foreach ($headers as $header) {
+            $monthly = $header->monthlyData?->first();
+
+            $targetBulanan = (float)($monthly->target_quantitative ?? 0);
+            $realisasiBulanan = (float)($monthly->realization_quantitative ?? 0);
+            $targetTahunan = (float)($header->target_quantitative_satu_tahun ?? 0);
+
+            $percentageBulanan = $targetBulanan > 0 ? round(($realisasiBulanan / $targetBulanan) * 100, 2) : 0;
+            $percentageTahunan = $targetTahunan > 0 ? round(($realisasiBulanan / $targetTahunan) * 100, 2) : 0;
+
+            $data[] = [
+                'no' => $no++,
+                'risk_code' => $header->risk_code ?? '',
+                'jenis_risiko' => $header->jenis_risiko ?? '',
+                'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
+                'penyebab_risiko' => $header->penyebab_risiko ?? '',
+                'target_bulan' => $this->formatCurrency($targetBulanan),
+                'realisasi_bulan' => $this->formatCurrency($realisasiBulanan),
+                'target_1_tahun' => $this->formatCurrency($targetTahunan),
+                'realisasi_duplicate' => $this->formatCurrency($realisasiBulanan),
+                'percentage_bulan' => $percentageBulanan . '%',
+                'percentage_tahun' => $percentageTahunan . '%',
+                'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
+                'level_dampak' => $header->residual_target_level_dampak ?? '',
+                'level_kemungkinan' => $header->residual_target_level_kemungkinan ?? '',
+                'posisi_risiko' => $header->residual_target_posisi_risiko ?? '',
+                'level_risiko' => $header->residual_target_level_risiko ?? ''
+            ];
+        }
+
+        return $data;
+    }
+
+    /**
+     * Prepare data untuk Heatmap PDF
+     */
+    private function getHeatmapData($headers, $monthName, $year)
+    {
+        // Load heatmap structure dan risk counts
+        $heatmapStructure = \DB::table('mst_heatmap')
+            ->select('dampak', 'kemungkinan', 'result')
+            ->orderBy('kemungkinan', 'desc')
+            ->orderBy('dampak', 'asc')
+            ->get();
+
+        $inherentCounts = $this->countRisksByLevel($headers, 'inherent');
+        $residualCurrentCounts = $this->countRisksByLevel($headers, 'residual_current');
+        $residualTargetCounts = $this->countRisksByLevel($headers, 'residual_target');
+
+        return [
+            'structure' => $heatmapStructure,
+            'inherent_counts' => $inherentCounts,
+            'residual_current_counts' => $residualCurrentCounts,
+            'residual_target_counts' => $residualTargetCounts,
+            'color_map' => $this->getColorMapping()
+        ];
+    }
+
+    /**
+     * Count risks by level untuk heatmap
+     */
+    private function countRisksByLevel($headers, $riskType)
+    {
+        $counts = [];
+
+        foreach ($headers as $header) {
+            $dampak = 0;
+            $kemungkinan = 0;
+
+            switch ($riskType) {
+                case 'inherent':
+                    $dampak = $header->inherent_risk_level_dampak ?? 0;
+                    $kemungkinan = $header->inherent_risk_level_kemungkinan ?? 0;
+                    break;
+
+                case 'residual_current':
+                    $monthly = $header->monthlyData->first();
+                    if ($monthly) {
+                        $dampak = $monthly->residual_risk_level_dampak ?? 0;
+                        $kemungkinan = $monthly->residual_risk_level_kemungkinan ?? 0;
+                    }
+                    break;
+
+                case 'residual_target':
+                    $dampak = $header->residual_target_level_dampak ?? 0;
+                    $kemungkinan = $header->residual_target_level_kemungkinan ?? 0;
+                    break;
+            }
+
+            if ($dampak > 0 && $kemungkinan > 0) {
+                $key = $kemungkinan . '_' . $dampak;
+                if (!isset($counts[$key])) {
+                    $counts[$key] = 0;
+                }
+                $counts[$key]++;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Get color mapping untuk heatmap
+     */
+    private function getColorMapping()
+    {
+        $colorMap = [];
+        try {
+            $colorRanges = \DB::table('mst_heatmap_risk_range')->get();
+            foreach ($colorRanges as $range) {
+                for ($i = $range->start; $i <= $range->end; $i++) {
+                    $colorMap[$i] = [
+                        'name' => $range->name,
+                        'color' => $range->color
+                    ];
+                }
+            }
+        } catch (\Exception $e) {
+            // Fallback colors
+            $colorMap = [
+                1 => ['name' => 'Low', 'color' => '#00B050'],
+                8 => ['name' => 'Low to Moderate', 'color' => '#92D050'],
+                13 => ['name' => 'Moderate', 'color' => '#FFFF00'],
+                17 => ['name' => 'Moderate to High', 'color' => '#FFC000'],
+                22 => ['name' => 'High', 'color' => '#FF0000']
+            ];
+        }
+        return $colorMap;
+    }
+
+    private function formatCurrency($value)
+    {
+        return 'Rp.' . number_format($value, 0, ',', '.');
     }
 
     private function getMonthName($month)
@@ -167,65 +425,47 @@ class ExportRiskController extends Controller
             return 'SEMUA_DEPT';
         }
 
-        // Ambil nama department dari database atau cache
         $department = \App\Models\Department::find($departmentId);
         return $department ? strtoupper(str_replace(' ', '_', $department->name)) : 'DEPT_' . $departmentId;
     }
 
-    /**
-     * PERBAIKAN: Method baru untuk mengambil department name dari headers yang sudah di-load
-     */
     private function getDepartmentNameFromHeaders($headers, $filterDepartment = null)
     {
-        // Jika ada filter department spesifik, gunakan itu
         if (!is_null($filterDepartment)) {
             return $this->getDepartmentName($filterDepartment);
         }
 
-        // Jika tidak ada filter, cek dari data headers
         if ($headers->isNotEmpty()) {
-            // Ambil department dari record pertama
             $firstHeader = $headers->first();
             if ($firstHeader && $firstHeader->department) {
                 return strtoupper(str_replace(' ', '_', $firstHeader->department->name));
             }
         }
 
-        // Fallback jika tidak ada data department
         return 'SEMUA_DEPT';
     }
 
-    /**
-     * Cek apakah perlu filter berdasarkan department user
-     * Misalnya jika user bukan admin, hanya bisa lihat data departmentnya
-     */
     private function shouldFilterByUserDepartment()
     {
         $user = Auth::user();
 
-        // Contoh logic: jika user bukan admin/super admin, filter by department
         return $user &&
                !in_array($user->role, ['admin', 'super_admin']) &&
                $user->department_id;
     }
 
-    /**
-     * Method untuk preview data sebelum export
-     */
     public function preview(Request $request, $id)
     {
         $filterYear  = $request->get('year');
         $filterMonth = $request->get('month');
-        $filterDepartment = $request->get('department_id'); // Tambah filter department
+        $filterDepartment = $request->get('department_id');
 
-        // Normalisasi filter bulan
         if (is_array($filterMonth) && isset($filterMonth['month'])) {
             $filterMonth = (int) $filterMonth['month'];
         } elseif (!is_null($filterMonth)) {
             $filterMonth = (int) $filterMonth;
         }
 
-        // Normalisasi filter department
         if (!is_null($filterDepartment)) {
             $filterDepartment = (int) $filterDepartment;
         }
@@ -261,26 +501,21 @@ class ExportRiskController extends Controller
                 'risk_code',
                 'jenis_risiko',
                 'penyebab_risiko',
-                'department_id', // Pastikan department_id di-select
-                // Field untuk inherent risk
+                'department_id',
                 'inherent_risk_level_dampak',
                 'inherent_risk_level_kemungkinan',
                 'inherent_risk_posisi_risiko',
                 'inherent_risk_level_risiko',
-                // Field untuk residual target risk
                 'residual_target_level_dampak',
                 'residual_target_level_kemungkinan',
                 'residual_target_posisi_risiko',
                 'residual_target_level_risiko',
-                // Field tambahan
                 'target_quantitative_satu_tahun',
                 'biaya_perlakuan_risiko'
             ])
-            // Filter berdasarkan department jika ada
             ->when(!is_null($filterDepartment), function ($query) use ($filterDepartment) {
                 $query->where('department_id', $filterDepartment);
             })
-            // Filter berdasarkan department user jika bukan admin (opsional)
             ->when($this->shouldFilterByUserDepartment(), function ($query) {
                 $query->where('department_id', Auth::user()->department_id);
             })
@@ -294,7 +529,6 @@ class ExportRiskController extends Controller
                     }
                 });
             })
-            // Jika ada ID specific, filter berdasarkan ID tersebut
             ->when($id, function ($query) use ($id) {
                 if ($id > 0) {
                     $query->where('id', $id);
@@ -315,6 +549,10 @@ class ExportRiskController extends Controller
                         'risk_register' => 'Sheet 1: Data lengkap risk register',
                         'monitoring' => 'Sheet 2: Data monitoring risiko',
                         'peta_risiko' => 'Sheet 3: Peta risiko (heatmap)'
+                    ],
+                    'formats' => [
+                        'excel' => 'Multi-sheet Excel (.xlsx)',
+                        'pdf' => 'Multi-page PDF (.pdf)'
                     ],
                     'filters' => [
                         'id' => $id,

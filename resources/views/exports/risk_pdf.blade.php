@@ -447,9 +447,9 @@
                         font-weight: bold;
                         font-size: 10px;
                     ">
-                        PROBABILITAS
+                        P<br>R<br>O<br>B<br>A<br>B<br>I<br>L<br>I<br>T<br>A<br>S
                     </td>
-                    <td style="background-color: #E6E6FA; border: 1px solid #000; font-size: 9px; text-align: left; padding: 8px; width: 12%;">{{ $probabilityLabels[5] }}</td>
+                    <td style="background-color: #E6E6FA; border: 1px solid #000; font-size: 9px; text-align: left; padding: 8px; width: 13%;">{{ $probabilityLabels[5] }}</td>
                     @for($impact = 1; $impact <= 5; $impact++)
                         @php
                             $riskScore = $heatmapMatrix[5][$impact] ?? 0;
@@ -586,7 +586,7 @@
         <div style="font-weight: bold; font-size: 10px; margin-bottom: 5px;">KETERANGAN :</div>
         <p><span style="display:inline-block; background-color:#0070C0; border-radius:50%; width:8px; height:8px;"></span> : Inherent Risk</p>
         <p><span style="display:inline-block; background-color:#7F7F7F; border-radius:50%; width:8px; height:8px;"></span> : Residual Current Risk (s.d. 31 {{ strtoupper($monthName) }} {{ $year }})</p>
-        <p><span style="display:inline-block; background-color:#7030A0; border-radius:50%; width:8px; height:8px;"></span> : Residual Target Risk (Residual Saat ini berbanding dengan target {{ $year }})</p>
+        <p><span style="display:inline-block; background-color:#7030A0; border-radius:50%; width:8px; height:8px;"></span> : Residual Target Risk (Residual saat ini berbanding dengan target {{ $year }})</p>
         </div>
     </div>
 </div>

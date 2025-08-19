@@ -71,7 +71,7 @@
         }
 
         th {
-            background-color: #E6E6FA;
+            background-color: #d8e4bc;
             font-weight: bold;
             font-size: 6px; /* kecil agar header tidak mudah pecah */
         }
@@ -128,7 +128,7 @@
             text-align: center;
             padding: 10px 5px;
             width: 30px;
-            background-color: #E6E6FA;
+            background-color: #d8e4bc;
             border: 1px solid #000;
             vertical-align: middle;
             letter-spacing: 2px;
@@ -143,7 +143,7 @@
             text-align: center;
             padding: 10px 5px;
             width: 30px;
-            background-color: #E6E6FA;
+            background-color: #d8e4bc;
             border: 1px solid #000;
             vertical-align: middle;
         }
@@ -156,7 +156,7 @@
 
         /* Label probabilitas di kolom pertama body */
         .heatmap-table tbody tr td:first-child {
-            background-color: #E6E6FA;
+            background-color: #d8e4bc;
             font-size: 9px;
             text-align: left;
             padding: 4px 6px;
@@ -203,7 +203,7 @@
         .probability-label { text-align: left; padding-left: 5px; font-size: 7px; }
 
         .impact-header {
-            background-color: #E6E6FA;
+            background-color: #d8e4bc;
             font-weight: bold;
             text-align: center;
             height: 25px;
@@ -433,81 +433,33 @@
                     }
                 @endphp
 
-                <tr>
-                    <td rowspan="6" style="
-                        background-color: #E6E6FA;
-                        border: 1px solid #000;
-                        text-align: center;
-                        vertical-align: middle;
-                        padding: 0;
-                        width: 20px;
-                        writing-mode: vertical-rl;
-                        transform: rotate(0deg);
-                        text-orientation: mixed;
-                        font-weight: bold;
-                        font-size: 10px;
-                    ">
-                        P<br>R<br>O<br>B<br>A<br>B<br>I<br>L<br>I<br>T<br>A<br>S
-                    </td>
-                    <td style="background-color: #E6E6FA; border: 1px solid #000; font-size: 9px; text-align: left; padding: 8px; width: 13%;">{{ $probabilityLabels[5] }}</td>
-                    @for($impact = 1; $impact <= 5; $impact++)
-                        @php
-                            $riskScore = $heatmapMatrix[5][$impact] ?? 0;
-                            $riskLevel = '';
-                            $bgColor = '';
-
-                            // Logika untuk menentukan warna berdasarkan skor risiko
-                            if($riskScore >= 1 && $riskScore <= 5) {
-                                $riskLevel = 'Low';
-                                $bgColor = '#00B050';
-                            } elseif($riskScore >= 6 && $riskScore <= 11) {
-                                $riskLevel = 'Low to Moderate';
-                                $bgColor = '#92D050';
-                            } elseif($riskScore >= 12 && $riskScore <= 15) {
-                                $riskLevel = 'Moderate';
-                                $bgColor = '#FFFF00';
-                            } elseif($riskScore >= 16 && $riskScore <= 19) {
-                                $riskLevel = 'Moderate to High';
-                                $bgColor = '#FFC000';
-                            } elseif($riskScore >= 20 && $riskScore <= 25) {
-                                $riskLevel = 'High';
-                                $bgColor = '#FF0000';
-                            }
-
-                            $key = '5_' . $impact;
-                            $inherentCount = $heatmapData['inherent_counts'][$key] ?? 0;
-                            $currentCount = $heatmapData['residual_current_counts'][$key] ?? 0;
-                            $targetCount = $heatmapData['residual_target_counts'][$key] ?? 0;
-                        @endphp
-                        <td style="background-color: {{ $bgColor }}; border: 1px solid #000; padding: 3px; text-align: center; vertical-align: middle; width: 80px; height: 60px;">
-                            <div style="font-weight: bold; font-size: 8px; line-height: 1.1; margin-bottom: 2px;">{{ $riskLevel }}</div>
-                            <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">{{ $riskScore }}</div>
-                            @if($inherentCount || $currentCount || $targetCount)
-                                <div style="text-align: center;">
-                                    @if($inherentCount)
-                                        <span style="display:inline-block; background-color:#0070C0; color:white; border-radius:50%; width:14px; height:14px; font-size:8px; line-height:14px; text-align:center; margin:1px;">{{ $inherentCount }}</span>
-                                    @endif
-                                    @if($currentCount)
-                                        <span style="display:inline-block; background-color:#7F7F7F; color:white; border-radius:50%; width:14px; height:14px; font-size:8px; line-height:14px; text-align:center; margin:1px;">{{ $currentCount }}</span>
-                                    @endif
-                                    @if($targetCount)
-                                        <span style="display:inline-block; background-color:#7030A0; color:white; border-radius:50%; width:14px; height:14px; font-size:8px; line-height:14px; text-align:center; margin:1px;">{{ $targetCount }}</span>
-                                    @endif
-                                </div>
-                            @endif
-                        </td>
-                    @endfor
-                </tr>
-
-                @foreach([4, 3, 2, 1] as $prob)
+                @foreach([5, 4, 3, 2, 1] as $prob)
                     <tr>
-                        <td style="background-color: #E6E6FA; border: 1px solid #000; font-size: 9px; text-align: left; padding: 8px; width: 140px;">{{ $probabilityLabels[$prob] }}</td>
+                        @if($prob == 5)
+                            <td rowspan="5" style="
+                                background-color: #ffffff;
+                                border: 1px solid #000;
+                                text-align: center;
+                                vertical-align: middle;
+                                padding: 0;
+                                width: 4%;
+                                writing-mode: vertical-rl;
+                                transform: rotate(0deg);
+                                text-orientation: mixed;
+                                font-weight: bold;
+                                font-size: 10px;
+                            ">
+                                P<br>R<br>O<br>B<br>A<br>B<br>I<br>L<br>I<br>T<br>A<br>S
+                            </td>
+                        @endif
+                        <td style="background-color: #ffffff; border: 1px solid #000; font-size: 9px; text-align: left; padding: 8px; width: 13%;">{{ $probabilityLabels[$prob] }}</td>
                         @for($impact = 1; $impact <= 5; $impact++)
                             @php
                                 $riskScore = $heatmapMatrix[$prob][$impact] ?? 0;
                                 $riskLevel = '';
                                 $bgColor = '';
 
+                                // Logika untuk menentukan warna berdasarkan skor risiko
                                 if($riskScore >= 1 && $riskScore <= 5) {
                                     $riskLevel = 'Low';
                                     $bgColor = '#00B050';
@@ -552,25 +504,30 @@
                 @endforeach
 
                 <tr>
-                    <td style="background-color: #E6E6FA; width: 140px;"></td> <td style="border: 1px solid #000; text-align: center; font-size: 8px; padding: 4px; width: 80px;">{{ $impactLabels[1] }}</td>
+                    <td style="background-color: #ffffff; border: none; width: 20px;"></td>
+                    <td style="background-color: #ffffff; border: none; width: 140px;"></td>
+                    <td style="border: 1px solid #000; text-align: center; font-size: 8px; padding: 4px; width: 80px;">{{ $impactLabels[1] }}</td>
                     <td style="border: 1px solid #000; text-align: center; font-size: 8px; padding: 4px; width: 80px;">{{ $impactLabels[2] }}</td>
                     <td style="border: 1px solid #000; text-align: center; font-size: 8px; padding: 4px; width: 80px;">{{ $impactLabels[3] }}</td>
                     <td style="border: 1px solid #000; text-align: center; font-size: 8px; padding: 4px; width: 80px;">{{ $impactLabels[4] }}</td>
                     <td style="border: 1px solid #000; text-align: center; font-size: 8px; padding: 4px; width: 80px;">{{ $impactLabels[5] }}</td>
                 </tr>
                 <tr>
-                    <td style="background-color: #E6E6FA; width: 5%;"></td> <td colspan="6" style="background-color: #E6E6FA; border: 1px solid #000; font-weight: bold; text-align: center; font-size: 10px; padding: 4px;">DAMPAK</td>
+                    <td style="background-color: #ffffff; border: none; width: 20px;"></td>
+                    <td style="background-color: #ffffff; border: none; width: 140px;"></td>
+                    <td colspan="5" style="background-color: #ffffff; border: 1px solid #000; font-weight: bold; text-align: center; font-size: 10px; padding: 4px;">DAMPAK</td>
                 </tr>
             </tbody>
         </table>
     </div>
 
-    <div style="font-size: 8px; margin-top: 20px;">
-        <table style="border-collapse: collapse; width: 150px;">
+    <div style="font-size: 12px; margin-top: 20px; display: flex; justify-content: space-between; align-items: flex-start;">
+
+        <table style="border-collapse: collapse; width: 250px; font-size: 12px;">
             <thead>
                 <tr>
-                    <th style="background-color: #E6E6FA; border: 1px solid #000;">LEVEL RISIKO</th>
-                    <th style="background-color: #E6E6FA; border: 1px solid #000;">POSISI</th>
+                    <th style="background-color: #ffffff; border: 1px solid #000;">LEVEL RISIKO</th>
+                    <th style="background-color: #ffffff; border: 1px solid #000;">POSISI</th>
                 </tr>
             </thead>
             <tbody>
@@ -582,11 +539,11 @@
             </tbody>
         </table>
 
-       <div style="margin-top: 8px;">
-        <div style="font-weight: bold; font-size: 10px; margin-bottom: 5px;">KETERANGAN :</div>
-        <p><span style="display:inline-block; background-color:#0070C0; border-radius:50%; width:8px; height:8px;"></span> : Inherent Risk</p>
-        <p><span style="display:inline-block; background-color:#7F7F7F; border-radius:50%; width:8px; height:8px;"></span> : Residual Current Risk (s.d. 31 {{ strtoupper($monthName) }} {{ $year }})</p>
-        <p><span style="display:inline-block; background-color:#7030A0; border-radius:50%; width:8px; height:8px;"></span> : Residual Target Risk (Residual saat ini berbanding dengan target {{ $year }})</p>
+        <div style="margin-left: 40px; font-size: 9px;">
+            <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">KETERANGAN :</div>
+            <p><span style="display:inline-block; background-color:#0070C0; border-radius:50%; width:8px; height:8px;"></span> : Inherent Risk</p>
+            <p><span style="display:inline-block; background-color:#7F7F7F; border-radius:50%; width:8px; height:8px;"></span> : Residual Current Risk (s.d. 31 {{ strtoupper($monthName) }} {{ $year }})</p>
+            <p><span style="display:inline-block; background-color:#7030A0; border-radius:50%; width:8px; height:8px;"></span> : Residual Target Risk (Residual saat ini berbanding dengan target {{ $year }})</p>
         </div>
     </div>
 </div>

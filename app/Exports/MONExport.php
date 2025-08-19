@@ -343,7 +343,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             ],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => 'E6E6FA']
+                'startColor' => ['rgb' => 'd8e4bc']
             ],
             'borders' => [
                 'allBorders' => [
@@ -453,7 +453,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             $sheet->mergeCells($value['range_start'].':'.$value['range_end']);
             $sheet->setCellValue($value['range_start'], $value['name']);
 
-            $this->setHeaderHorizontalStyle($sheet, $value['range_start'].':'.$value['range_end'], 'FFE6E6FA', 8, true);
+            $this->setHeaderHorizontalStyle($sheet, $value['range_start'].':'.$value['range_end'], 'FFd8e4bc', 8, true);
         }
         //merge header horizontal (for inherent risk, residual risk and residual target)
 
@@ -525,7 +525,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             $sheet->mergeCells($value['column'].$value['start_row'].':'.$value['column'].'10');
             $sheet->setCellValue($value['column'].$value['start_row'], $value['name']);
 
-            $this->setHeaderHorizontalStyle($sheet, $value['column'].$value['start_row'].':'.$value['column'].'10', 'FFE6E6FA', 8, true);
+            $this->setHeaderHorizontalStyle($sheet, $value['column'].$value['start_row'].':'.$value['column'].'10', 'FFd8e4bc', 8, true);
         }
         //merge header vertical
     }

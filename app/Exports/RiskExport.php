@@ -252,7 +252,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 'font' => ['bold' => true, 'size' => 8], // Font lebih kecil untuk header
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['argb' => 'FFE6E6FA'],
+                    'startColor' => ['argb' => 'FFd8e4bc'],
                 ],
                 'borders' => [
                     'allBorders' => [
@@ -270,7 +270,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 'font' => ['bold' => true, 'size' => 8], // Font lebih kecil untuk header
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['argb' => 'FFE6E6FA'],
+                    'startColor' => ['argb' => 'FFd8e4bc'],
                 ],
                 'borders' => [
                     'allBorders' => [
@@ -327,7 +327,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                     $sheet->mergeCells($value['range_start'].'6:'.$value['range_end'].'6');
                     $sheet->setCellValue($value['range_start'].'6', $value['name']);
 
-                    $this->setHeaderStyle($sheet, $value['range_start'].'6:'.$value['range_end'].'6', 'FFE6E6FA', 8, true);
+                    $this->setHeaderStyle($sheet, $value['range_start'].'6:'.$value['range_end'].'6', 'd8e4bc', 8, true);
                 }
                 //merge header horizontal (for inherent risk, residual risk and residual target)
 
@@ -403,7 +403,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                     $sheet->mergeCells($value['column'].'6:'.$value['column'].'7');
                     $sheet->setCellValue($value['column'].'6', $value['name']);
 
-                    $this->setHeaderStyle($sheet, $value['column'].'6:'.$value['column'].'7', 'FFE6E6FA', 8, true);
+                    $this->setHeaderStyle($sheet, $value['column'].'6:'.$value['column'].'7', 'd8e4bc', 8, true);
                 }
                 //merge header vertical
 
@@ -572,7 +572,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
         ];
     }
 
-    function setHeaderStyle($sheet, $range, $bgColor = '4472C4', $fontSize = 8, $bold = true)
+    function setHeaderStyle($sheet, $range, $bgColor = 'd8e4bc', $fontSize = 8, $bold = true)
     {
         $sheet->getStyle($range)->applyFromArray([
             'font' => [

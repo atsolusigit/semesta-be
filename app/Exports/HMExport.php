@@ -430,7 +430,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $sheet->getStyle('A5')->applyFromArray([
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
-                        'color' => ['rgb' => 'E6E6FA']
+                        'color' => ['rgb' => 'ffffff']
                     ]
                 ]);
 
@@ -487,7 +487,7 @@ class HMExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $sheet->getStyle('C11:G11')->applyFromArray([
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
-                        'color' => ['rgb' => 'E6E6FA']
+                        'color' => ['rgb' => 'ffffff']
                     ],
                     'borders' => [
                         'allBorders' => [

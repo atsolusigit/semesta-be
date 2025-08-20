@@ -223,6 +223,23 @@
         .col-percent { width: 3%; }
         .col-treatment { width: 15%; }
         .col-status { width: 6%; }
+
+        .rotate {
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: middle;
+            width: 1.5em;
+        }
+
+        .rotate div {
+            -moz-transform: rotate(-90.0deg);  /* FF3.5+ */
+            -o-transform: rotate(-90.0deg);  /* Opera 10.5 */
+            -webkit-transform: rotate(-90.0deg);  /* Saf3.1+, Chrome */
+            filter:  progid:DXImageTransform.Microsoft.BasicImage(rotation=0.083);  /* IE6,IE7 */
+            -ms-filter: "progid:DXImageTransform.Microsoft.BasicImage(rotation=0.083)"; /* IE8 */
+            margin-left: -10em;
+            margin-right: -10em;
+        }
     </style>
 </head>
 <body>
@@ -436,20 +453,18 @@
                 @foreach([5, 4, 3, 2, 1] as $prob)
                     <tr>
                         @if($prob == 5)
-                            <td rowspan="5" style="
+                            <td rowspan="5" class="rotate" style="
                                 background-color: #ffffff;
                                 border: 1px solid #000;
                                 text-align: center;
                                 vertical-align: middle;
                                 padding: 0;
                                 width: 4%;
-                                writing-mode: vertical-rl;
-                                transform: rotate(0deg);
-                                text-orientation: mixed;
                                 font-weight: bold;
                                 font-size: 10px;
+
                             ">
-                                P<br>R<br>O<br>B<br>A<br>B<br>I<br>L<br>I<br>T<br>A<br>S
+                                <div >PROBABILITAS</div>
                             </td>
                         @endif
                         <td style="background-color: #ffffff; border: 1px solid #000; font-size: 9px; text-align: left; padding: 8px; width: 13%;">{{ $probabilityLabels[$prob] }}</td>

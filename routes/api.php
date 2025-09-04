@@ -199,6 +199,8 @@ Route::prefix('heatmap-risk-range')->group(function () {
 
 // ===================== HEATMAP =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/heatmap', [MstHeatmapController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/heatmap-data', [MstHeatmapController::class, 'getHeatmapData']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/heatmap-detail', [MstHeatmapController::class, 'getHeatmapDetailData']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->post('/heatmap', [MstHeatmapController::class, 'store']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/heatmap/{id}', [MstHeatmapController::class, 'show']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->put('/heatmap/{id}', [MstHeatmapController::class, 'update']);
@@ -220,6 +222,10 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/op
 
 // ===================== RISK HEADER =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header', [TrRiskHeaderController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-headers/pending-approval', [TrRiskHeaderController::class, 'getPendingApproval']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-headers/rejected', [TrRiskHeaderController::class, 'getRejectedData']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->patch('/risk-headers/{id}/approve', [TrRiskHeaderController::class, 'approveRiskHeader']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->patch('/risk-headers/{id}/reject', [TrRiskHeaderController::class, 'rejectRiskHeader']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->post('/risk-header', [TrRiskHeaderController::class, 'store']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header/{id}', [TrRiskHeaderController::class, 'show']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);

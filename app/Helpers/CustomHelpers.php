@@ -914,5 +914,189 @@ if (!function_exists('get_decrypted_username')) {
 }
 
 
+if (!function_exists('get_month_name')) {
+    /**
+     * Ambil nama bulan dalam bahasa Indonesia berdasarkan nomor bulan.
+     *
+     * @param int $month Nomor bulan (1-12)
+     * @return string Nama bulan atau string kosong jika tidak valid
+     */
+    function get_month_name($month)
+    {
+        $months = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+
+        return $months[$month] ?? '';
+    }
 }
 
+if (!function_exists('initialize_risk_matrix')) {
+    /**
+     * Inisialisasi matrix 5x5 dengan nilai 0
+     *
+     * @return array Matrix 5x5 untuk heatmap risiko
+     */
+    function initialize_risk_matrix()
+    {
+        $matrix = [];
+        for ($likelihood = 1; $likelihood <= 5; $likelihood++) {
+            for ($impact = 1; $impact <= 5; $impact++) {
+                $matrix[$likelihood][$impact] = 0;
+            }
+        }
+        return $matrix;
+    }
+}
+
+if (!function_exists('initialize_risk_summary')) {
+    /**
+     * Inisialisasi summary dengan kategori default
+     *
+     * @return array Summary kategori risiko dengan nilai 0
+     */
+    function initialize_risk_summary()
+    {
+        return [
+            'Low' => 0,
+            'Low to Moderate' => 0,
+            'Moderate' => 0,
+            'Moderate to High' => 0,
+            'High' => 0
+        ];
+    }
+}
+
+if (!function_exists('format_matrix_for_response')) {
+    /**
+     * Format matrix untuk response yang mudah dikonsumsi frontend
+     *
+     * @param array $matrix Matrix 5x5 hasil perhitungan
+     * @return array Formatted matrix untuk response
+     */
+    function format_matrix_for_response($matrix)
+    {
+        $formatted = [];
+        foreach ($matrix as $likelihood => $impacts) {
+            foreach ($impacts as $impact => $count) {
+                if ($count > 0) {
+                    $formatted[] = [
+                        'likelihood' => $likelihood,
+                        'impact' => $impact,
+                        'count' => $count,
+                        'position' => "{$likelihood}_{$impact}",
+                        'score' => $likelihood * $impact,
+                        'category' => get_risk_category_by_score($likelihood * $impact)
+                    ];
+                }
+            }
+        }
+        return $formatted;
+    }
+}
+
+if (!function_exists('get_risk_category_by_score')) {
+    /**
+     * Mendapatkan kategori risiko berdasarkan score
+     *
+     * @param int $score Score risiko (1-25)
+     * @return string Kategori risiko
+     */
+    function get_risk_category_by_score($score)
+    {
+        if ($score >= 1 && $score <= 5) return 'Low';
+        if ($score >= 6 && $score <= 10) return 'Low to Moderate';
+        if ($score >= 11 && $score <= 15) return 'Moderate';
+        if ($score >= 16 && $score <= 20) return 'Moderate to High';
+        if ($score >= 21 && $score <= 25) return 'High';
+
+        return 'Unknown';
+    }
+
+}
+}
+
+if (!function_exists('initialize_risk_matrix')) {
+    /**
+     * Inisialisasi matrix 5x5 dengan nilai 0
+     *
+     * @return array Matrix 5x5 untuk heatmap risiko
+     */
+    function initialize_risk_matrix()
+    {
+        $matrix = [];
+        for ($likelihood = 1; $likelihood <= 5; $likelihood++) {
+            for ($impact = 1; $impact <= 5; $impact++) {
+                $matrix[$likelihood][$impact] = 0;
+            }
+        }
+        return $matrix;
+    }
+}
+
+if (!function_exists('initialize_risk_summary')) {
+    /**
+     * Inisialisasi summary dengan kategori default
+     *
+     * @return array Summary kategori risiko dengan nilai 0
+     */
+    function initialize_risk_summary()
+    {
+        return [
+            'Low' => 0,
+            'Low to Moderate' => 0,
+            'Moderate' => 0,
+            'Moderate to High' => 0,
+            'High' => 0
+        ];
+    }
+}
+
+if (!function_exists('format_matrix_for_response')) {
+    /**
+     * Format matrix untuk response yang mudah dikonsumsi frontend
+     *
+     * @param array $matrix Matrix 5x5 hasil perhitungan
+     * @return array Formatted matrix untuk response
+     */
+    function format_matrix_for_response($matrix)
+    {
+        $formatted = [];
+        foreach ($matrix as $likelihood => $impacts) {
+            foreach ($impacts as $impact => $count) {
+                if ($count > 0) {
+                    $formatted[] = [
+                        'likelihood' => $likelihood,
+                        'impact' => $impact,
+                        'count' => $count,
+                        'position' => "{$likelihood}_{$impact}",
+                        'score' => $likelihood * $impact,
+                        'category' => get_risk_category_by_score($likelihood * $impact)
+                    ];
+                }
+            }
+        }
+        return $formatted;
+    }
+}
+
+if (!function_exists('get_risk_category_by_score')) {
+    /**
+     * Mendapatkan kategori risiko berdasarkan score
+     *
+     * @param int $score Score risiko (1-25)
+     * @return string Kategori risiko
+     */
+    function get_risk_category_by_score($score)
+    {
+        if ($score >= 1 && $score <= 5) return 'Low';
+        if ($score >= 6 && $score <= 10) return 'Low to Moderate';
+        if ($score >= 11 && $score <= 15) return 'Moderate';
+        if ($score >= 16 && $score <= 20) return 'Moderate to High';
+        if ($score >= 21 && $score <= 25) return 'High';
+
+        return 'Unknown';
+    }
+}

@@ -23,4 +23,15 @@ class MstDepartment extends Model
         );
     }
 
+      public function jabatans()
+    {
+        return $this->hasMany(MstJabatan::class, 'department_id');
+    }
+
+    // Relationship ke risk headers
+    public function riskHeaders()
+    {
+        return $this->hasMany(TrRiskHeader::class, 'department_id');
+    }
+
 }

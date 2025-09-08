@@ -86,6 +86,14 @@ public function department()
 {
     return $this->belongsTo(MstDepartment::class, 'department_id');
 }
+    /**
+     * Relasi ke jabatan
+     */
+
+ public function jabatan()
+    {
+        return $this->belongsTo(MstJabatan::class, 'jabatan_id');
+    }
 
     /**
      * (Opsional) Relasi ke divisi

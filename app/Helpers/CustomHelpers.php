@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Models\MstHeatmap;
 use App\Models\TrRiskMonthlyUpload;
+use App\Models\MstRole;
+use App\Models\RoleApprovalFlow;
 
 if (!function_exists('check_validation')) {
     /**
@@ -566,13 +568,29 @@ if (!function_exists('validate_bulk_quantitative_data')) {
                 ];
             }
 
-            // Validasi target_quantitative harus berupa angka positif
+            // Validasi target_quantitative harus berupa string atau numeric
             if (isset($monthData['target_quantitative']) && !is_null($monthData['target_quantitative'])) {
-                if (!is_numeric($monthData['target_quantitative']) || $monthData['target_quantitative'] < 0) {
+                if (!is_string($monthData['target_quantitative']) && !is_numeric($monthData['target_quantitative'])) {
                     return [
                         'valid' => false,
                         'title' => 'Target Quantitative Tidak Valid',
-                        'message' => "Data pada index {$index} memiliki target_quantitative yang tidak valid. Harus berupa angka positif.",
+                        'message' => "Data pada index {$index} memiliki target_quantitative yang tidak valid. Harus berupa string atau angka.",
+                        'data' => [
+                            'header_id' => $headerId,
+                            'invalid_index' => $index,
+                            'month' => $hasMonthField ? ($monthData['month'] ?? 'unknown') : ($index + 1),
+                            'error_field' => 'target_quantitative',
+                            'current_value' => $monthData['target_quantitative']
+                        ]
+                    ];
+                }
+
+                // Cek jika string kosong
+                if (is_string($monthData['target_quantitative']) && trim($monthData['target_quantitative']) === '') {
+                    return [
+                        'valid' => false,
+                        'title' => 'Target Quantitative Tidak Boleh Kosong',
+                        'message' => "Data pada index {$index} memiliki target_quantitative yang kosong.",
                         'data' => [
                             'header_id' => $headerId,
                             'invalid_index' => $index,
@@ -1018,85 +1036,129 @@ if (!function_exists('get_risk_category_by_score')) {
 }
 }
 
-if (!function_exists('initialize_risk_matrix')) {
+if (!function_exists('get_month_name')) {
     /**
-     * Inisialisasi matrix 5x5 dengan nilai 0
+     * Ambil nama bulan dalam bahasa Indonesia berdasarkan nomor bulan.
      *
-     * @return array Matrix 5x5 untuk heatmap risiko
+     * @param int $month Nomor bulan (1-12)
+     * @return string Nama bulan atau string kosong jika tidak valid
      */
-    function initialize_risk_matrix()
+    function get_month_name($month)
     {
-        $matrix = [];
-        for ($likelihood = 1; $likelihood <= 5; $likelihood++) {
-            for ($impact = 1; $impact <= 5; $impact++) {
-                $matrix[$likelihood][$impact] = 0;
-            }
-        }
-        return $matrix;
-    }
-}
-
-if (!function_exists('initialize_risk_summary')) {
-    /**
-     * Inisialisasi summary dengan kategori default
-     *
-     * @return array Summary kategori risiko dengan nilai 0
-     */
-    function initialize_risk_summary()
-    {
-        return [
-            'Low' => 0,
-            'Low to Moderate' => 0,
-            'Moderate' => 0,
-            'Moderate to High' => 0,
-            'High' => 0
+        $months = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
         ];
+
+        return $months[$month] ?? '';
+    }
+
+}
+
+if (!function_exists('format_target_quantitative')) {
+    /**
+     * Format target quantitative value yang bisa berupa numeric atau string.
+     * Jika numeric, akan diformat dengan number_format.
+     * Jika string, akan dikembalikan sebagai string yang sudah di-clean.
+     *
+     * @param mixed $value Nilai target quantitative (numeric atau string)
+     * @return string|null
+     */
+    function format_target_quantitative($value)
+    {
+        // Jika null atau empty, return null
+        if (is_null($value) || $value === '') {
+            return null;
+        }
+
+        // Cek apakah value adalah numeric (bisa berupa string angka)
+        if (is_numeric($value)) {
+            return number_format((float)$value, 0, ',', '.');
+        }
+
+        // Jika bukan numeric, kembalikan sebagai string yang sudah di-clean
+        return clean_string($value);
     }
 }
 
-if (!function_exists('format_matrix_for_response')) {
-    /**
-     * Format matrix untuk response yang mudah dikonsumsi frontend
-     *
-     * @param array $matrix Matrix 5x5 hasil perhitungan
-     * @return array Formatted matrix untuk response
-     */
-    function format_matrix_for_response($matrix)
+if (!function_exists('get_next_role_level')) {
+    function get_next_role_level()
     {
-        $formatted = [];
-        foreach ($matrix as $likelihood => $impacts) {
-            foreach ($impacts as $impact => $count) {
-                if ($count > 0) {
-                    $formatted[] = [
-                        'likelihood' => $likelihood,
-                        'impact' => $impact,
-                        'count' => $count,
-                        'position' => "{$likelihood}_{$impact}",
-                        'score' => $likelihood * $impact,
-                        'category' => get_risk_category_by_score($likelihood * $impact)
-                    ];
+        $maxLevel = MstRole::max('level') ?? 0;
+        return $maxLevel + 1;
+    }
+}
+
+if (!function_exists('can_user_approve_simple')) {
+    function can_user_approve_simple($userId, $departmentId)
+    {
+        try {
+            $user = \App\Models\User::find($userId);
+
+            if (!$user) {
+                return false;
+            }
+
+            // PERBAIKAN: Hanya Superadmin (1) yang selalu bisa approve
+            if ($user->role_id == 1) {
+                return true;
+            }
+
+            // PERBAIKAN: Role 2 (Admin) dan Role 3 hanya bisa approve dari department yang sama
+            if (($user->role_id == 2 || $user->role_id == 3) && $user->department_id == $departmentId) {
+                return true;
+            }
+
+            return false;
+
+        } catch (\Exception $e) {
+            \Log::error('Error in can_user_approve_simple: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('get_approver_jabatan_simple')) {
+    function get_approver_jabatan_simple($departmentId, $userId = null)
+    {
+        try {
+            // Jika user_id diberikan, gunakan jabatan user tersebut
+            if ($userId) {
+                $user = \App\Models\User::find($userId);
+                if ($user && $user->jabatan_id) {
+                    return $user->jabatan_id;
                 }
             }
+
+            // Jika tidak ada jabatan user, cari jabatan di department
+            $jabatan = \App\Models\MstJabatan::where('department_id', $departmentId)->first();
+
+            return $jabatan ? $jabatan->id : null;
+
+        } catch (\Exception $e) {
+            \Log::error('Error in get_approver_jabatan_simple: ' . $e->getMessage());
+            return null;
         }
-        return $formatted;
     }
 }
 
-if (!function_exists('get_risk_category_by_score')) {
-    /**
-     * Mendapatkan kategori risiko berdasarkan score
-     *
-     * @param int $score Score risiko (1-25)
-     * @return string Kategori risiko
-     */
-    function get_risk_category_by_score($score)
+if (!function_exists('get_approval_status_simple')) {
+    function get_approval_status_simple($documentId)
     {
-        if ($score >= 1 && $score <= 5) return 'Low';
-        if ($score >= 6 && $score <= 10) return 'Low to Moderate';
-        if ($score >= 11 && $score <= 15) return 'Moderate';
-        if ($score >= 16 && $score <= 20) return 'Moderate to High';
-        if ($score >= 21 && $score <= 25) return 'High';
+        try {
+            $approval = \App\Models\MstApproval::where('document_id', $documentId)->first();
 
-        return 'Unknown';
+            if (!$approval) {
+                return 'not_found';
+            }
+
+            return $approval->status; // 'pending', 'approved', 'rejected'
+
+        } catch (\Exception $e) {
+            \Log::error('Error in get_approval_status_simple: ' . $e->getMessage());
+            return 'error';
+        }
     }
 }
+

@@ -13,13 +13,15 @@ class MstRole extends Model
         'description',
         'access',
         'created_by',
-        'created_at',
-        'updated_at'
+        'level',
+        'status',
+        'is_default',
+
     ];
 
-    public function users()
+   public function users()
     {
-        return $this->hasMany(User::class, 'tr_role_page','role_id','page_id');
+        return $this->hasMany(User::class, 'role_id'); // Perbaiki relasi
     }
 
     public function pages()
@@ -32,6 +34,16 @@ class MstRole extends Model
 {
     return $this->belongsTo(MstRole::class, 'role_id');
 }
+
+public function approvalFlows()
+    {
+        return $this->hasMany(RoleApprovalFlow::class, 'role_id');
+    }
+
+     public function canApprove()
+    {
+        return $this->hasMany(RoleApprovalFlow::class, 'can_approve_role_id');
+    }
 
 }
 

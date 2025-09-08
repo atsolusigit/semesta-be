@@ -56,7 +56,7 @@ class TrRiskMonthly extends Model
         'start_date' => 'date',
         'expired_date' => 'date',
         'realization_quantitative' => 'decimal:2',
-        'target_quantitative' => 'decimal:2',
+        // 'target_quantitative' => 'decimal:2',
         'is_finalize' => 'boolean',
     ];
 

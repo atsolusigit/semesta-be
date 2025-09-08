@@ -25,6 +25,7 @@ class TrRiskHeader extends Model
         'inherent_risk_posisi_risiko',
         'inherent_risk_level_risiko',
         'internal_control',
+        'mitigasi',
         'target_satu_tahun_option',
         'target_satu_tahun_notes',
         'target_satu_tahun_position',
@@ -38,11 +39,15 @@ class TrRiskHeader extends Model
         'year',
         'created_by',
         'updated_by',
+        'status',
+        'approval_notes',
+        'approved_by',
+        'approved_at',
+        'created_by_role',
     ];
 
     protected $casts = [
         'biaya_perlakuan_risiko' => 'decimal:2',
-        'target_quantitative_satu_tahun' => 'decimal:2',
         'process_code' => 'integer',
     ];
 
@@ -107,6 +112,21 @@ class TrRiskHeader extends Model
     // =====================================
     // RELATIONS
     // =====================================
+
+       public function creatorRole()
+    {
+        return $this->belongsTo(MstRole::class, 'created_by_role', 'id');
+    }
+
+    public function approvals()
+    {
+        return $this->hasMany(MstApproval::class, 'document_id');
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
 
         public function createdBy()
     {

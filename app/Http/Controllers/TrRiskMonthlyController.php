@@ -49,7 +49,7 @@ class TrRiskMonthlyController extends Controller
         // Format angka pada header jika ada
         if (isset($arr['header'])) {
             if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
-                $arr['header']['target_quantitative_satu_tahun'] = number_format((float)$arr['header']['target_quantitative_satu_tahun'], 0, ',', '.');
+                $arr['header']['target_quantitative_satu_tahun'] = format_target_quantitative($arr['header']['target_quantitative_satu_tahun']);
             }
             if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
                 $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 0, ',', '.');
@@ -150,7 +150,7 @@ public function show($id)
         // Format angka pada header jika ada
         if (isset($arr['header'])) {
             if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
-                $arr['header']['target_quantitative_satu_tahun'] = number_format((float)$arr['header']['target_quantitative_satu_tahun'], 0, ',', '.');
+                $arr['header']['target_quantitative_satu_tahun'] = format_target_quantitative($arr['header']['target_quantitative_satu_tahun']);
             }
             if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
                 $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 0, ',', '.');
@@ -234,8 +234,8 @@ public function getByHeader($headerId)
 
         // Format angka pada header jika ada
         if (isset($arr['header'])) {
-            if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
-                $arr['header']['target_quantitative_satu_tahun'] = number_format((float)str_replace(',', '', $arr['header']['target_quantitative_satu_tahun']), 0, ',', '.');
+             if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
+                $arr['header']['target_quantitative_satu_tahun'] = format_target_quantitative($arr['header']['target_quantitative_satu_tahun']);
             }
             if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
                 $arr['header']['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $arr['header']['biaya_perlakuan_risiko']), 0, ',', '.');
@@ -309,9 +309,9 @@ public function getByHeader($headerId)
 
     // Convert header ke array dan format angka
     $headerArray = $header->toArray();
-    if (isset($headerArray['target_quantitative_satu_tahun']) && $headerArray['target_quantitative_satu_tahun']) {
-        $headerArray['target_quantitative_satu_tahun'] = number_format((float)str_replace(',', '', $headerArray['target_quantitative_satu_tahun']), 0, ',', '.');
-    }
+      if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
+                $arr['header']['target_quantitative_satu_tahun'] = format_target_quantitative($arr['header']['target_quantitative_satu_tahun']);
+            }
     if (isset($headerArray['biaya_perlakuan_risiko']) && $headerArray['biaya_perlakuan_risiko']) {
         $headerArray['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $headerArray['biaya_perlakuan_risiko']), 0, ',', '.');
     }
@@ -458,7 +458,7 @@ public function getByHeader($headerId)
             'id' => $data->id,
             'header_id' => $data->header_id,
             'month' => $data->month,
-            'risk_code' => clean_string($data->risk_code),
+            'risk_code' => $data->risk_code,
             'status_risiko' => clean_string($data->status_risiko),
             'process_code' => clean_string($data->process_code),
             'start_date' => clean_string($data->start_date),
@@ -618,7 +618,7 @@ public function getByHeader($headerId)
             'id' => $data->id,
             'header_id' => $data->header_id,
             'month' => $data->month,
-            'risk_code' => clean_string($data->risk_code),
+            'risk_code' => $data->risk_code,
             'status_risiko' => clean_string($data->status_risiko),
             'process_code' => clean_string($data->process_code),
             'start_date' => clean_string($data->start_date),
@@ -678,7 +678,7 @@ public function getByHeader($headerId)
     }
 
     $validationRules = [
-        'target_quantitative' => 'required|numeric',
+        'target_quantitative' => 'required|string',
         'target_notes' => 'nullable|string',
     ];
 
@@ -706,8 +706,8 @@ public function getByHeader($headerId)
             'id' => $monthly->id,
             'header_id' => $monthly->header_id,
             'month' => $monthly->month,
-            'risk_code' => clean_string($monthly->risk_code),
-            'target_quantitative' => $monthly->target_quantitative ? number_format((float)$monthly->target_quantitative, 0, ',', '.') : '0',
+            'risk_code' => $monthly->header_id,
+            'target_quantitative' => clean_string($monthly->target_quantitative),
             'target_notes' => clean_string($monthly->target_notes),
             'status_risiko' => clean_string($monthly->status_risiko),
             'is_finalize' => $monthly->is_finalize,
@@ -735,6 +735,223 @@ public function getByHeader($headerId)
     } catch (\Throwable $e) {
         DB::rollBack();
         return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan pada sistem.', ['error' => $e->getMessage()]);
+    }
+}
+
+public function bulkUpdateQuantitative(Request $request, $headerId)
+{
+    $header = TrRiskHeader::find($headerId);
+    if (!$header) {
+        return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', ['header_id' => $headerId]);
+    }
+
+    if (empty($request->monthly_data)) {
+        return json(400, false, 'Data Kosong', 'Data perbulan tidak boleh kosong.', ['header_id' => $headerId]);
+    }
+
+    $finalized = $header->monthly()->where(function ($query) {
+        $query->where('is_finalize', true)
+              ->orWhereHas('entries', function ($q) {
+                  $q->where('is_finalize', true);
+              });
+    })->exists();
+
+    if ($finalized) {
+        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
+    }
+
+    $hasMonthField = collect($request->monthly_data)->first() && isset(collect($request->monthly_data)->first()['month']);
+
+    $bulkValidation = validate_bulk_quantitative_data($request->monthly_data, $hasMonthField, $headerId);
+    if (!$bulkValidation['valid']) {
+        return json(400, false, $bulkValidation['title'], $bulkValidation['message'], $bulkValidation['data']);
+    }
+
+    if ($hasMonthField) {
+        $validationRules = [
+            'monthly_data' => 'required|array|min:1|max:12',
+            'monthly_data.*.month' => 'required|integer|min:1|max:12',
+            'monthly_data.*.target_quantitative' => 'required|string',
+            'monthly_data.*.target_notes' => 'nullable|string|max:1000',
+            'require_all_months' => 'nullable|boolean',
+            'update_mode' => 'nullable|string|in:selective,complete',
+        ];
+    } else {
+        $validationRules = [
+            'monthly_data' => 'required|array|min:1|max:12',
+            'monthly_data.*.target_quantitative' => 'required|string',
+            'monthly_data.*.target_notes' => 'nullable|string|max:1000',
+            'require_all_months' => 'nullable|boolean',
+            'update_mode' => 'nullable|string|in:selective,complete',
+        ];
+
+        if ($request->require_all_months === true) {
+            $validationRules['monthly_data'] = 'required|array|size:12';
+        }
+    }
+
+    $validation = check_validation($request->all(), $validationRules);
+    if ($validation[0] == 1) {
+        $errors = $validation[1]->getData(true)['data'] ?? [];
+        return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+    }
+
+    $updateMode = $request->update_mode ?? 'complete';
+    $processedData = process_bulk_monthly_data($request->monthly_data, $hasMonthField);
+    $existingMonthly = TrRiskMonthly::where('header_id', $headerId)->get()->keyBy('month');
+
+    $bulkValidationResult = validate_bulk_monthly_constraints(
+        $processedData['monthly_data'],
+        $existingMonthly,
+        $request->require_all_months,
+        $headerId
+    );
+
+    if (!$bulkValidationResult['valid']) {
+        return json(400, false, $bulkValidationResult['title'], $bulkValidationResult['message'], $bulkValidationResult['data']);
+    }
+
+    $warnings = $bulkValidationResult['warnings'] ?? [];
+
+    if (!validate_header_year($header->year)) {
+        return json(400, false, 'Tahun Tidak Valid', 'Tahun pada header tidak valid untuk pembuatan tanggal.', [
+            'header_id' => $headerId,
+            'year' => $header->year
+        ]);
+    }
+
+    DB::beginTransaction();
+    try {
+        $result = execute_bulk_quantitative_update(
+            $processedData['monthly_data'],
+            $existingMonthly,
+            $header,
+            $updateMode,
+            auth()->id()
+        );
+
+        // Load uploads untuk header ini
+        $header->load('uploads');
+
+        // Ambil semua id monthly yang diupdate atau dibuat
+        $idsToLoad = [];
+        if (isset($result['updated_data']) && is_array($result['updated_data'])) {
+            $idsToLoad = array_merge($idsToLoad, array_column($result['updated_data'], 'id'));
+        }
+        if (isset($result['created_data']) && is_array($result['created_data'])) {
+            $idsToLoad = array_merge($idsToLoad, array_column($result['created_data'], 'id'));
+        }
+
+        // Load TrRiskMonthly dengan relasi createdBy dan updatedBy untuk semua id tersebut
+        $monthlyRecords = TrRiskMonthly::with(['createdBy', 'updatedBy'])->whereIn('id', $idsToLoad)->get()->keyBy('id');
+
+        // Nama pembuat header, fallback jika createdBy monthly gak ada
+        $headerCreatorName = $header->createdBy ? get_decrypted_username($header->createdBy) : 'Unknown User';
+
+        // Format data pada updated_data
+        if (isset($result['updated_data']) && is_array($result['updated_data'])) {
+            foreach ($result['updated_data'] as &$item) {
+                // Clean string target_quantitative
+                if (isset($item['target_quantitative'])) {
+                    $item['target_quantitative'] = clean_string($item['target_quantitative']);
+                }
+
+                // Format data dalam header jika ada
+                if (isset($item['header'])) {
+                    if (isset($item['header']['target_quantitative_satu_tahun']) && $item['header']['target_quantitative_satu_tahun']) {
+                        $item['header']['target_quantitative_satu_tahun'] = clean_string($item['header']['target_quantitative_satu_tahun']);
+                    }
+                    if (isset($item['header']['biaya_perlakuan_risiko'])) {
+                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko'] ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.') : '0';
+                    }
+                }
+
+                $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
+
+                $item['uploaded_files'] = $monthlyUploads->count() > 0
+                    ? $monthlyUploads->map(function ($file) {
+                        return [
+                            'id' => $file->id,
+                            'filepath' => clean_string($file->filepath),
+                            'domain' => clean_string($file->domain),
+                        ];
+                    })->values()->toArray()
+                    : [];
+
+                $monthlyModel = $monthlyRecords->get($item['id']);
+
+                if ($monthlyModel) {
+                    if ($monthlyModel->updatedBy) {
+                        $item['updated_by_name'] = get_decrypted_username($monthlyModel->updatedBy);
+                    } elseif ($monthlyModel->createdBy) {
+                        $item['created_by_name'] = get_decrypted_username($monthlyModel->createdBy);
+                    } else {
+                        $item['created_by_name'] = $headerCreatorName;
+                    }
+                } else {
+                    $item['created_by_name'] = $headerCreatorName;
+                }
+            }
+        }
+
+        // Format data pada created_data
+        if (isset($result['created_data']) && is_array($result['created_data'])) {
+            foreach ($result['created_data'] as &$item) {
+                // Clean string target_quantitative
+                if (isset($item['target_quantitative'])) {
+                    $item['target_quantitative'] = clean_string($item['target_quantitative']);
+                }
+
+                // Format data dalam header jika ada
+                if (isset($item['header'])) {
+                    if (isset($item['header']['target_quantitative_satu_tahun']) && $item['header']['target_quantitative_satu_tahun']) {
+                        $item['header']['target_quantitative_satu_tahun'] = clean_string($item['header']['target_quantitative_satu_tahun']);
+                    }
+                    if (isset($item['header']['biaya_perlakuan_risiko'])) {
+                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko'] ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.') : '0';
+                    }
+                }
+
+                $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
+
+                $item['uploaded_files'] = $monthlyUploads->count() > 0
+                    ? $monthlyUploads->map(function ($file) {
+                        return [
+                            'filepath' => clean_string($file->filepath),
+                            'domain' => clean_string($file->domain),
+                        ];
+                    })->values()->toArray()
+                    : [];
+
+                $monthlyModel = $monthlyRecords->get($item['id']);
+
+                if ($monthlyModel) {
+                    if ($monthlyModel->updatedBy) {
+                        $item['updated_by_name'] = get_decrypted_username($monthlyModel->updatedBy);
+                    } elseif ($monthlyModel->createdBy) {
+                        $item['created_by_name'] = get_decrypted_username($monthlyModel->createdBy);
+                    } else {
+                        $item['created_by_name'] = $headerCreatorName;
+                    }
+                } else {
+                    $item['created_by_name'] = $headerCreatorName;
+                }
+            }
+        }
+
+        DB::commit();
+
+        $message = "Berhasil memproses {$result['total_processed']} data. ";
+        $message .= "Updated: {$result['updated_count']}, Created: {$result['created_count']}.";
+
+        return json(200, true, 'Berhasil Bulk Update', $message, $result, $warnings);
+
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Bulk Update', 'Terjadi kesalahan sistem.', [
+            'header_id' => $headerId,
+            'error' => $e->getMessage()
+        ]);
     }
 }
 
@@ -849,223 +1066,6 @@ public function getByHeader($headerId)
             return json(500, false, 'Gagal Difinalisasi', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
-
-   public function bulkUpdateQuantitative(Request $request, $headerId)
-{
-    $header = TrRiskHeader::find($headerId);
-    if (!$header) {
-        return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', ['header_id' => $headerId]);
-    }
-
-    if (empty($request->monthly_data)) {
-        return json(400, false, 'Data Kosong', 'Data perbulan tidak boleh kosong.', ['header_id' => $headerId]);
-    }
-
-    $finalized = $header->monthly()->where(function ($query) {
-        $query->where('is_finalize', true)
-              ->orWhereHas('entries', function ($q) {
-                  $q->where('is_finalize', true);
-              });
-    })->exists();
-
-    if ($finalized) {
-        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
-    }
-
-    $hasMonthField = collect($request->monthly_data)->first() && isset(collect($request->monthly_data)->first()['month']);
-
-    $bulkValidation = validate_bulk_quantitative_data($request->monthly_data, $hasMonthField, $headerId);
-    if (!$bulkValidation['valid']) {
-        return json(400, false, $bulkValidation['title'], $bulkValidation['message'], $bulkValidation['data']);
-    }
-
-    if ($hasMonthField) {
-        $validationRules = [
-            'monthly_data' => 'required|array|min:1|max:12',
-            'monthly_data.*.month' => 'required|integer|min:1|max:12',
-            'monthly_data.*.target_quantitative' => 'required|numeric|min:0',
-            'monthly_data.*.target_notes' => 'nullable|string|max:1000',
-            'require_all_months' => 'nullable|boolean',
-            'update_mode' => 'nullable|string|in:selective,complete',
-        ];
-    } else {
-        $validationRules = [
-            'monthly_data' => 'required|array|min:1|max:12',
-            'monthly_data.*.target_quantitative' => 'required|numeric|min:0',
-            'monthly_data.*.target_notes' => 'nullable|string|max:1000',
-            'require_all_months' => 'nullable|boolean',
-            'update_mode' => 'nullable|string|in:selective,complete',
-        ];
-
-        if ($request->require_all_months === true) {
-            $validationRules['monthly_data'] = 'required|array|size:12';
-        }
-    }
-
-    $validation = check_validation($request->all(), $validationRules);
-    if ($validation[0] == 1) {
-        $errors = $validation[1]->getData(true)['data'] ?? [];
-        return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
-    }
-
-    $updateMode = $request->update_mode ?? 'complete';
-    $processedData = process_bulk_monthly_data($request->monthly_data, $hasMonthField);
-    $existingMonthly = TrRiskMonthly::where('header_id', $headerId)->get()->keyBy('month');
-
-    $bulkValidationResult = validate_bulk_monthly_constraints(
-        $processedData['monthly_data'],
-        $existingMonthly,
-        $request->require_all_months,
-        $headerId
-    );
-
-    if (!$bulkValidationResult['valid']) {
-        return json(400, false, $bulkValidationResult['title'], $bulkValidationResult['message'], $bulkValidationResult['data']);
-    }
-
-    $warnings = $bulkValidationResult['warnings'] ?? [];
-
-    if (!validate_header_year($header->year)) {
-        return json(400, false, 'Tahun Tidak Valid', 'Tahun pada header tidak valid untuk pembuatan tanggal.', [
-            'header_id' => $headerId,
-            'year' => $header->year
-        ]);
-    }
-
-    DB::beginTransaction();
-    try {
-        $result = execute_bulk_quantitative_update(
-            $processedData['monthly_data'],
-            $existingMonthly,
-            $header,
-            $updateMode,
-            auth()->id()
-        );
-
-        // Load uploads untuk header ini
-        $header->load('uploads');
-
-        // Ambil semua id monthly yang diupdate atau dibuat
-        $idsToLoad = [];
-        if (isset($result['updated_data']) && is_array($result['updated_data'])) {
-            $idsToLoad = array_merge($idsToLoad, array_column($result['updated_data'], 'id'));
-        }
-        if (isset($result['created_data']) && is_array($result['created_data'])) {
-            $idsToLoad = array_merge($idsToLoad, array_column($result['created_data'], 'id'));
-        }
-
-        // Load TrRiskMonthly dengan relasi createdBy dan updatedBy untuk semua id tersebut
-        $monthlyRecords = TrRiskMonthly::with(['createdBy', 'updatedBy'])->whereIn('id', $idsToLoad)->get()->keyBy('id');
-
-        // Nama pembuat header, fallback jika createdBy monthly gak ada
-        $headerCreatorName = $header->createdBy ? get_decrypted_username($header->createdBy) : 'Unknown User';
-
-        // Format angka pada updated_data
-        if (isset($result['updated_data']) && is_array($result['updated_data'])) {
-            foreach ($result['updated_data'] as &$item) {
-                // Format target_quantitative
-                if (isset($item['target_quantitative'])) {
-                    $item['target_quantitative'] = $item['target_quantitative'] ? number_format((float)$item['target_quantitative'], 0, ',', '.') : '0';
-                }
-
-                // Format data dalam header jika ada
-                if (isset($item['header'])) {
-                    if (isset($item['header']['target_quantitative_satu_tahun'])) {
-                        $item['header']['target_quantitative_satu_tahun'] = $item['header']['target_quantitative_satu_tahun'] ? number_format((float)$item['header']['target_quantitative_satu_tahun'], 0, ',', '.') : '0';
-                    }
-                    if (isset($item['header']['biaya_perlakuan_risiko'])) {
-                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko'] ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.') : '0';
-                    }
-                }
-
-                $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
-
-                $item['uploaded_files'] = $monthlyUploads->count() > 0
-                    ? $monthlyUploads->map(function ($file) {
-                        return [
-                            'id' => $file->id,
-                            'filepath' => clean_string($file->filepath),
-                            'domain' => clean_string($file->domain),
-                        ];
-                    })->values()->toArray()
-                    : [];
-
-                $monthlyModel = $monthlyRecords->get($item['id']);
-
-                if ($monthlyModel) {
-                    if ($monthlyModel->updatedBy) {
-                        $item['updated_by_name'] = get_decrypted_username($monthlyModel->updatedBy);
-                    } elseif ($monthlyModel->createdBy) {
-                        $item['created_by_name'] = get_decrypted_username($monthlyModel->createdBy);
-                    } else {
-                        $item['created_by_name'] = $headerCreatorName;
-                    }
-                } else {
-                    $item['created_by_name'] = $headerCreatorName;
-                }
-            }
-        }
-
-        // Format angka pada created_data
-        if (isset($result['created_data']) && is_array($result['created_data'])) {
-            foreach ($result['created_data'] as &$item) {
-                // Format target_quantitative
-                if (isset($item['target_quantitative'])) {
-                    $item['target_quantitative'] = $item['target_quantitative'] ? number_format((float)$item['target_quantitative'], 0, ',', '.') : '0';
-                }
-
-                // Format data dalam header jika ada
-                if (isset($item['header'])) {
-                    if (isset($item['header']['target_quantitative_satu_tahun'])) {
-                        $item['header']['target_quantitative_satu_tahun'] = $item['header']['target_quantitative_satu_tahun'] ? number_format((float)$item['header']['target_quantitative_satu_tahun'], 0, ',', '.') : '0';
-                    }
-                    if (isset($item['header']['biaya_perlakuan_risiko'])) {
-                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko'] ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.') : '0';
-                    }
-                }
-
-                $monthlyUploads = $header->uploads ? $header->uploads->where('risk_monthly_id', $item['id']) : collect([]);
-
-                $item['uploaded_files'] = $monthlyUploads->count() > 0
-                    ? $monthlyUploads->map(function ($file) {
-                        return [
-                            'filepath' => clean_string($file->filepath),
-                            'domain' => clean_string($file->domain),
-                        ];
-                    })->values()->toArray()
-                    : [];
-
-                $monthlyModel = $monthlyRecords->get($item['id']);
-
-                if ($monthlyModel) {
-                    if ($monthlyModel->updatedBy) {
-                        $item['updated_by_name'] = get_decrypted_username($monthlyModel->updatedBy);
-                    } elseif ($monthlyModel->createdBy) {
-                        $item['created_by_name'] = get_decrypted_username($monthlyModel->createdBy);
-                    } else {
-                        $item['created_by_name'] = $headerCreatorName;
-                    }
-                } else {
-                    $item['created_by_name'] = $headerCreatorName;
-                }
-            }
-        }
-
-        DB::commit();
-
-        $message = "Berhasil memproses {$result['total_processed']} data. ";
-        $message .= "Updated: {$result['updated_count']}, Created: {$result['created_count']}.";
-
-        return json(200, true, 'Berhasil Bulk Update', $message, $result, $warnings);
-
-    } catch (\Throwable $e) {
-        DB::rollBack();
-        return json(500, false, 'Gagal Bulk Update', 'Terjadi kesalahan sistem.', [
-            'header_id' => $headerId,
-            'error' => $e->getMessage()
-        ]);
-    }
-}
 
    public function uploadDocument(Request $request, $monthlyId)
 {

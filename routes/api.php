@@ -25,6 +25,10 @@ use App\Http\Controllers\ExportRiskController;
 use App\Http\Controllers\HeatmapController;
 use App\Http\Controllers\TrRiskHeaderEntryController;
 use App\Http\Controllers\TrRiskMonthlyEntryController;
+use App\Http\Controllers\RiskTimelinePdfController;
+use App\Http\Controllers\MstJabatanController;
+use App\Http\Controllers\MstApprovalController;
+
 // ============================
 //  Auth Routes (tanpa token)
 // ============================
@@ -224,13 +228,36 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/op
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header', [TrRiskHeaderController::class, 'index']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-headers/pending-approval', [TrRiskHeaderController::class, 'getPendingApproval']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-headers/rejected', [TrRiskHeaderController::class, 'getRejectedData']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->patch('/risk-headers/{id}/approve', [TrRiskHeaderController::class, 'approveRiskHeader']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,'])->patch('/risk-headers/{id}/approve', [TrRiskHeaderController::class, 'approveRiskHeader']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->patch('/risk-headers/{id}/reject', [TrRiskHeaderController::class, 'rejectRiskHeader']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->post('/risk-header', [TrRiskHeaderController::class, 'store']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header/{id}', [TrRiskHeaderController::class, 'show']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monitoring', [TrRiskHeaderController::class, 'monitoring']);
+
+// // ===================== RISK HEADER (SCALABLE) =====================
+// Route::middleware(['auth:api'])->group(function () {
+//     // READ operations - semua role bisa
+//     Route::get('/risk-header', [TrRiskHeaderController::class, 'index']);
+//     Route::get('/risk-headers/pending-approval', [TrRiskHeaderController::class, 'getPendingApproval']);
+//     Route::get('/risk-headers/rejected', [TrRiskHeaderController::class, 'getRejectedData']);
+//     Route::get('/risk-header/{id}', [TrRiskHeaderController::class, 'show']);
+//     Route::get('/risk-monitoring', [TrRiskHeaderController::class, 'monitoring']);
+
+//     // CREATE - semua role bisa
+//     Route::post('/risk-header', [TrRiskHeaderController::class, 'store']);
+
+//     // UPDATE - dynamic permission berdasarkan ownership & approval flow
+//     Route::middleware(['dynamic.risk.update'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);
+
+//     // APPROVE/REJECT - menggunakan middleware yang sama
+//     Route::middleware(['dynamic.risk.update'])->patch('/risk-headers/{id}/approve', [TrRiskHeaderController::class, 'approveRiskHeader']);
+//     Route::middleware(['dynamic.risk.update'])->patch('/risk-headers/{id}/reject', [TrRiskHeaderController::class, 'rejectRiskHeader']);
+
+//     // DELETE - hanya superadmin (atau bisa jadi dynamic juga)
+//     Route::middleware([RoleAccessMiddleware::class . ':1'])->delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);
+// });
 
 // ===================== RISK HEADER ENTRY =====================
 // Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-header/{id}/entry', [TrRiskHeaderEntryController::class, 'index']);
@@ -247,9 +274,9 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/r
 
 // ===================== MITIGATION MONTHLY =====================
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/mitigation-monthly', [TrMitigationMonthlyController::class, 'index']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/mitigation-monthly', [TrMitigationMonthlyController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->post('/mitigation-monthly', [TrMitigationMonthlyController::class, 'store']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/mitigation-monthly/{id}', [TrMitigationMonthlyController::class, 'show']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/mitigation-monthly/{id}', [TrMitigationMonthlyController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->put('/mitigation-monthly/{id}', [TrMitigationMonthlyController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/mitigation-monthly/{id}', [TrMitigationMonthlyController::class, 'destroy']);
 
 // ===================== MONTHLY UPLOAD =====================
@@ -263,13 +290,20 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->post('/risk
 // ===================== RISK MONTHLY =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly', [TrRiskMonthlyController::class, 'index']);
+
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/pending-approvals', [TrRiskMonthlyController::class, 'getPendingApprovals']);
+    Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/rejected', [TrRiskMonthlyController::class, 'getRejectedData']);
+
+    // Route dengan parameter {id} ditempatkan setelah route spesifik
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'show']);
     Route::middleware([RoleAccessMiddleware::class . ':1'])->delete('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'destroy']);
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->put('/risk-monthly/{id}/quantitative', [TrRiskMonthlyController::class, 'updateQuantitative']);
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->put('/risk-monthly/{id}/update-residual', [TrRiskMonthlyController::class, 'updateResidual']);
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->put('/risk-monthly/{id}/update-residual-and-finalize', [TrRiskMonthlyController::class, 'updateResidualAndFinalize']);
     Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->post('/risk-monthly/{id}/upload', [TrRiskMonthlyController::class, 'uploadDocument']);
-    // Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'update']);
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}/approve', [TrRiskMonthlyController::class, 'approveRiskMonthly']);
+    Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}/reject', [TrRiskMonthlyController::class, 'rejectRiskMonthly']);
+     // Route::middleware([RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly/{id}', [TrRiskMonthlyController::class, 'update']);
 
     // ===================== ADDITIONAL ENDPOINTS YANG DIPERLUKAN =====================
 
@@ -299,3 +333,25 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/export-risk/{id}/preview', [ExportRiskController::class, 'preview'])
         ->where('id', '[0-9]+');
 });
+// ===================== RISK TIMELINE PDF DOWNLOAD =====================
+Route::middleware([RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-timeline/download-pdf/{headerId}', [RiskTimelinePdfController::class, 'downloadTimelinePdf'])->name('api.risk.timeline.pdf');
+
+// ===================== MST JABATAN ROUTES =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/jabatan', [MstJabatanController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/jabatan/{id}', [MstJabatanController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/jabatan', [MstJabatanController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/jabatan/{id}', [MstJabatanController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/jabatan/{id}', [MstJabatanController::class, 'destroy']);
+
+// ===================== MST APPROVAL ROUTES =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/approval', [MstApprovalController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/approval/{id}', [MstApprovalController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->post('/approval', [MstApprovalController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/approval/{id}', [MstApprovalController::class, 'update']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/approval/{id}', [MstApprovalController::class, 'destroy']);
+
+// Route untuk debug data
+Route::get('/debug-risk-data', [ExportRiskController::class, 'debugRiskData']);
+
+// Route untuk test export
+Route::get('/test-export-risk/{format}', [ExportRiskController::class, 'testExport']);

@@ -13,29 +13,32 @@ use App\Models\MstOption;
 use App\Models\MstRiskCode;
 use App\Models\MstHeatmapDampak;
 use App\Models\MstHeatmapKemungkinan;
+use App\Models\User;
+use App\Models\MstDepartment;
+use App\Models\MstJabatan;
+use App\Models\MstApproval;
 
 class TrRiskHeaderController extends Controller
 {
- public function index(Request $request)
+
+public function index(Request $request)
 {
-     $user = auth()->user();
+    $user = auth()->user();
 
     $perPage = $request->input('per_page', 10);
 
     $query = TrRiskHeader::with([
-        'riskCode:id,name',
         'irDampak:id,label',
         'irKemungkinan:id,label',
         'rrDampak:id,label',
         'rrKemungkinan:id,label',
         'department:id,name',
-        'optionTargetSatuTahun:id,name,position',
+        'optionTargetSatuTahun:id,name,position,type',
         'uploads',
         'monthlyData' => function ($query) {
             $query->orderBy('month', 'asc')->with('uploads');
         },
         'headerEntry.monthlyEntryData.uploads',
-        'headerEntry.riskCode:id,name',
         'headerEntry.irDampak:id,label',
         'headerEntry.irKemungkinan:id,label',
         'headerEntry.rrDampak:id,label',
@@ -45,11 +48,12 @@ class TrRiskHeaderController extends Controller
         'createdBy:id,username,id',
         'updatedBy:id,username,id',
     ])
-
-    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
-    // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
-    $query->where('department_id', $user->department_id);
-})
+    // Filter hanya data yang sudah di-approve
+    ->where('status', 'approved')
+    // ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+    //     // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+    //     $query->where('department_id', $user->department_id);
+    // })
     ->when($request->peristiwa, function ($query) use ($request) {
         $query->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
     })
@@ -78,8 +82,9 @@ class TrRiskHeaderController extends Controller
             $dataBulanan = $item->monthlyData->firstWhere('month', $i);
 
             if ($dataBulanan) {
-                $target = $dataBulanan->target_quantitative ?? 0;
-                $realization = $dataBulanan->realization_quantitative ?? 0;
+                // Safe numeric conversion untuk perhitungan
+                $target = is_numeric($dataBulanan->target_quantitative) ? (float)$dataBulanan->target_quantitative : 0;
+                $realization = is_numeric($dataBulanan->realization_quantitative) ? (float)$dataBulanan->realization_quantitative : 0;
                 $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
 
                 $monthlyDataMap[$i] = $dataBulanan;
@@ -126,8 +131,9 @@ class TrRiskHeaderController extends Controller
             for ($i = 1; $i <= 12; $i++) {
                 $monthlyEntry = $entry->monthlyEntryData->firstWhere('month', $i);
                 if ($monthlyEntry) {
-                    $target = $monthlyEntry->target_quantitative ?? 0;
-                    $realization = $monthlyEntry->realization_quantitative ?? 0;
+                    // Safe numeric conversion untuk perhitungan
+                    $target = is_numeric($monthlyEntry->target_quantitative) ? (float)$monthlyEntry->target_quantitative : 0;
+                    $realization = is_numeric($monthlyEntry->realization_quantitative) ? (float)$monthlyEntry->realization_quantitative : 0;
                     $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
 
                     $monthlyEntries[] = [
@@ -172,9 +178,27 @@ class TrRiskHeaderController extends Controller
             return $entryArray;
         });
 
+        // Handle risk_code - sekarang berupa string yang dipisahkan koma
+        $riskCodes = [];
+        if (!empty($item->risk_code)) {
+            $riskCodeIds = explode(',', $item->risk_code);
+            $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
+                ->get(['id', 'name'])
+                ->map(function ($riskCode) {
+                    return [
+                        'id' => $riskCode->id,
+                        'name' => clean_string($riskCode->name)
+                    ];
+                })
+                ->toArray();
+        }
+
+        // Safe numeric conversion untuk biaya_perlakuan_risiko
+        $biayaPerlakuan = is_numeric($item->biaya_perlakuan_risiko) ? $item->biaya_perlakuan_risiko : 0;
+
         return [
             'id' => $item->id,
-            'risk_code' => $item->riskCode ?? null,
+            'risk_code' => $riskCodes, // Sekarang berupa array dari multiple risk codes
             'process_code' => $item->process_code ?? '',
             'jenis_risiko' => $item->jenis_risiko ?? '',
             'sasaran' => $item->sasaran ?? '',
@@ -192,9 +216,10 @@ class TrRiskHeaderController extends Controller
             'target_satu_tahun_option_name' => $item->optionTargetSatuTahun->name ?? '',
             'target_satu_tahun_notes' => $item->target_satu_tahun_notes ?? '',
             'target_satu_tahun_position' => $item->optionTargetSatuTahun->position ?? 0,
-            'target_quantitative_satu_tahun' => number_format($item->target_quantitative_satu_tahun, 0, ',', '.'),
+            "target_satu_tahun_type" => $item->optionTargetSatuTahun->type ?? null,
+            'target_quantitative_satu_tahun' => format_target_quantitative($item->target_quantitative_satu_tahun),
 
-            'biaya_perlakuan_risiko' => number_format($item->biaya_perlakuan_risiko, 0, ',', '.'),
+            'biaya_perlakuan_risiko' => number_format($biayaPerlakuan, 0, ',', '.'),
             'residual_target_level_dampak' => $item->residual_target_level_dampak ?? 0,
             'residual_target_level_kemungkinan' => $item->residual_target_level_kemungkinan ?? 0,
             'residual_target_posisi_risiko' => $item->residual_target_posisi_risiko ?? '',
@@ -218,8 +243,9 @@ class TrRiskHeaderController extends Controller
             'department' => $item->department ?? null,
 
             'monthly_data' => $item->monthlyData->map(function ($dataBulanan) {
-                $target = $dataBulanan->target_quantitative ?? 0;
-                $realization = $dataBulanan->realization_quantitative ?? 0;
+                // Safe numeric conversion untuk perhitungan
+                $target = is_numeric($dataBulanan->target_quantitative) ? (float)$dataBulanan->target_quantitative : 0;
+                $realization = is_numeric($dataBulanan->realization_quantitative) ? (float)$dataBulanan->realization_quantitative : 0;
                 $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
 
                 return [
@@ -231,9 +257,10 @@ class TrRiskHeaderController extends Controller
                     'process_code' => $dataBulanan->process_code,
                     'start_date' => $dataBulanan->start_date ? $dataBulanan->start_date->format('Y-m-d H:i:s') : null,
                     'expired_date' => $dataBulanan->expired_date ? $dataBulanan->expired_date->format('Y-m-d H:i:s') : null,
-                    'realization_quantitative' => $realization,
+                    // Return original value untuk display
+                    'realization_quantitative' => $dataBulanan->realization_quantitative,
                     'realization_note' => $dataBulanan->realization_note,
-                    'target_quantitative' => $target,
+                    'target_quantitative' => $dataBulanan->target_quantitative,
                     'target_notes' => $dataBulanan->target_notes,
                     'residual_risk_level_dampak' => $dataBulanan->residual_risk_level_dampak,
                     'residual_risk_level_kemungkinan' => $dataBulanan->residual_risk_level_kemungkinan,
@@ -275,25 +302,27 @@ class TrRiskHeaderController extends Controller
     return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $cleanData);
 }
 
- public function show($id)
+public function show($id)
 {
     $data = TrRiskHeader::with([
-        'riskCode:id,name',
         'irDampak:id,label',
         'irKemungkinan:id,label',
         'rrDampak:id,label',
         'rrKemungkinan:id,label',
         'department:id,name',
-        'optionTargetSatuTahun:id,name,position',
+        'optionTargetSatuTahun:id,name,position,type',
         'createdBy',
         'updatedBy',
         'monthlyData' => function($query) {
             $query->orderBy('month', 'asc')->with(['uploads', 'createdBy', 'updatedBy']);
         }
-    ])->find($id);
+    ])
+    // Filter hanya data yang sudah di-approve
+    ->where('status', 'approved')
+    ->find($id);
 
     if (!$data) {
-        return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan atau belum disetujui.', null);
     }
 
     $inherentColor = get_color_by_position($data->inherent_risk_posisi_risiko);
@@ -398,10 +427,25 @@ class TrRiskHeaderController extends Controller
         }
     }
 
+    // Handle risk_code - sekarang berupa string yang dipisahkan koma
+    $riskCodes = [];
+    if (!empty($data->risk_code)) {
+        $riskCodeIds = explode(',', $data->risk_code);
+        $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
+            ->get(['id', 'name'])
+            ->map(function ($riskCode) {
+                return [
+                    'id' => $riskCode->id,
+                    'name' => clean_string($riskCode->name)
+                ];
+            })
+            ->toArray();
+    }
+
     // Siapkan data utama
     $orderedData = [
         'id' => $data->id,
-        'risk_code' => $data->riskCode ?? null,
+        'risk_code' => $riskCodes, // Sekarang berupa array dari multiple risk codes
         'process_code' => $data->process_code ?? '',
         'jenis_risiko' => $data->jenis_risiko ?? '',
         'sasaran' => $data->sasaran ?? '',
@@ -420,7 +464,9 @@ class TrRiskHeaderController extends Controller
         'target_satu_tahun_option_name' => $data->optionTargetSatuTahun->name ?? '',
         'target_satu_tahun_notes' => $data->target_satu_tahun_notes ?? '',
         'target_satu_tahun_position' => $data->optionTargetSatuTahun->position ?? 0,
-        'target_quantitative_satu_tahun' => number_format($data->target_quantitative_satu_tahun, 0, ',', '.'),
+        "target_satu_tahun_type" => $data->optionTargetSatuTahun->type ?? '',
+        // 'target_quantitative_satu_tahun' => number_format($data->target_quantitative_satu_tahun, 0, ',', '.'),
+        'target_quantitative_satu_tahun' => format_target_quantitative($data->target_quantitative_satu_tahun),
 
         'biaya_perlakuan_risiko' => number_format($data->biaya_perlakuan_risiko, 0, ',', '.'),
         'residual_target_level_dampak' => $data->residual_target_level_dampak ?? 0,
@@ -455,9 +501,73 @@ class TrRiskHeaderController extends Controller
 
 public function store(Request $request)
 {
+    // ============================================
+    // VALIDASI WAJIB: HANYA BOLEH 11 FIELD DASAR
+    // ============================================
+
+    $allowedFields = [
+        'department_id',
+        'risk_code',
+        'jenis_risiko',
+        'sasaran',
+        'peristiwa_risiko',
+        'penyebab_risiko',
+        'dampak_risiko',
+        'inherent_risk_level_dampak',
+        'inherent_risk_level_kemungkinan',
+        'residual_target_level_dampak',
+        'residual_target_level_kemungkinan'
+    ];
+
+    $forbiddenFields = [
+        'internal_control',
+        'mitigasi',
+        'year',
+        'target_quantitative_satu_tahun',
+        'target_satu_tahun_option',
+        'target_satu_tahun_notes',
+        'biaya_perlakuan_risiko'
+    ];
+
+    // CEK SETIAP FORBIDDEN FIELD
+    $violations = [];
+    foreach ($forbiddenFields as $field) {
+        $value = $request->input($field);
+
+        // Jika ada value apapun (selain null), langsung tolak
+        if ($value !== null) {
+            $violations[] = [
+                'field' => $field,
+                'value' => $value,
+                'type' => gettype($value)
+            ];
+        }
+    }
+
+    // JIKA ADA PELANGGARAN, LANGSUNG EXIT
+    if (!empty($violations)) {
+        return response()->json([
+            'code' => 404,
+            'status' => false,
+            'title' => 'AKSES DITOLAK',
+            'message' => 'MAAF! Anda hanya diizinkan mengisi 11 field dasar saja. 7 field tambahan hanya bisa diisi setelah data 11 field disetujui.',
+            'data' => [
+                'violations' => $violations,
+                'allowed_fields' => $allowedFields,
+                'forbidden_fields' => $forbiddenFields,
+                'instruction' => 'Hapus semua field yang tidak diizinkan dari request Anda.'
+            ]
+        ], 404);
+    }
+
+    // ============================================
+    // LANJUT KE VALIDASI NORMAL
+    // ============================================
+
     $validator = Validator::make($request->all(), [
-        'risk_code' => 'required|exists:mst_risk_code,id',
-        // 'process_code' => 'required|integer',
+        // 11 field wajib untuk penyimpanan awal
+        'risk_code' => 'required|array',
+        'risk_code.*' => 'exists:mst_risk_code,id',
         'jenis_risiko' => 'required|string',
         'sasaran' => 'required|string',
         'peristiwa_risiko' => 'required|string',
@@ -467,13 +577,7 @@ public function store(Request $request)
         'inherent_risk_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
         'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
         'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
-        'internal_control' => 'required|string',
-        'target_satu_tahun_option' => 'nullable|exists:mst_option,id',
-        'target_satu_tahun_notes' => 'nullable|string',
-        'target_quantitative_satu_tahun' => 'nullable|numeric',
-        'biaya_perlakuan_risiko' => 'nullable|numeric',
         'department_id' => 'required|exists:mst_department,id',
-        'year' => 'required|integer',
     ]);
 
     if ($validator->fails()) {
@@ -483,18 +587,38 @@ public function store(Request $request)
     try {
         DB::beginTransaction();
 
-        $data = $request->all();
-        $data['created_by'] = auth()->id();
-
-        if (!empty($data['target_satu_tahun_option'])) {
-            $option = MstOption::find($data['target_satu_tahun_option']);
-            if ($option) {
-                $data['target_satu_tahun_position'] = $option->position;
-            } else {
-                $data['target_satu_tahun_position'] = null;
+        // HANYA AMBIL DATA YANG DIIZINKAN
+        $data = [];
+        foreach ($allowedFields as $field) {
+            if ($request->has($field)) {
+                $data[$field] = $request->input($field);
             }
+        }
+
+        $data['created_by'] = auth()->id();
+        $data['created_by_role'] = auth()->user()->role_id;
+
+        // ============================================
+        // SET DEPARTMENT SESUAI ROLE
+        // ============================================
+
+        $currentUser = auth()->user();
+
+        // Superadmin (role 1) boleh pilih departemen dari request
+        if ($currentUser->role_id == 1) {
+            $data['department_id'] = $request->input('department_id');
         } else {
-            $data['target_satu_tahun_position'] = null;
+            // Role lain (2, 3, dst) selalu pakai department_id user
+            $data['department_id'] = $currentUser->department_id;
+        }
+
+        // Status selalu pending untuk 11 field
+        $data['status'] = 'pending';
+        $data['is_complete'] = false;
+
+
+        if (!empty($data['risk_code']) && is_array($data['risk_code'])) {
+            $data['risk_code'] = implode(',', $data['risk_code']);
         }
 
         $irHeatmap = MstHeatmap::with('riskRange')
@@ -522,23 +646,38 @@ public function store(Request $request)
         $data['residual_target_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
 
         $riskHeader = TrRiskHeader::create($data);
-        generate_monthly_data($riskHeader);
+
+        // Selalu buat approval entry untuk 11 field
+        $currentUser = auth()->user();
+        $jabatanId = null;
+
+        if ($currentUser->jabatan_id) {
+            $jabatanId = $currentUser->jabatan_id;
+        } else {
+            $jabatan = MstJabatan::where('department_id', $data['department_id'])->first();
+            $jabatanId = $jabatan ? $jabatan->id : null;
+        }
+
+        \App\Models\MstApproval::create([
+            'document_id' => $riskHeader->id,
+            'tahun' => date('Y'),
+            'posisi' => 1,
+            'jabatan_id' => $jabatanId,
+            'status' => 'pending',
+            'tanggal' => null,
+            'note' => null
+        ]);
 
         DB::commit();
 
         // Load relasi yang diperlukan
         $riskHeader->load([
-            'riskCode:id,name',
             'irDampak:id,label',
             'irKemungkinan:id,label',
             'rrDampak:id,label',
             'rrKemungkinan:id,label',
             'department:id,name',
-            'optionTargetSatuTahun:id,name,position',
             'createdBy:id,username',
-            'monthlyData' => function ($query) {
-                $query->orderBy('month', 'asc');
-            }
         ]);
 
         $createdByName = 'Unknown User';
@@ -550,7 +689,7 @@ public function store(Request $request)
 
         $responseData = [
             'id' => $riskHeader->id,
-            'risk_code' => $riskHeader->risk_code,
+            'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
             'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
             'sasaran' => clean_string($riskHeader->sasaran),
             'peristiwa_risiko' => clean_string($riskHeader->peristiwa_risiko),
@@ -560,99 +699,40 @@ public function store(Request $request)
             'inherent_risk_level_kemungkinan' => $riskHeader->inherent_risk_level_kemungkinan,
             'residual_target_level_dampak' => $riskHeader->residual_target_level_dampak,
             'residual_target_level_kemungkinan' => $riskHeader->residual_target_level_kemungkinan,
-            'internal_control' => clean_string($riskHeader->internal_control),
-            'target_satu_tahun_option' => $riskHeader->target_satu_tahun_option,
-            'target_satu_tahun_notes' => clean_string($riskHeader->target_satu_tahun_notes),
-            'target_quantitative_satu_tahun' => number_format($riskHeader->target_quantitative_satu_tahun, 0, ',', '.'),
-            'biaya_perlakuan_risiko' => number_format($riskHeader->biaya_perlakuan_risiko, 0, ',', '.'),
             'department_id' => $riskHeader->department_id,
-            'year' => $riskHeader->year,
-            'target_satu_tahun_position' => clean_string($riskHeader->target_satu_tahun_position),
             'inherent_risk_posisi_risiko' => $riskHeader->inherent_risk_posisi_risiko,
             'inherent_risk_level_risiko' => clean_string($riskHeader->inherent_risk_level_risiko),
             'residual_target_posisi_risiko' => $riskHeader->residual_target_posisi_risiko,
             'residual_target_level_risiko' => clean_string($riskHeader->residual_target_level_risiko),
             'process_code' => $riskHeader->process_code ?? null,
+            'status' => $riskHeader->status,
+            'is_complete' => $riskHeader->is_complete ?? false,
             'updated_at' => $riskHeader->updated_at,
             'created_at' => $riskHeader->created_at,
             'created_by' => $riskHeader->created_by,
             'created_by_name' => $createdByName,
+
+            // 7 field tambahan selalu NULL di response store
+            'internal_control' => null,
+            'mitigasi' => null,
+            'target_satu_tahun_option' => null,
+            'target_satu_tahun_notes' => null,
+            'target_satu_tahun_type' => null,
+            'target_quantitative_satu_tahun' => null,
+            'biaya_perlakuan_risiko' => null,
+            'year' => null,
+            'target_satu_tahun_position' => null,
+            'approval_notes' => null,
+            'approved_by' => null,
+            'approved_at' => null,
         ];
 
-        $responseData['risk_code'] = $riskHeader->riskCode ? [
-            'id' => $riskHeader->riskCode->id,
-            'name' => clean_string($riskHeader->riskCode->name)
-        ] : null;
+        // Tambahkan relasi
+        $this->addRelationsToResponse($riskHeader, $responseData);
 
-        $responseData['ir_dampak'] = $riskHeader->irDampak ? [
-            'id' => $riskHeader->irDampak->id,
-            'label' => clean_string($riskHeader->irDampak->label)
-        ] : null;
+        $message = 'Risk header (11 field dasar) berhasil disimpan dan menunggu persetujuan. Setelah disetujui, 11 field akan terkunci dan Anda dapat melengkapi 7 field sisanya melalui proses update.';
 
-        $responseData['ir_kemungkinan'] = $riskHeader->irKemungkinan ? [
-            'id' => $riskHeader->irKemungkinan->id,
-            'label' => clean_string($riskHeader->irKemungkinan->label)
-        ] : null;
-
-        $responseData['rr_dampak'] = $riskHeader->rrDampak ? [
-            'id' => $riskHeader->rrDampak->id,
-            'label' => clean_string($riskHeader->rrDampak->label)
-        ] : null;
-
-        $responseData['rr_kemungkinan'] = $riskHeader->rrKemungkinan ? [
-            'id' => $riskHeader->rrKemungkinan->id,
-            'label' => clean_string($riskHeader->rrKemungkinan->label)
-        ] : null;
-
-        $responseData['department'] = $riskHeader->department ? [
-            'id' => $riskHeader->department->id,
-            'name' => clean_string($riskHeader->department->name)
-        ] : null;
-
-        $responseData['option_target_satu_tahun'] = $riskHeader->optionTargetSatuTahun ? [
-            'id' => $riskHeader->optionTargetSatuTahun->id,
-            'name' => clean_string($riskHeader->optionTargetSatuTahun->name),
-            'position' => clean_string($riskHeader->optionTargetSatuTahun->position)
-        ] : null;
-
-        // Tambahkan target_satu_tahun_option_name jika ada
-        if ($riskHeader->optionTargetSatuTahun) {
-            $responseData['target_satu_tahun_option_name'] = clean_string($riskHeader->optionTargetSatuTahun->name);
-        }
-
-        $monthlyData = [];
-        if ($riskHeader->monthlyData) {
-            foreach ($riskHeader->monthlyData as $monthly) {
-                $monthlyArray = $monthly->toArray();
-                foreach ($monthlyArray as $key => $value) {
-                    if (is_string($value)) {
-                        $monthlyArray[$key] = clean_string($value);
-                    }
-                }
-                $monthlyData[] = $monthlyArray;
-            }
-        }
-        $responseData['monthly_data'] = $monthlyData;
-
-        // Test JSON encode sebelum return
-        $jsonTest = json_encode($responseData, JSON_UNESCAPED_UNICODE);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            \Log::error('JSON encode error: ' . json_last_error_msg());
-            \Log::error('Problematic data: ', $responseData);
-
-            return json(200, true, 'Berhasil Disimpan', 'Risk header berhasil disimpan.', [
-                'id' => $riskHeader->id,
-                'created_by' => $riskHeader->created_by,
-                'created_by_name' => 'Unknown User',
-                'year' => $riskHeader->year,
-                'department_id' => $riskHeader->department_id,
-                'risk_code' => $riskHeader->risk_code,
-                'created_at' => $riskHeader->created_at,
-                'updated_at' => $riskHeader->updated_at,
-            ]);
-        }
-
-        return json(200, true, 'Berhasil Disimpan', 'Risk header berhasil disimpan.', $responseData);
+        return json(200, true, 'Berhasil Disimpan', $message, $responseData);
 
     } catch (\Exception $e) {
         DB::rollBack();
@@ -662,24 +742,228 @@ public function store(Request $request)
 
 public function update(Request $request, $id)
 {
-    $data = TrRiskHeader::find($id);
+    $riskHeader = TrRiskHeader::find($id);
 
-    if (!$data) {
-        return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
+    if (!$riskHeader) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
     }
 
-    // Check if any monthly data is finalized
-    $finalizedMonthly = TrRiskMonthly::where('header_id', $id)
-        ->where('is_finalize', true)
-        ->exists();
+    // Cek apakah data sudah complete dan approved (tidak bisa diubah sama sekali)
+    // Jika status approved dan semua 7 field tambahan sudah terisi, maka data sudah final
+    $isDataComplete = $riskHeader->status === 'approved' &&
+                     !empty($riskHeader->internal_control) &&
+                     !empty($riskHeader->mitigasi) &&
+                     !empty($riskHeader->year) &&
+                     !empty($riskHeader->target_quantitative_satu_tahun) &&
+                     !empty($riskHeader->target_satu_tahun_option) &&
+                     !empty($riskHeader->target_satu_tahun_notes) &&
+                     !empty($riskHeader->biaya_perlakuan_risiko);
 
-    if ($finalizedMonthly) {
-        return json(400, false, 'Data Tidak Dapat Diubah', 'Terdapat data monthly yang sudah difinalisasi. Header tidak dapat diubah.', null);
+    if ($isDataComplete) {
+        return json(404, false, 'Akses Ditolak', 'Semua data sudah terisi dan di-approve, tidak bisa dirubah lagi.', null);
     }
 
+    // ============================================
+    // TENTUKAN SKENARIO UPDATE BERDASARKAN STATUS
+    // ============================================
+
+    $currentStatus = $riskHeader->status;
+    $isComplete = $riskHeader->is_complete ?? false;
+
+    // Skenario 1: 11 field sudah di-approve, hanya boleh isi 7 field tambahan
+    if ($currentStatus === 'approved' && !$isComplete) {
+        return $this->handleApprovedPartialUpdate($request, $riskHeader);
+    }
+
+    // Skenario 2: 11 field di-reject, hanya boleh update 11 field (7 field harus kosong)
+    if ($currentStatus === 'rejected') {
+        return $this->handleRejectedUpdate($request, $riskHeader);
+    }
+
+    // Skenario 3: Status pending, boleh update 11 field
+    if ($currentStatus === 'pending') {
+        return $this->handlePendingUpdate($request, $riskHeader);
+    }
+
+    return json(400, false, 'Status Tidak Valid', 'Status data tidak memungkinkan untuk diupdate.', null);
+}
+
+private function handleApprovedPartialUpdate(Request $request, $riskHeader)
+{
+    // 11 field sudah approved, HANYA BOLEH ISI 7 FIELD TAMBAHAN
+    $allowedFields = [
+        'internal_control',
+        'mitigasi',
+        'year',
+        'target_quantitative_satu_tahun',
+        'target_satu_tahun_option',
+        'target_satu_tahun_notes',
+        'biaya_perlakuan_risiko'
+    ];
+
+    $forbiddenFields = [
+        'risk_code', 'jenis_risiko', 'sasaran', 'peristiwa_risiko', 'penyebab_risiko',
+        'dampak_risiko', 'inherent_risk_level_dampak', 'inherent_risk_level_kemungkinan',
+        'residual_target_level_dampak', 'residual_target_level_kemungkinan', 'department_id'
+    ];
+
+    // CEK SETIAP FORBIDDEN FIELD (sama seperti di store)
+    $violations = [];
+    foreach ($forbiddenFields as $field) {
+        $value = $request->input($field);
+
+        // Jika ada value apapun (selain null), langsung tolak
+        if ($value !== null) {
+            $violations[] = [
+                'field' => $field,
+                'value' => $value,
+                'type' => gettype($value)
+            ];
+        }
+    }
+
+    // JIKA ADA PELANGGARAN, LANGSUNG EXIT (sama seperti di store)
+    if (!empty($violations)) {
+        return response()->json([
+            'code' => 404,
+            'status' => false,
+            'title' => 'AKSES DITOLAK',
+            'message' => '11 field dasar sudah disetujui dan tidak dapat diubah. Anda hanya boleh mengisi 7 field tambahan.',
+            'data' => [
+                'violations' => $violations,
+                'allowed_fields' => $allowedFields,
+                'forbidden_fields' => $forbiddenFields,
+                'instruction' => 'Hapus semua field yang tidak diizinkan dari request Anda.'
+            ]
+        ], 404);
+    }
+
+    // Validasi 7 field tambahan (wajib diisi)
     $validator = Validator::make($request->all(), [
-        'risk_code' => 'required|exists:mst_risk_code,id',
-        // 'process_code' => 'required|integer',
+        'internal_control' => 'required|string',
+        'mitigasi' => 'required|string',
+        'target_satu_tahun_option' => 'required|exists:mst_option,id',
+        'target_satu_tahun_notes' => 'required|string',
+        'target_quantitative_satu_tahun' => 'required|string|max:500',
+        'biaya_perlakuan_risiko' => 'required|numeric',
+        'year' => 'required|integer',
+    ]);
+
+    if ($validator->fails()) {
+        return json(400, false, 'Validasi Gagal', 'Semua 7 field tambahan wajib diisi.', $validator->errors());
+    }
+
+    try {
+        DB::beginTransaction();
+
+        // HANYA AMBIL DATA YANG DIIZINKAN (sama seperti di store)
+        $updateData = [];
+        foreach ($allowedFields as $field) {
+            if ($request->has($field)) {
+                $updateData[$field] = $request->input($field);
+            }
+        }
+
+        // Set status menjadi approved dan complete setelah 7 field diisi
+        $updateData['status'] = 'approved';
+        $updateData['is_complete'] = true;
+        $updateData['approved_by'] = auth()->id();
+        $updateData['approved_at'] = now();
+
+        // Handle target_satu_tahun_position
+        if (!empty($updateData['target_satu_tahun_option'])) {
+            $option = MstOption::find($updateData['target_satu_tahun_option']);
+            $updateData['target_satu_tahun_position'] = $option ? $option->position : null;
+        }
+
+        $riskHeader->update($updateData);
+
+        // Generate monthly data karena sekarang sudah lengkap
+        generate_monthly_data($riskHeader);
+
+        // Update created_by untuk monthly data
+        TrRiskMonthly::where('header_id', $riskHeader->id)
+            ->whereNull('created_by')
+            ->update([
+                'created_by' => $riskHeader->created_by,
+                'updated_by' => auth()->id()
+            ]);
+
+        DB::commit();
+
+        $riskHeader->refresh();
+        $responseData = $this->buildResponse($riskHeader);
+
+        return json(200, true, 'Berhasil Dilengkapi', 'Risk header berhasil dilengkapi dengan 7 field tambahan. Data sekarang sudah final dan tidak dapat diubah lagi.', $responseData);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+private function handleRejectedUpdate(Request $request, $riskHeader)
+{
+    // Data di-reject, HANYA BOLEH UPDATE 11 FIELD, 7 FIELD HARUS KOSONG
+    $allowedFields = [
+        'department_id',
+        'risk_code',
+        'jenis_risiko',
+        'sasaran',
+        'peristiwa_risiko',
+        'penyebab_risiko',
+        'dampak_risiko',
+        'inherent_risk_level_dampak',
+        'inherent_risk_level_kemungkinan',
+        'residual_target_level_dampak',
+        'residual_target_level_kemungkinan'
+    ];
+
+    $forbiddenFields = [
+        'internal_control',
+        'mitigasi',
+        'year',
+        'target_quantitative_satu_tahun',
+        'target_satu_tahun_option',
+        'target_satu_tahun_notes',
+        'biaya_perlakuan_risiko'
+    ];
+
+    // CEK SETIAP FORBIDDEN FIELD (sama seperti di store)
+    $violations = [];
+    foreach ($forbiddenFields as $field) {
+        $value = $request->input($field);
+
+        // Jika ada value apapun (selain null), langsung tolak
+        if ($value !== null) {
+            $violations[] = [
+                'field' => $field,
+                'value' => $value,
+                'type' => gettype($value)
+            ];
+        }
+    }
+
+    // JIKA ADA PELANGGARAN, LANGSUNG EXIT (sama seperti di store)
+    if (!empty($violations)) {
+        return response()->json([
+            'code' => 404,
+            'status' => false,
+            'title' => 'AKSES DITOLAK',
+            'message' => 'Data ditolak. Anda hanya boleh memperbaiki 11 field dasar saja. 7 field tambahan tidak boleh diisi.',
+            'data' => [
+                'violations' => $violations,
+                'allowed_fields' => $allowedFields,
+                'forbidden_fields' => $forbiddenFields,
+                'instruction' => 'Hapus semua field yang tidak diizinkan dari request Anda.'
+            ]
+        ], 404);
+    }
+
+    // Validasi 11 field dasar
+    $validator = Validator::make($request->all(), [
+        'risk_code' => 'required|array',
+        'risk_code.*' => 'exists:mst_risk_code,id',
         'jenis_risiko' => 'required|string',
         'sasaran' => 'required|string',
         'peristiwa_risiko' => 'required|string',
@@ -689,246 +973,368 @@ public function update(Request $request, $id)
         'inherent_risk_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
         'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
         'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
-        'internal_control' => 'required|string',
-        'target_satu_tahun_option' => 'nullable|exists:mst_option,id',
-        'target_satu_tahun_notes' => 'nullable|string',
-        'target_quantitative_satu_tahun' => 'nullable|numeric',
-        'biaya_perlakuan_risiko' => 'nullable|numeric',
         'department_id' => 'required|exists:mst_department,id',
-        'year' => 'required|integer',
     ]);
 
     if ($validator->fails()) {
-        return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        return json(400, false, 'Validasi Gagal', 'Validasi 11 field dasar gagal.', $validator->errors());
     }
 
     try {
         DB::beginTransaction();
-        $updateData = $request->all();
-        $updateData['updated_by'] = auth()->id();
 
-        // Auto-fill position from mst_option if target_satu_tahun_option is provided
-        if (!empty($updateData['target_satu_tahun_option'])) {
-            $option = MstOption::find($updateData['target_satu_tahun_option']);
-            if ($option) {
-                $updateData['target_satu_tahun_position'] = $option->position;
+        // HANYA AMBIL DATA YANG DIIZINKAN (sama seperti di store)
+        $updateData = [];
+        foreach ($allowedFields as $field) {
+            if ($request->has($field)) {
+                $updateData[$field] = $request->input($field);
             }
+        }
+
+        $updateData['created_by'] = auth()->id();
+        $updateData['created_by_role'] = auth()->user()->role_id;
+
+        // PAKSA kosongkan 7 field tambahan
+        $updateData['internal_control'] = null;
+        $updateData['mitigasi'] = null;
+        $updateData['year'] = null;
+        $updateData['target_quantitative_satu_tahun'] = null;
+        $updateData['target_satu_tahun_option'] = null;
+        $updateData['target_satu_tahun_notes'] = null;
+        $updateData['biaya_perlakuan_risiko'] = null;
+        $updateData['target_satu_tahun_position'] = null;
+
+        // Set status kembali ke pending
+        $updateData['status'] = 'pending';
+        $updateData['is_complete'] = false;
+        $updateData['approval_notes'] = null;
+
+        // Handle risk_code (sama seperti di store)
+        if (!empty($updateData['risk_code']) && is_array($updateData['risk_code'])) {
+            $updateData['risk_code'] = implode(',', $updateData['risk_code']);
+        }
+
+        // Update heatmap calculations (sama seperti di store)
+        $irHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $updateData['inherent_risk_level_dampak'])
+            ->where('kemungkinan', $updateData['inherent_risk_level_kemungkinan'])
+            ->first();
+
+        if (!$irHeatmap) {
+            return json(400, false, 'IR Tidak Ditemukan', 'Kombinasi IR tidak ditemukan.', null);
+        }
+
+        $updateData['inherent_risk_posisi_risiko'] = $irHeatmap->result;
+        $updateData['inherent_risk_level_risiko'] = $irHeatmap->riskRange->name ?? null;
+
+        $rrHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $updateData['residual_target_level_dampak'])
+            ->where('kemungkinan', $updateData['residual_target_level_kemungkinan'])
+            ->first();
+
+        if (!$rrHeatmap) {
+            return json(400, false, 'RR Tidak Ditemukan', 'Kombinasi RR tidak ditemukan.', null);
+        }
+
+        $updateData['residual_target_posisi_risiko'] = $rrHeatmap->result;
+        $updateData['residual_target_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
+
+        $riskHeader->update($updateData);
+
+        // Update approval entry (sama seperti di store)
+        $currentUser = auth()->user();
+        $jabatanId = null;
+
+        if ($currentUser->jabatan_id) {
+            $jabatanId = $currentUser->jabatan_id;
         } else {
-            $updateData['target_satu_tahun_position'] = null;
+            $jabatan = MstJabatan::where('department_id', $updateData['department_id'])->first();
+            $jabatanId = $jabatan ? $jabatan->id : null;
         }
 
-        if ($request->inherent_risk_level_dampak != $data->inherent_risk_level_dampak ||
-            $request->inherent_risk_level_kemungkinan != $data->inherent_risk_level_kemungkinan) {
-
-            $irHeatmap = MstHeatmap::with('riskRange')
-                ->where('dampak', $updateData['inherent_risk_level_dampak'])
-                ->where('kemungkinan', $updateData['inherent_risk_level_kemungkinan'])
-                ->first();
-
-            if (!$irHeatmap) {
-                return json(400, false, 'IR Tidak Ditemukan', 'Kombinasi IR tidak ditemukan.', null);
-            }
-
-            $updateData['inherent_risk_posisi_risiko'] = $irHeatmap->result;
-            $updateData['inherent_risk_level_risiko'] = $irHeatmap->riskRange->name ?? null;
-        }
-
-        if ($request->residual_target_level_dampak != $data->residual_target_level_dampak ||
-            $request->residual_target_level_kemungkinan != $data->residual_target_level_kemungkinan) {
-
-            $rrHeatmap = MstHeatmap::with('riskRange')
-                ->where('dampak', $updateData['residual_target_level_dampak'])
-                ->where('kemungkinan', $updateData['residual_target_level_kemungkinan'])
-                ->first();
-
-            if (!$rrHeatmap) {
-                return json(400, false, 'RR Tidak Ditemukan', 'Kombinasi RR tidak ditemukan.', null);
-            }
-
-            $updateData['residual_target_posisi_risiko'] = $rrHeatmap->result;
-            $updateData['residual_target_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
-
-            TrRiskMonthly::where('header_id', $id)
-                ->where('is_finalize', false)
-                ->update([
-                    'rr_level_dampak' => $updateData['residual_target_level_dampak'],
-                    'rr_level_kemungkinan' => $updateData['residual_target_level_kemungkinan'],
-                    'rr_posisi_risiko' => $updateData['residual_target_posisi_risiko'],
-                    'rr_level_risiko' => $updateData['residual_target_level_risiko'],
-                ]);
-        }
-
-        $data->update($updateData);
-        DB::commit();
-
-        // Load relasi dengan nama yang tepat
-        $data->load([
-            'riskCode:id,name',
-            'irDampak:id,label',
-            'irKemungkinan:id,label',
-            'rrDampak:id,label',
-            'rrKemungkinan:id,label',
-            'department:id,name',
-            'optionTargetSatuTahun:id,name,position',
-            'createdBy:id,username',
-            'monthlyData' => function($query) {
-                $query->orderBy('month', 'asc');
-            }
-        ]);
-
-        // Gunakan helper get_decrypted_username dan clean_string
-        $createdByName = 'Unknown User';
-        try {
-            $createdByName = get_decrypted_username($data->createdBy);
-        } catch (\Throwable $e) {
-            \Log::warning("Error handling createdBy: {$e->getMessage()}");
-        }
-
-        // Buat response array dengan struktur yang diinginkan - bersihkan setiap field
-        $responseData = [
-            'id' => $data->id,
-            'risk_code' => $data->risk_code,
-            'jenis_risiko' => clean_string($data->jenis_risiko),
-            'sasaran' => clean_string($data->sasaran),
-            'peristiwa_risiko' => clean_string($data->peristiwa_risiko),
-            'penyebab_risiko' => clean_string($data->penyebab_risiko),
-            'dampak_risiko' => clean_string($data->dampak_risiko),
-            'inherent_risk_level_dampak' => $data->inherent_risk_level_dampak,
-            'inherent_risk_level_kemungkinan' => $data->inherent_risk_level_kemungkinan,
-            'residual_target_level_dampak' => $data->residual_target_level_dampak,
-            'residual_target_level_kemungkinan' => $data->residual_target_level_kemungkinan,
-            'internal_control' => clean_string($data->internal_control),
-            'target_satu_tahun_option' => $data->target_satu_tahun_option,
-            'target_satu_tahun_option_name' => $data->optionTargetSatuTahun ? clean_string($data->optionTargetSatuTahun->name) : null,
-            'target_satu_tahun_position' => clean_string($data->target_satu_tahun_position),
-            'target_satu_tahun_notes' => clean_string($data->target_satu_tahun_notes),
-            'target_quantitative_satu_tahun' => number_format($data->target_quantitative_satu_tahun, 0, ',', '.'),
-            'biaya_perlakuan_risiko' => number_format($data->biaya_perlakuan_risiko, 0, ',', '.'),
-            'department_id' => $data->department_id,
-            'year' => $data->year,
-            'inherent_risk_posisi_risiko' => $data->inherent_risk_posisi_risiko,
-            'inherent_risk_level_risiko' => clean_string($data->inherent_risk_level_risiko),
-            'residual_target_posisi_risiko' => $data->residual_target_posisi_risiko,
-            'residual_target_level_risiko' => clean_string($data->residual_target_level_risiko),
-            'process_code' => $data->process_code ?? null,
-            'updated_at' => $data->updated_at,
-            'created_at' => $data->created_at,
-            'created_by' => $data->created_by,
-            'created_by_name' => $createdByName,
-        ];
-
-        // Ubah nama key relasi sesuai format yang diinginkan
-        $responseData['risk_code'] = $data->riskCode ? [
-            'id' => $data->riskCode->id,
-            'name' => clean_string($data->riskCode->name)
-        ] : null;
-
-        $responseData['ir_dampak'] = $data->irDampak ? [
-            'id' => $data->irDampak->id,
-            'label' => clean_string($data->irDampak->label)
-        ] : null;
-
-        $responseData['ir_kemungkinan'] = $data->irKemungkinan ? [
-            'id' => $data->irKemungkinan->id,
-            'label' => clean_string($data->irKemungkinan->label)
-        ] : null;
-
-        $responseData['rr_dampak'] = $data->rrDampak ? [
-            'id' => $data->rrDampak->id,
-            'label' => clean_string($data->rrDampak->label)
-        ] : null;
-
-        $responseData['rr_kemungkinan'] = $data->rrKemungkinan ? [
-            'id' => $data->rrKemungkinan->id,
-            'label' => clean_string($data->rrKemungkinan->label)
-        ] : null;
-
-        $responseData['department'] = $data->department ? [
-            'id' => $data->department->id,
-            'name' => clean_string($data->department->name)
-        ] : null;
-
-        $responseData['option_target_satu_tahun'] = $data->optionTargetSatuTahun ? [
-            'id' => $data->optionTargetSatuTahun->id,
-            'name' => clean_string($data->optionTargetSatuTahun->name),
-            'position' => clean_string($data->optionTargetSatuTahun->position)
-        ] : null;
-
-        // Bersihkan monthly data
-        $monthlyData = [];
-        if ($data->monthlyData) {
-            foreach ($data->monthlyData as $monthly) {
-                $monthlyArray = $monthly->toArray();
-                // Bersihkan string fields di monthly data
-                foreach ($monthlyArray as $key => $value) {
-                    if (is_string($value)) {
-                        $monthlyArray[$key] = clean_string($value);
-                    }
-                }
-                $monthlyData[] = $monthlyArray;
-            }
-        }
-        $responseData['monthly_data'] = $monthlyData;
-
-        // Test JSON encoding sebelum return
-        $jsonTest = json_encode($responseData, JSON_UNESCAPED_UNICODE);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            \Log::error('JSON encode error: ' . json_last_error_msg());
-            \Log::error('Problematic data: ', $responseData);
-
-            // Return simplified response jika masih error
-            return json(200, true, 'Berhasil Diperbarui', 'Risk header berhasil diperbarui.', [
-                'id' => $data->id,
-                'created_by' => $data->created_by,
-                'created_by_name' => 'Unknown User',
-                'year' => $data->year,
-                'department_id' => $data->department_id,
-                'risk_code' => $data->risk_code,
-                'created_at' => $data->created_at,
-                'updated_at' => $data->updated_at,
+        $existingApproval = \App\Models\MstApproval::where('document_id', $riskHeader->id)->first();
+        if ($existingApproval) {
+            $existingApproval->update([
+                'jabatan_id' => $jabatanId,
+                'status' => 'pending',
+                'tanggal' => null,
+                'note' => null
             ]);
         }
 
-        return json(200, true, 'Berhasil Diperbarui', 'Risk header berhasil diperbarui.', $responseData);
+        DB::commit();
+
+        $riskHeader->refresh();
+        $responseData = $this->buildResponse($riskHeader);
+
+        return json(200, true, 'Berhasil Diperbaiki', 'Data yang ditolak berhasil diperbaiki. Status kembali ke pending untuk review ulang.', $responseData);
 
     } catch (\Exception $e) {
         DB::rollBack();
-        return json(500, false, 'Gagal Diperbarui', 'Terjadi kesalahan sistem.', $e->getMessage());
+        return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $e->getMessage());
     }
 }
 
-    public function destroy($id)
-    {
-        $data = TrRiskHeader::find($id);
+private function handlePendingUpdate(Request $request, $riskHeader)
+{
+    // Status pending, HANYA BOLEH UPDATE 11 FIELD, 7 FIELD HARUS KOSONG
+    $allowedFields = [
+        'department_id',
+        'risk_code',
+        'jenis_risiko',
+        'sasaran',
+        'peristiwa_risiko',
+        'penyebab_risiko',
+        'dampak_risiko',
+        'inherent_risk_level_dampak',
+        'inherent_risk_level_kemungkinan',
+        'residual_target_level_dampak',
+        'residual_target_level_kemungkinan'
+    ];
 
-        if (!$data) {
-            return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
-        }
+    $forbiddenFields = [
+        'internal_control',
+        'mitigasi',
+        'year',
+        'target_quantitative_satu_tahun',
+        'target_satu_tahun_option',
+        'target_satu_tahun_notes',
+        'biaya_perlakuan_risiko'
+    ];
 
-        $finalizedMonthly = TrRiskMonthly::where('header_id', $id)
-            ->where('is_finalize', true)
-            ->exists();
+    // CEK SETIAP FORBIDDEN FIELD
+    $violations = [];
+    foreach ($forbiddenFields as $field) {
+        $value = $request->input($field);
 
-        if ($finalizedMonthly) {
-            return json(400, false, 'Data Tidak Dapat Dihapus', 'Terdapat data monthly yang sudah difinalisasi. Header tidak dapat dihapus.', null);
-        }
-
-        try {
-            $data->delete();
-            return json(200, true, 'Berhasil Dihapus', 'Data risk header berhasil dihapus.', null);
-        } catch (\Exception $e) {
-            return json(500, false, 'Gagal Dihapus', 'Terjadi kesalahan sistem.', $e->getMessage());
+        if ($value !== null) {
+            $violations[] = [
+                'field' => $field,
+                'value' => $value,
+                'type' => gettype($value)
+            ];
         }
     }
 
+    // JIKA ADA PELANGGARAN, LANGSUNG EXIT
+    if (!empty($violations)) {
+        return response()->json([
+            'code' => 404,
+            'status' => false,
+            'title' => 'AKSES DITOLAK',
+            'message' => 'Data masih pending. Anda hanya boleh mengubah 11 field dasar saja. 7 field tambahan tidak boleh diisi.',
+            'data' => [
+                'violations' => $violations,
+                'allowed_fields' => $allowedFields,
+                'forbidden_fields' => $forbiddenFields,
+                'instruction' => 'Hapus semua field yang tidak diizinkan dari request Anda.'
+            ]
+        ], 404);
+    }
+
+    // Validasi 11 field dasar
+    $validator = Validator::make($request->all(), [
+        'risk_code' => 'required|array',
+        'risk_code.*' => 'exists:mst_risk_code,id',
+        'jenis_risiko' => 'required|string',
+        'sasaran' => 'required|string',
+        'peristiwa_risiko' => 'required|string',
+        'penyebab_risiko' => 'required|string',
+        'dampak_risiko' => 'required|string',
+        'inherent_risk_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+        'inherent_risk_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+        'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+        'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+        'department_id' => 'required|exists:mst_department,id',
+    ]);
+
+    if ($validator->fails()) {
+        return json(400, false, 'Validasi Gagal', 'Validasi 11 field dasar gagal.', $validator->errors());
+    }
+
+    try {
+        DB::beginTransaction();
+
+        // HANYA AMBIL DATA YANG DIIZINKAN
+        $updateData = [];
+        foreach ($allowedFields as $field) {
+            if ($request->has($field)) {
+                $updateData[$field] = $request->input($field);
+            }
+        }
+
+        // Update creator info
+        $updateData['created_by'] = auth()->id();
+        $updateData['created_by_role'] = auth()->user()->role_id;
+
+        // PAKSA kosongkan 7 field tambahan untuk memastikan
+        $updateData['internal_control'] = null;
+        $updateData['mitigasi'] = null;
+        $updateData['year'] = null;
+        $updateData['target_quantitative_satu_tahun'] = null;
+        $updateData['target_satu_tahun_option'] = null;
+        $updateData['target_satu_tahun_notes'] = null;
+        $updateData['biaya_perlakuan_risiko'] = null;
+        $updateData['target_satu_tahun_position'] = null;
+
+        // Status tetap pending, reset approval info
+        $updateData['status'] = 'pending';
+        $updateData['is_complete'] = false;
+        $updateData['approval_notes'] = null;
+        $updateData['approved_by'] = null;
+        $updateData['approved_at'] = null;
+
+        // Handle risk_code
+        if (!empty($updateData['risk_code']) && is_array($updateData['risk_code'])) {
+            $updateData['risk_code'] = implode(',', $updateData['risk_code']);
+        }
+
+        // Update heatmap calculations
+        $irHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $updateData['inherent_risk_level_dampak'])
+            ->where('kemungkinan', $updateData['inherent_risk_level_kemungkinan'])
+            ->first();
+
+        if (!$irHeatmap) {
+            return json(400, false, 'IR Tidak Ditemukan', 'Kombinasi IR tidak ditemukan.', null);
+        }
+
+        $updateData['inherent_risk_posisi_risiko'] = $irHeatmap->result;
+        $updateData['inherent_risk_level_risiko'] = $irHeatmap->riskRange->name ?? null;
+
+        $rrHeatmap = MstHeatmap::with('riskRange')
+            ->where('dampak', $updateData['residual_target_level_dampak'])
+            ->where('kemungkinan', $updateData['residual_target_level_kemungkinan'])
+            ->first();
+
+        if (!$rrHeatmap) {
+            return json(400, false, 'RR Tidak Ditemukan', 'Kombinasi RR tidak ditemukan.', null);
+        }
+
+        $updateData['residual_target_posisi_risiko'] = $rrHeatmap->result;
+        $updateData['residual_target_level_risiko'] = $rrHeatmap->riskRange->name ?? null;
+
+        $riskHeader->update($updateData);
+
+        // Update approval entry untuk single level approval
+        $currentUser = auth()->user();
+        $jabatanId = null;
+
+        if ($currentUser->jabatan_id) {
+            $jabatanId = $currentUser->jabatan_id;
+        } else {
+            $jabatan = MstJabatan::where('department_id', $updateData['department_id'])->first();
+            $jabatanId = $jabatan ? $jabatan->id : null;
+        }
+
+        // Update existing approval entry
+        $existingApproval = \App\Models\MstApproval::where('document_id', $riskHeader->id)->first();
+        if ($existingApproval) {
+            $existingApproval->update([
+                'jabatan_id' => $jabatanId,
+                'status' => 'pending',
+                'tanggal' => null,
+                'note' => null
+            ]);
+        } else {
+            // Jika tidak ada, buat baru
+            \App\Models\MstApproval::create([
+                'document_id' => $riskHeader->id,
+                'tahun' => date('Y'),
+                'posisi' => 1, // Selalu 1 untuk single level
+                'jabatan_id' => $jabatanId,
+                'status' => 'pending',
+                'tanggal' => null,
+                'note' => null
+            ]);
+        }
+
+        DB::commit();
+
+        $riskHeader->refresh();
+        $responseData = $this->buildResponse($riskHeader);
+
+        return json(200, true, 'Berhasil Diupdate', 'Data pending berhasil diupdate. Status tetap pending menunggu persetujuan.', $responseData);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+private function buildResponse($riskHeader)
+{
+    // Load relasi yang diperlukan
+    $riskHeader->load([
+        'irDampak:id,label',
+        'irKemungkinan:id,label',
+        'rrDampak:id,label',
+        'rrKemungkinan:id,label',
+        'department:id,name',
+        'optionTargetSatuTahun:id,name,position',
+        'createdBy:id,username',
+    ]);
+
+    $createdByName = 'Unknown User';
+    try {
+        $createdByName = get_decrypted_username($riskHeader->createdBy);
+    } catch (\Throwable $e) {
+        \Log::warning("Error handling createdBy: {$e->getMessage()}");
+    }
+
+    $formattedTarget = format_target_quantitative($riskHeader->target_quantitative_satu_tahun);
+
+    $responseData = [
+        'id' => $riskHeader->id,
+        'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
+        'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
+        'sasaran' => clean_string($riskHeader->sasaran),
+        'peristiwa_risiko' => clean_string($riskHeader->peristiwa_risiko),
+        'penyebab_risiko' => clean_string($riskHeader->penyebab_risiko),
+        'dampak_risiko' => clean_string($riskHeader->dampak_risiko),
+        'inherent_risk_level_dampak' => $riskHeader->inherent_risk_level_dampak,
+        'inherent_risk_level_kemungkinan' => $riskHeader->inherent_risk_level_kemungkinan,
+        'residual_target_level_dampak' => $riskHeader->residual_target_level_dampak,
+        'residual_target_level_kemungkinan' => $riskHeader->residual_target_level_kemungkinan,
+        'internal_control' => clean_string($riskHeader->internal_control),
+        'mitigasi' => clean_string($riskHeader->mitigasi),
+        'target_satu_tahun_option' => $riskHeader->target_satu_tahun_option,
+        'target_satu_tahun_notes' => clean_string($riskHeader->target_satu_tahun_notes),
+        'target_satu_tahun_type' => $riskHeader->optionTargetSatuTahun ? $riskHeader->optionTargetSatuTahun->name : null,
+        'target_quantitative_satu_tahun' => $formattedTarget,
+        'biaya_perlakuan_risiko' => $riskHeader->biaya_perlakuan_risiko ? number_format($riskHeader->biaya_perlakuan_risiko, 0, ',', '.') : null,
+        'department_id' => $riskHeader->department_id,
+        'year' => $riskHeader->year,
+        'target_satu_tahun_position' => clean_string($riskHeader->target_satu_tahun_position),
+        'inherent_risk_posisi_risiko' => $riskHeader->inherent_risk_posisi_risiko,
+        'inherent_risk_level_risiko' => clean_string($riskHeader->inherent_risk_level_risiko),
+        'residual_target_posisi_risiko' => $riskHeader->residual_target_posisi_risiko,
+        'residual_target_level_risiko' => clean_string($riskHeader->residual_target_level_risiko),
+        'process_code' => $riskHeader->process_code ?? null,
+        'status' => $riskHeader->status,
+        'is_complete' => $riskHeader->is_complete ?? false,
+        'approval_notes' => clean_string($riskHeader->approval_notes),
+        'approved_by' => $riskHeader->approved_by,
+        'approved_at' => $riskHeader->approved_at,
+        'updated_at' => $riskHeader->updated_at,
+        'created_at' => $riskHeader->created_at,
+        'created_by' => $riskHeader->created_by,
+        'created_by_name' => $createdByName,
+    ];
+
+    $this->addRelationsToResponse($riskHeader, $responseData);
+
+    return $responseData;
+}
+
 public function monitoring(Request $request)
 {
- $user = auth()->user();
+    $user = auth()->user();
 
     $perPage = $request->input('per_page', 10);
 
     $query = TrRiskHeader::with([
-        'riskCode:id,name',
+        // PERBAIKAN: Hapus relasi riskCode karena sekarang risk_code adalah string comma-separated
         'irDampak:id,label',
         'irKemungkinan:id,label',
         'rrDampak:id,label',
@@ -940,7 +1346,7 @@ public function monitoring(Request $request)
             $query->orderBy('month', 'asc')->with('uploads');
         },
         'headerEntry.monthlyEntryData.uploads',
-        'headerEntry.riskCode:id,name',
+        // PERBAIKAN: Hapus relasi riskCode dari headerEntry juga
         'headerEntry.irDampak:id,label',
         'headerEntry.irKemungkinan:id,label',
         'headerEntry.rrDampak:id,label',
@@ -951,10 +1357,10 @@ public function monitoring(Request $request)
         'updatedBy:id,username,id',
     ])
 
-      ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
-    // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
-    $query->where('department_id', $user->department_id);
-})
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+        // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+        $query->where('department_id', $user->department_id);
+    })
 
     ->when($request->peristiwa, function ($query) use ($request) {
         $query->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
@@ -967,15 +1373,56 @@ public function monitoring(Request $request)
     ->when($request->tahun, function ($query) use ($request) {
         $query->where('year', $request->tahun);
     })
-    ->orderBy('id', 'asc');
+    ->orderBy('id', 'desc');
 
     // Paginate
     $data = $query->paginate($perPage);
 
+    // Helper function untuk menangani persentase dengan target yang bisa string atau angka
+    $calculatePercentage = function ($target, $realization) {
+        // Jika target adalah string atau tidak numeric, return null untuk menandakan tidak dapat dihitung
+        if (!is_numeric($target) || $target <= 0) {
+            return null;
+        }
+
+        // Jika realization bukan numeric, return 0
+        if (!is_numeric($realization)) {
+            return 0;
+        }
+
+        return round(($realization / $target) * 100, 2);
+    };
+
+    // Helper function untuk format target quantitative
+    $formatTargetQuantitative = function ($target) {
+        // Jika target adalah string atau mengandung huruf, return apa adanya
+        if (!is_numeric($target)) {
+            return $target;
+        }
+
+        // Jika numeric, format dengan number_format
+        return number_format($target, 0, ',', '.');
+    };
+
     // Mapping data with same structure as index
-    $orderedData = collect($data->items())->map(function ($item) {
+    $orderedData = collect($data->items())->map(function ($item) use ($calculatePercentage, $formatTargetQuantitative) {
         $inherentColor = get_color_by_position($item->inherent_risk_posisi_risiko);
         $residualTargetColor = get_color_by_position($item->residual_target_posisi_risiko);
+
+        // PERBAIKAN: Process risk_code dari string comma-separated menjadi array
+        $riskCodes = [];
+        if (!empty($item->risk_code)) {
+            $riskCodeIds = explode(',', $item->risk_code);
+            $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
+                ->get(['id', 'name'])
+                ->map(function ($riskCode) {
+                    return [
+                        'id' => $riskCode->id,
+                        'name' => clean_string($riskCode->name)
+                    ];
+                })
+                ->toArray();
+        }
 
         $monthlyDataMap = [];
         $monthly = [];
@@ -984,18 +1431,18 @@ public function monitoring(Request $request)
             $dataBulanan = $item->monthlyData->firstWhere('month', $i);
 
             if ($dataBulanan) {
-                $target = $dataBulanan->target_quantitative ?? 0;
+                $target = $dataBulanan->target_quantitative;
                 $realization = $dataBulanan->realization_quantitative ?? 0;
-                $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+                $percentage = $calculatePercentage($target, $realization);
 
                 $monthlyDataMap[$i] = $dataBulanan;
 
                 $monthly[] = [
                     'bulan' => $i,
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
-                    'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                     'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
-                    'realization_percentage' => $percentage . '%',
+                    'target_quantitative' => $formatTargetQuantitative($target),
+                    'realization_percentage' => $percentage !== null ? $percentage . '%' : '-',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
                     'uploads' => $dataBulanan->uploads->map(function ($upload) {
                         return [
@@ -1010,9 +1457,9 @@ public function monitoring(Request $request)
                 $monthly[] = [
                     'bulan' => $i,
                     'residual_risk_level' => null,
-                    'residual_risk_posisi_risiko' => null,
                     'residual_risk_posisi_risiko_color' => null,
-                    'realization_percentage' => '0%',
+                    'target_quantitative' => null,
+                    'realization_percentage' => '-',
                     'is_finalized' => false,
                     'uploads' => [],
                 ];
@@ -1027,21 +1474,20 @@ public function monitoring(Request $request)
             ];
         });
 
-        $entryData = $item->headerEntry->map(function ($entry) {
+        $entryData = $item->headerEntry->map(function ($entry) use ($calculatePercentage) {
             $monthlyEntries = collect();
             for ($i = 1; $i <= 12; $i++) {
                 $monthlyEntry = $entry->monthlyEntryData->firstWhere('month', $i);
                 if ($monthlyEntry) {
-                    $target = $monthlyEntry->target_quantitative ?? 0;
+                    $target = $monthlyEntry->target_quantitative;
                     $realization = $monthlyEntry->realization_quantitative ?? 0;
-                    $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+                    $percentage = $calculatePercentage($target, $realization);
 
                     $monthlyEntries[] = [
                         'bulan' => $i,
                         'residual_risk_level' => $monthlyEntry->residual_risk_level_risiko,
-                        'residual_risk_posisi_risiko' => $monthlyEntry->residual_risk_posisi_risiko,
                         'residual_risk_posisi_risiko_color' => get_color_by_position($monthlyEntry->residual_risk_posisi_risiko),
-                        'realization_percentage' => $percentage . '%',
+                        'realization_percentage' => $percentage !== null ? $percentage . '%' : '-',
                         'is_finalized' => (bool) $monthlyEntry->is_finalize,
                         'monthly_entry_data' => $monthlyEntry,
                         'uploads' => $monthlyEntry->uploads->map(function ($upload) {
@@ -1056,9 +1502,8 @@ public function monitoring(Request $request)
                     $monthlyEntries[] = [
                         'bulan' => $i,
                         'residual_risk_level' => null,
-                        'residual_risk_posisi_risiko' => null,
                         'residual_risk_posisi_risiko_color' => null,
-                        'realization_percentage' => '0%',
+                        'realization_percentage' => '-',
                         'is_finalized' => false,
                         'monthly_entry_data' => null,
                         'uploads' => [],
@@ -1080,7 +1525,7 @@ public function monitoring(Request $request)
 
         return [
             'id' => $item->id,
-            'risk_code' => $item->riskCode ?? null,
+            'risk_code' => $riskCodes, // PERBAIKAN: Gunakan array yang sudah diproses
             'process_code' => $item->process_code ?? '',
             'jenis_risiko' => $item->jenis_risiko ?? '',
             'sasaran' => $item->sasaran ?? '',
@@ -1093,12 +1538,14 @@ public function monitoring(Request $request)
             'inherent_risk_level_risiko' => $item->inherent_risk_level_risiko ?? 0,
             'inherent_risk_posisi_risiko_color' => $inherentColor,
             'internal_control' => $item->internal_control ?? '',
+            'mitigasi' => $item->mitigasi ?? '',
 
             'target_satu_tahun_option' => $item->target_satu_tahun_option ?? null,
             'target_satu_tahun_option_name' => $item->optionTargetSatuTahun->name ?? '',
             'target_satu_tahun_notes' => $item->target_satu_tahun_notes ?? '',
             'target_satu_tahun_position' => $item->optionTargetSatuTahun->position ?? 0,
-            'target_quantitative_satu_tahun' => number_format($item->target_quantitative_satu_tahun, 0, ',', '.'),
+            // 'target_quantitative_satu_tahun' => number_format($item->target_quantitative_satu_tahun, 0, ',', '.'),
+            'target_quantitative_satu_tahun' => format_target_quantitative($item->target_quantitative_satu_tahun),
 
             'biaya_perlakuan_risiko' => number_format($item->biaya_perlakuan_risiko, 0, ',', '.'),
             'residual_target_level_dampak' => $item->residual_target_level_dampak ?? 0,
@@ -1123,30 +1570,30 @@ public function monitoring(Request $request)
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             'department' => $item->department ?? null,
 
-            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) {
-                $target = $dataBulanan->target_quantitative ?? 0;
+            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) use ($riskCodes, $calculatePercentage, $formatTargetQuantitative) {
+                $target = $dataBulanan->target_quantitative;
                 $realization = $dataBulanan->realization_quantitative ?? 0;
-                $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+                $percentage = $calculatePercentage($target, $realization);
 
                 return [
                     'id' => $dataBulanan->id,
                     'header_id' => $dataBulanan->header_id,
                     'month' => $dataBulanan->month,
-                    'risk_code' => $dataBulanan->risk_code,
+                    'risk_code' => $riskCodes, // PERBAIKAN: Gunakan array risk codes dari header
                     'status_risiko' => $dataBulanan->status_risiko,
                     'process_code' => $dataBulanan->process_code,
                     'start_date' => $dataBulanan->start_date ? $dataBulanan->start_date->format('Y-m-d H:i:s') : null,
                     'expired_date' => $dataBulanan->expired_date ? $dataBulanan->expired_date->format('Y-m-d H:i:s') : null,
                     'realization_quantitative' => $realization,
                     'realization_note' => $dataBulanan->realization_note,
-                    'target_quantitative' => $target,
+                    'target_quantitative' => $formatTargetQuantitative($target), // PERBAIKAN: Format target sesuai jenis data
                     'target_notes' => $dataBulanan->target_notes,
                     'residual_risk_level_dampak' => $dataBulanan->residual_risk_level_dampak,
                     'residual_risk_level_kemungkinan' => $dataBulanan->residual_risk_level_kemungkinan,
                     'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                     'residual_risk_level_risiko' => $dataBulanan->residual_risk_level_risiko,
                     'residual_risk_level_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
-                    'realization_percentage' => $percentage . '%',
+                    'realization_percentage' => $percentage !== null ? $percentage . '%' : '-',
                     'is_finalize' => (bool) $dataBulanan->is_finalize,
                     'finalized_at' => $dataBulanan->finalized_at,
                     'finalized_by' => $dataBulanan->finalized_by,
@@ -1180,6 +1627,585 @@ public function monitoring(Request $request)
     ]);
 
     return json(200, true, 'Data Monitoring Risk Profile Bulanan', 'Data Monitoring', $cleanData);
+}
+
+public function getPendingApproval(Request $request)
+{
+
+    try {
+        // IMMEDIATE BLOCK untuk role 2 dan 3
+        $user = auth()->user();
+
+          \Log::info('User info for pending approval', [
+    'id' => $user->id,
+    'role_id' => $user->role_id,
+    'department_id' => $user->department_id,
+]);
+
+        if (($user->role_id == 2 || $user->role_id == 3) && empty($user->department_id)) {
+            return json(403, false, 'Akses Ditolak', 'Department tidak valid untuk akses ini.', null);
+        }
+
+        $query = TrRiskHeader::with([
+            'irDampak:id,label',
+            'irKemungkinan:id,label',
+            'rrDampak:id,label',
+            'rrKemungkinan:id,label',
+            'department:id,name',
+            'optionTargetSatuTahun:id,name,position',
+            'createdBy:id,username',
+        ])->where('status', 'pending');
+        // PAKSA FILTER DEPARTMENT untuk role 2 dan 3
+        if ($user->role_id == 2 || $user->role_id == 3) {
+            $query->where('department_id', $user->department_id);
+        }
+
+        // BLOCK parameter department_id untuk role 2 dan 3
+        if ($request->has('department_id') && $request->department_id) {
+            if ($user->role_id == 2 || $user->role_id == 3) {
+                if ((int)$request->department_id !== (int)$user->department_id) {
+                    return json(403, false, 'Akses Ditolak', 'Anda hanya dapat melihat data dari department Anda sendiri.', null);
+                }
+            }
+            $query->where('department_id', $request->department_id);
+        }
+
+        \Log::info('Pending approval query', [
+    'sql' => $query->toSql(),
+    'bindings' => $query->getBindings()
+]);
+
+        if ($request->has('year') && $request->year) {
+            $query->where('year', $request->year);
+        }
+
+        $pendingData = $query->orderBy('created_at', 'desc')->get();
+
+        $responseData = $pendingData->map(function ($riskHeader) {
+            $createdByName = 'Unknown User';
+            try {
+                $createdByName = get_decrypted_username($riskHeader->createdBy);
+            } catch (\Throwable $e) {
+                \Log::warning("Error handling createdBy: {$e->getMessage()}");
+            }
+
+            $riskCodes = [];
+            if (!empty($riskHeader->risk_code)) {
+                $riskCodeIds = explode(',', $riskHeader->risk_code);
+                $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
+                    ->get(['id', 'name'])
+                    ->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'name' => clean_string($item->name)
+                        ];
+                    })
+                    ->toArray();
+            }
+
+            return [
+                'id' => $riskHeader->id,
+                'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
+                'risk_codes' => $riskCodes,
+                'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
+                'sasaran' => clean_string($riskHeader->sasaran),
+                'peristiwa_risiko' => clean_string($riskHeader->peristiwa_risiko),
+                'penyebab_risiko' => clean_string($riskHeader->penyebab_risiko),
+                'dampak_risiko' => clean_string($riskHeader->dampak_risiko),
+                'internal_control' => clean_string($riskHeader->internal_control),
+                'mitigasi' => clean_string($riskHeader->mitigasi),
+                'inherent_risk_level_risiko' => clean_string($riskHeader->inherent_risk_level_risiko),
+                'residual_target_level_risiko' => clean_string($riskHeader->residual_target_level_risiko),
+                'department' => $riskHeader->department ? [
+                    'id' => $riskHeader->department->id,
+                    'name' => clean_string($riskHeader->department->name)
+                ] : null,
+                'year' => $riskHeader->year,
+                'status' => $riskHeader->status,
+                'created_at' => $riskHeader->created_at,
+                'created_by_name' => $createdByName,
+                'target_quantitative_satu_tahun' => format_target_quantitative($riskHeader->target_quantitative_satu_tahun),
+                'biaya_perlakuan_risiko' => number_format($riskHeader->biaya_perlakuan_risiko ?? 0, 0, ',', '.'),
+            ];
+        });
+
+        return json(200, true, 'Data Berhasil Diambil', 'Data pending approval berhasil diambil.', $responseData);
+
+    } catch (\Exception $e) {
+        return json(500, false, 'Gagal Mengambil Data', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+public function approveRiskHeader(Request $request, $id)
+{
+    $validator = Validator::make($request->all(), [
+        'approval_notes' => 'nullable|string'
+    ]);
+
+    if ($validator->fails()) {
+        return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+    }
+
+    try {
+        DB::beginTransaction();
+
+        $riskHeader = TrRiskHeader::with(['createdBy', 'department'])->find($id);
+
+        if (!$riskHeader) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        if ($riskHeader->status !== 'pending') {
+            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status pending yang dapat disetujui.', null);
+        }
+
+        $currentUser = auth()->user();
+
+        // BLOCK langsung untuk role 2 dan 3 jika department berbeda
+        if ($currentUser->role_id == 2 || $currentUser->role_id == 3) {
+            if ((int)$riskHeader->department_id !== (int)$currentUser->department_id) {
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menyetujui risk header dari departemen Anda sendiri.', null);
+            }
+        }
+
+        // Validasi approval right menggunakan helper yang sudah diperbaiki
+        $hasApprovalRight = can_user_approve_simple($currentUser->id, $riskHeader->department_id);
+
+        if (!$hasApprovalRight) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
+        }
+
+        $riskHeader->update([
+            'status' => 'approved',
+            'is_complete' => false,
+            'approval_notes' => $request->approval_notes,
+            'approved_by' => auth()->id(),
+            'approved_at' => now()
+        ]);
+
+        \App\Models\MstApproval::where('document_id', $id)
+            ->update([
+                'status' => 'approved',
+                'tanggal' => now(),
+                'note' => $request->approval_notes ?? 'Approved via risk header'
+            ]);
+
+        DB::commit();
+
+        $riskHeader->load([
+            'createdBy:id,username',
+            'approvedBy:id,username'
+        ]);
+
+        $approvedByName = 'Unknown User';
+        try {
+            $approvedByName = get_decrypted_username($riskHeader->approvedBy);
+        } catch (\Throwable $e) {
+            \Log::warning("Error handling approvedBy: {$e->getMessage()}");
+        }
+
+        return json(200, true, 'Berhasil Disetujui', '11 field dasar berhasil disetujui dan terkunci. Silakan lengkapi 7 field tambahan untuk menyelesaikan data.', [
+            'id' => $riskHeader->id,
+            'status' => $riskHeader->status,
+            'is_complete' => $riskHeader->is_complete,
+            'approval_notes' => clean_string($riskHeader->approval_notes),
+            'approved_by' => $riskHeader->approved_by,
+            'approved_by_name' => $approvedByName,
+            'approved_at' => $riskHeader->approved_at,
+            'next_step' => 'Silakan isi 7 field tambahan melalui proses update',
+            'fields_to_complete' => [
+                'internal_control',
+                'mitigasi',
+                'year',
+                'target_quantitative_satu_tahun',
+                'target_satu_tahun_option',
+                'target_satu_tahun_notes',
+                'biaya_perlakuan_risiko'
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Menyetujui', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+public function rejectRiskHeader(Request $request, $id)
+{
+    $validator = Validator::make($request->all(), [
+        'approval_notes' => 'required|string'
+    ]);
+
+    if ($validator->fails()) {
+        return json(400, false, 'Validasi Gagal', 'Catatan penolakan wajib diisi.', $validator->errors());
+    }
+
+    try {
+        DB::beginTransaction();
+
+        $riskHeader = TrRiskHeader::with(['createdBy', 'department'])->find($id);
+
+        if (!$riskHeader) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        if ($riskHeader->status !== 'pending') {
+            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status pending yang dapat ditolak.', null);
+        }
+
+        $currentUser = auth()->user();
+
+        // BLOCK langsung untuk role 2 dan 3 jika department berbeda
+        if ($currentUser->role_id == 2 || $currentUser->role_id == 3) {
+            if ((int)$riskHeader->department_id !== (int)$currentUser->department_id) {
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menolak risk header dari departemen Anda sendiri.', null);
+            }
+        }
+
+        // Validasi approval right menggunakan helper yang sudah diperbaiki
+        $hasApprovalRight = can_user_approve_simple($currentUser->id, $riskHeader->department_id);
+
+        if (!$hasApprovalRight) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menolak data ini.', null);
+        }
+
+        $riskHeader->update([
+            'status' => 'rejected',
+            'is_complete' => false,
+            'approval_notes' => $request->approval_notes,
+            'approved_by' => auth()->id(),
+            'approved_at' => now()
+        ]);
+
+        \App\Models\MstApproval::where('document_id', $id)
+            ->update([
+                'status' => 'rejected',
+                'tanggal' => now(),
+                'note' => $request->approval_notes
+            ]);
+
+        $riskHeader->update([
+            'internal_control' => null,
+            'mitigasi' => null,
+            'year' => null,
+            'target_quantitative_satu_tahun' => null,
+            'target_satu_tahun_option' => null,
+            'target_satu_tahun_notes' => null,
+            'biaya_perlakuan_risiko' => null,
+            'target_satu_tahun_position' => null
+        ]);
+
+        TrRiskMonthly::where('header_id', $riskHeader->id)->delete();
+
+        DB::commit();
+
+        $riskHeader->load('approvedBy:id,username');
+
+        $rejectedByName = 'Unknown User';
+        try {
+            $rejectedByName = get_decrypted_username($riskHeader->approvedBy);
+        } catch (\Throwable $e) {
+            \Log::warning("Error handling approvedBy: {$e->getMessage()}");
+        }
+
+        return json(200, true, 'Berhasil Ditolak', 'Risk header berhasil ditolak. Silakan perbaiki 11 field dasar sesuai catatan penolakan.', [
+            'id' => $riskHeader->id,
+            'status' => $riskHeader->status,
+            'is_complete' => $riskHeader->is_complete,
+            'rejection_notes' => clean_string($riskHeader->approval_notes),
+            'rejected_by' => $riskHeader->approved_by,
+            'rejected_by_name' => $rejectedByName,
+            'rejected_at' => $riskHeader->approved_at,
+            'next_step' => 'Perbaiki 11 field dasar dan submit ulang untuk review',
+            'editable_fields' => [
+                'department_id', 'risk_code', 'jenis_risiko', 'sasaran', 'peristiwa_risiko', 'penyebab_risiko',
+                'dampak_risiko', 'inherent_risk_level_dampak', 'inherent_risk_level_kemungkinan',
+                'residual_target_level_dampak', 'residual_target_level_kemungkinan'
+            ],
+            'locked_fields' => [
+                'internal_control', 'mitigasi', 'year', 'target_quantitative_satu_tahun',
+                'target_satu_tahun_option', 'target_satu_tahun_notes', 'biaya_perlakuan_risiko'
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return json(500, false, 'Gagal Menolak', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+public function getRejectedData(Request $request)
+{
+    try {
+        $user = auth()->user();
+
+        if (($user->role_id == 2 || $user->role_id == 3) && empty($user->department_id)) {
+            return json(403, false, 'Akses Ditolak', 'Department tidak valid untuk akses ini.', null);
+        }
+
+        $query = TrRiskHeader::with([
+            'irDampak:id,label',
+            'irKemungkinan:id,label',
+            'rrDampak:id,label',
+            'rrKemungkinan:id,label',
+            'department:id,name',
+            'optionTargetSatuTahun:id,name,position',
+            'createdBy:id,username',
+            'approvedBy:id,username'
+        ])->where('status', 'rejected');
+
+        // PAKSA FILTER DEPARTMENT untuk role 2 dan 3
+        if ($user->role_id == 2 || $user->role_id == 3) {
+            $query->where('department_id', $user->department_id);
+        }
+
+        if ($request->has('year') && $request->year) {
+            $query->where('year', $request->year);
+        }
+
+        // BLOCK parameter department_id untuk role 2 dan 3
+        if ($request->has('department_id') && $request->department_id) {
+            if ($user->role_id == 2 || $user->role_id == 3) {
+                if ((int)$request->department_id !== (int)$user->department_id) {
+                    return json(403, false, 'Akses Ditolak', 'Anda hanya dapat melihat data dari department Anda sendiri.', null);
+                }
+            }
+            $query->where('department_id', $request->department_id);
+        }
+
+        $rejectedData = $query->orderBy('approved_at', 'desc')->get();
+
+        $responseData = $rejectedData->map(function ($riskHeader) {
+            $createdByName = 'Unknown User';
+            $approvedByName = 'Unknown User';
+
+            try {
+                $createdByName = get_decrypted_username($riskHeader->createdBy);
+            } catch (\Throwable $e) {
+                \Log::warning("Error handling createdBy: {$e->getMessage()}");
+            }
+
+            try {
+                $approvedByName = get_decrypted_username($riskHeader->approvedBy);
+            } catch (\Throwable $e) {
+                \Log::warning("Error handling approvedBy: {$e->getMessage()}");
+            }
+
+            $riskCodes = [];
+            if (!empty($riskHeader->risk_code)) {
+                $riskCodeIds = explode(',', $riskHeader->risk_code);
+                $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
+                    ->get(['id', 'name'])
+                    ->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'name' => clean_string($item->name)
+                        ];
+                    })
+                    ->toArray();
+            }
+
+            return [
+                'id' => $riskHeader->id,
+                'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
+                'risk_codes' => $riskCodes,
+                'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
+                'sasaran' => clean_string($riskHeader->sasaran),
+                'peristiwa_risiko' => clean_string($riskHeader->peristiwa_risiko),
+                'penyebab_risiko' => clean_string($riskHeader->penyebab_risiko),
+                'dampak_risiko' => clean_string($riskHeader->dampak_risiko),
+                'internal_control' => clean_string($riskHeader->internal_control),
+                'mitigasi' => clean_string($riskHeader->mitigasi),
+                'inherent_risk_level_risiko' => clean_string($riskHeader->inherent_risk_level_risiko),
+                'residual_target_level_risiko' => clean_string($riskHeader->residual_target_level_risiko),
+                'department' => $riskHeader->department ? [
+                    'id' => $riskHeader->department->id,
+                    'name' => clean_string($riskHeader->department->name)
+                ] : null,
+                'year' => $riskHeader->year,
+                'status' => $riskHeader->status,
+                'approval_notes' => clean_string($riskHeader->approval_notes),
+                'rejected_by' => $riskHeader->approved_by,
+                'rejected_by_name' => $approvedByName,
+                'rejected_at' => $riskHeader->approved_at,
+                'created_at' => $riskHeader->created_at,
+                'created_by_name' => $createdByName,
+                'target_quantitative_satu_tahun' => format_target_quantitative($riskHeader->target_quantitative_satu_tahun),
+                'biaya_perlakuan_risiko' => number_format($riskHeader->biaya_perlakuan_risiko ?? 0, 0, ',', '.'),
+            ];
+        });
+
+        return json(200, true, 'Data Berhasil Diambil', 'Data yang ditolak berhasil diambil.', $responseData);
+
+    } catch (\Exception $e) {
+        return json(500, false, 'Gagal Mengambil Data', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+/**
+ * Helper function untuk menentukan apakah request ini adalah penyimpanan lengkap
+ */
+private function isFullSaveRequest($request)
+{
+    $requiredFieldsForComplete = [
+        'internal_control', 'mitigasi', 'target_satu_tahun_option',
+        'target_satu_tahun_notes', 'target_quantitative_satu_tahun',
+        'biaya_perlakuan_risiko', 'year'
+    ];
+
+    foreach ($requiredFieldsForComplete as $field) {
+        if (!$request->filled($field)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Helper function untuk menambahkan relasi ke response data
+ */
+private function addRelationsToResponse($riskHeader, &$responseData)
+{
+    $responseData['ir_dampak'] = $riskHeader->irDampak ? [
+        'id' => $riskHeader->irDampak->id,
+        'label' => clean_string($riskHeader->irDampak->label)
+    ] : null;
+
+    $responseData['ir_kemungkinan'] = $riskHeader->irKemungkinan ? [
+        'id' => $riskHeader->irKemungkinan->id,
+        'label' => clean_string($riskHeader->irKemungkinan->label)
+    ] : null;
+
+    $responseData['rr_dampak'] = $riskHeader->rrDampak ? [
+        'id' => $riskHeader->rrDampak->id,
+        'label' => clean_string($riskHeader->rrDampak->label)
+    ] : null;
+
+    $responseData['rr_kemungkinan'] = $riskHeader->rrKemungkinan ? [
+        'id' => $riskHeader->rrKemungkinan->id,
+        'label' => clean_string($riskHeader->rrKemungkinan->label)
+    ] : null;
+
+    $responseData['department'] = $riskHeader->department ? [
+        'id' => $riskHeader->department->id,
+        'name' => clean_string($riskHeader->department->name)
+    ] : null;
+
+    $responseData['option_target_satu_tahun'] = $riskHeader->optionTargetSatuTahun ? [
+        'id' => $riskHeader->optionTargetSatuTahun->id,
+        'name' => clean_string($riskHeader->optionTargetSatuTahun->name),
+        'position' => clean_string($riskHeader->optionTargetSatuTahun->position)
+    ] : null;
+
+    $riskCodes = [];
+    if (!empty($riskHeader->risk_code)) {
+        $riskCodeIds = explode(',', $riskHeader->risk_code);
+        $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
+            ->get(['id', 'name'])
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'name' => clean_string($item->name)
+                ];
+            })
+            ->toArray();
+    }
+    $responseData['risk_codes'] = $riskCodes;
+
+    if ($riskHeader->optionTargetSatuTahun) {
+        $responseData['target_satu_tahun_option_name'] = clean_string($riskHeader->optionTargetSatuTahun->name);
+    }
+
+    $responseData['monthly_data'] = [];
+}
+
+public function destroy($id)
+{
+    try {
+        DB::beginTransaction();
+
+        $riskHeader = TrRiskHeader::find($id);
+
+        if (!$riskHeader) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        $currentUser = auth()->user();
+        $currentUserRole = $currentUser->role_id;
+
+        // VALIDASI HAK AKSES DELETE
+        // Hanya Superadmin (role 1) yang bisa delete
+        if ($currentUserRole !== 1) {
+            return json(404, false, 'Akses Ditolak', 'Hanya Superadmin yang dapat menghapus data risk header.', null);
+        }
+
+        // VALIDASI BUSINESS LOGIC
+        // Cek apakah data sudah complete dan memiliki monthly data
+        $hasMonthlyData = TrRiskMonthly::where('header_id', $riskHeader->id)->exists();
+
+        if ($hasMonthlyData) {
+            return json(400, false, 'Tidak Dapat Dihapus', 'Risk header ini sudah memiliki data monitoring bulanan dan tidak dapat dihapus. Gunakan fitur archive jika diperlukan.', null);
+        }
+
+        // OPTIONAL: Cek apakah sudah approved dan complete
+        if ($riskHeader->status === 'approved' && $riskHeader->is_complete) {
+            return json(400, false, 'Tidak Dapat Dihapus', 'Risk header yang sudah approved dan lengkap tidak dapat dihapus. Gunakan fitur archive jika diperlukan.', null);
+        }
+
+        // PROSES DELETE
+        // 1. Hapus approval data terkait
+        \App\Models\MstApproval::where('document_id', $riskHeader->id)->delete();
+
+        // 2. Hapus monthly data jika ada (safety measure)
+        TrRiskMonthly::where('header_id', $riskHeader->id)->delete();
+
+        // 3. Simpan data untuk log sebelum dihapus
+        $deletedData = [
+            'id' => $riskHeader->id,
+            'risk_code' => $riskHeader->risk_code,
+            'jenis_risiko' => $riskHeader->jenis_risiko,
+            'sasaran' => $riskHeader->sasaran,
+            'department_id' => $riskHeader->department_id,
+            'status' => $riskHeader->status,
+            'is_complete' => $riskHeader->is_complete,
+            'created_by' => $riskHeader->created_by,
+            'created_at' => $riskHeader->created_at,
+            'deleted_by' => $currentUser->id,
+            'deleted_at' => now()
+        ];
+
+        // 4. Hapus risk header
+        $riskHeader->delete();
+
+        // 5. Log aktivitas delete (opsional)
+        \Log::info('Risk Header Deleted', [
+            'deleted_data' => $deletedData,
+            'deleted_by_user' => $currentUser->id,
+            'deleted_by_username' => $currentUser->username ?? 'Unknown'
+        ]);
+
+        DB::commit();
+
+        return json(200, true, 'Berhasil Dihapus', 'Risk header berhasil dihapus dari sistem.', [
+            'deleted_id' => $deletedData['id'],
+            'deleted_risk_code' => $deletedData['risk_code'],
+            'deleted_jenis_risiko' => clean_string($deletedData['jenis_risiko']),
+            'deleted_at' => $deletedData['deleted_at'],
+            'deleted_by' => $deletedData['deleted_by']
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+
+        \Log::error('Error deleting risk header', [
+            'risk_header_id' => $id,
+            'user_id' => auth()->id(),
+            'error' => $e->getMessage()
+        ]);
+
+        return json(500, false, 'Gagal Menghapus', 'Terjadi kesalahan sistem saat menghapus data.', $e->getMessage());
+    }
 }
 
 }

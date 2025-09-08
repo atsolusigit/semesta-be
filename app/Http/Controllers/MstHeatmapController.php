@@ -145,6 +145,51 @@ class MstHeatmapController extends Controller
         $departmentName = null; // Clear department name filter karena sudah di-override
     }
 
+    // NEW: Ambil data dari tabel master kemungkinan, dampak, dan risk categories
+    $probabilitasLabels = [];
+    $dampakLabels = [];
+    $riskCategoriesArray = [];
+    $riskCategoriesForTable = []; // untuk table data
+
+    // Ambil data dari mst_heat_map_kemungkinan
+    $kemungkinanData = \DB::table('mst_heatmap_kemungkinan')
+        ->select('id', 'label')
+        ->orderBy('id')
+        ->get();
+
+    foreach ($kemungkinanData as $item) {
+        $probabilitasLabels[(string)$item->id] = $item->label;
+    }
+
+    // Ambil data dari mst_heatmap_dampak
+    $dampakData = \DB::table('mst_heatmap_dampak')
+        ->select('id', 'label')
+        ->orderBy('id')
+        ->get();
+
+    foreach ($dampakData as $item) {
+        $dampakLabels[(string)$item->id] = $item->label;
+    }
+
+    // Ambil data dari mst_heatmap_risk_range
+    $riskRangeData = \DB::table('mst_heatmap_risk_range')
+        ->select('name', 'start', 'end', 'color')
+        ->orderBy('start')
+        ->get();
+
+    foreach ($riskRangeData as $item) {
+        // Untuk legend (array format)
+        $riskCategoriesArray[] = [
+            'name' => $item->name,
+            'min_score' => $item->start,
+            'max_score' => $item->end,
+            'color' => $item->color
+        ];
+
+        // Untuk table data (key-value format)
+        $riskCategoriesForTable[$item->name] = $item->color;
+    }
+
     // Pastikan nama model dan relasi benar
     $query = TrRiskHeader::with([
         'monthlyData' => function($q) use ($month) {
@@ -296,17 +341,8 @@ class MstHeatmapController extends Controller
         }
     }
 
-    // Convert table summary ke format array yang sesuai untuk frontend
-    // Pastikan semua kategori muncul, bahkan yang kosong
-    $riskCategories = [
-        'Low' => '#00FF00',
-        'Low to Moderate' => '#90EE90',
-        'Moderate' => '#FFFF00',
-        'Moderate to High' => '#FFA500',
-        'High' => '#FF0000'
-    ];
-
-    foreach ($riskCategories as $category => $color) {
+    // Convert table summary ke format array yang sesuai untuk frontend menggunakan data dari database
+    foreach ($riskCategoriesForTable as $category => $color) {
         $tableData[] = [
             'category' => $category,
             'color' => $color,
@@ -349,27 +385,9 @@ class MstHeatmapController extends Controller
         ],
         'table_data' => $tableData, // Data untuk tabel
         'legend' => [
-            'probabilitas_labels' => [
-                '1' => 'Sangat Jarang Terjadi',
-                '2' => 'Jarang Terjadi',
-                '3' => 'Bisa Terjadi',
-                '4' => 'Sangat Mungkin Terjadi',
-                '5' => 'Hampir Pasti Terjadi'
-            ],
-            'dampak_labels' => [
-                '1' => 'Sangat Rendah',
-                '2' => 'Rendah',
-                '3' => 'Menengah',
-                '4' => 'Tinggi',
-                '5' => 'Sangat Tinggi'
-            ],
-            'risk_categories' => [
-                ['name' => 'Low', 'min_score' => 1, 'max_score' => 5, 'color' => '#00FF00'],
-                ['name' => 'Low to Moderate', 'min_score' => 6, 'max_score' => 10, 'color' => '#90EE90'],
-                ['name' => 'Moderate', 'min_score' => 11, 'max_score' => 15, 'color' => '#FFFF00'],
-                ['name' => 'Moderate to High', 'min_score' => 16, 'max_score' => 20, 'color' => '#FFA500'],
-                ['name' => 'High', 'min_score' => 21, 'max_score' => 25, 'color' => '#FF0000']
-            ]
+            'probabilitas_labels' => $probabilitasLabels, // NEW: Data dari mst_heatmap_kemungkinan
+            'dampak_labels' => $dampakLabels, // NEW: Data dari mst_heatmap_dampak
+            'risk_categories' => $riskCategoriesArray // NEW: Data dari mst_heatmap_risk_range dalam format key-value
         ]
     ]);
 }

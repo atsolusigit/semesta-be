@@ -595,14 +595,27 @@ public function store(Request $request)
             }
         }
 
-
         $data['created_by'] = auth()->id();
-
         $data['created_by_role'] = auth()->user()->role_id;
+
+        // ============================================
+        // SET DEPARTMENT SESUAI ROLE
+        // ============================================
+
+        $currentUser = auth()->user();
+
+        // Superadmin (role 1) boleh pilih departemen dari request
+        if ($currentUser->role_id == 1) {
+            $data['department_id'] = $request->input('department_id');
+        } else {
+            // Role lain (2, 3, dst) selalu pakai department_id user
+            $data['department_id'] = $currentUser->department_id;
+        }
 
         // Status selalu pending untuk 11 field
         $data['status'] = 'pending';
         $data['is_complete'] = false;
+
 
         if (!empty($data['risk_code']) && is_array($data['risk_code'])) {
             $data['risk_code'] = implode(',', $data['risk_code']);
@@ -1618,9 +1631,16 @@ public function monitoring(Request $request)
 
 public function getPendingApproval(Request $request)
 {
+
     try {
         // IMMEDIATE BLOCK untuk role 2 dan 3
         $user = auth()->user();
+
+          \Log::info('User info for pending approval', [
+    'id' => $user->id,
+    'role_id' => $user->role_id,
+    'department_id' => $user->department_id,
+]);
 
         if (($user->role_id == 2 || $user->role_id == 3) && empty($user->department_id)) {
             return json(403, false, 'Akses Ditolak', 'Department tidak valid untuk akses ini.', null);
@@ -1635,7 +1655,6 @@ public function getPendingApproval(Request $request)
             'optionTargetSatuTahun:id,name,position',
             'createdBy:id,username',
         ])->where('status', 'pending');
-
         // PAKSA FILTER DEPARTMENT untuk role 2 dan 3
         if ($user->role_id == 2 || $user->role_id == 3) {
             $query->where('department_id', $user->department_id);
@@ -1650,6 +1669,11 @@ public function getPendingApproval(Request $request)
             }
             $query->where('department_id', $request->department_id);
         }
+
+        \Log::info('Pending approval query', [
+    'sql' => $query->toSql(),
+    'bindings' => $query->getBindings()
+]);
 
         if ($request->has('year') && $request->year) {
             $query->where('year', $request->year);

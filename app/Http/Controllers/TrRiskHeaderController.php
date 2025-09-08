@@ -1367,9 +1367,9 @@ public function monitoring(Request $request)
 
     // Helper function untuk menangani persentase dengan target yang bisa string atau angka
     $calculatePercentage = function ($target, $realization) {
-        // Jika target adalah string atau tidak numeric, return 0
+        // Jika target adalah string atau tidak numeric, return null untuk menandakan tidak dapat dihitung
         if (!is_numeric($target) || $target <= 0) {
-            return 0;
+            return null;
         }
 
         // Jika realization bukan numeric, return 0
@@ -1380,8 +1380,19 @@ public function monitoring(Request $request)
         return round(($realization / $target) * 100, 2);
     };
 
+    // Helper function untuk format target quantitative
+    $formatTargetQuantitative = function ($target) {
+        // Jika target adalah string atau mengandung huruf, return apa adanya
+        if (!is_numeric($target)) {
+            return $target;
+        }
+
+        // Jika numeric, format dengan number_format
+        return number_format($target, 0, ',', '.');
+    };
+
     // Mapping data with same structure as index
-    $orderedData = collect($data->items())->map(function ($item) use ($calculatePercentage) {
+    $orderedData = collect($data->items())->map(function ($item) use ($calculatePercentage, $formatTargetQuantitative) {
         $inherentColor = get_color_by_position($item->inherent_risk_posisi_risiko);
         $residualTargetColor = get_color_by_position($item->residual_target_posisi_risiko);
 
@@ -1416,9 +1427,9 @@ public function monitoring(Request $request)
                 $monthly[] = [
                     'bulan' => $i,
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
-                    'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                     'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
-                    'realization_percentage' => $percentage . '%',
+                    'target_quantitative' => $formatTargetQuantitative($target),
+                    'realization_percentage' => $percentage !== null ? $percentage . '%' : '-',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
                     'uploads' => $dataBulanan->uploads->map(function ($upload) {
                         return [
@@ -1433,9 +1444,9 @@ public function monitoring(Request $request)
                 $monthly[] = [
                     'bulan' => $i,
                     'residual_risk_level' => null,
-                    'residual_risk_posisi_risiko' => null,
                     'residual_risk_posisi_risiko_color' => null,
-                    'realization_percentage' => '0%',
+                    'target_quantitative' => null,
+                    'realization_percentage' => '-',
                     'is_finalized' => false,
                     'uploads' => [],
                 ];
@@ -1462,9 +1473,8 @@ public function monitoring(Request $request)
                     $monthlyEntries[] = [
                         'bulan' => $i,
                         'residual_risk_level' => $monthlyEntry->residual_risk_level_risiko,
-                        'residual_risk_posisi_risiko' => $monthlyEntry->residual_risk_posisi_risiko,
                         'residual_risk_posisi_risiko_color' => get_color_by_position($monthlyEntry->residual_risk_posisi_risiko),
-                        'realization_percentage' => $percentage . '%',
+                        'realization_percentage' => $percentage !== null ? $percentage . '%' : '-',
                         'is_finalized' => (bool) $monthlyEntry->is_finalize,
                         'monthly_entry_data' => $monthlyEntry,
                         'uploads' => $monthlyEntry->uploads->map(function ($upload) {
@@ -1479,9 +1489,8 @@ public function monitoring(Request $request)
                     $monthlyEntries[] = [
                         'bulan' => $i,
                         'residual_risk_level' => null,
-                        'residual_risk_posisi_risiko' => null,
                         'residual_risk_posisi_risiko_color' => null,
-                        'realization_percentage' => '0%',
+                        'realization_percentage' => '-',
                         'is_finalized' => false,
                         'monthly_entry_data' => null,
                         'uploads' => [],
@@ -1548,7 +1557,7 @@ public function monitoring(Request $request)
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             'department' => $item->department ?? null,
 
-            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) use ($riskCodes, $calculatePercentage) {
+            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) use ($riskCodes, $calculatePercentage, $formatTargetQuantitative) {
                 $target = $dataBulanan->target_quantitative;
                 $realization = $dataBulanan->realization_quantitative ?? 0;
                 $percentage = $calculatePercentage($target, $realization);
@@ -1564,14 +1573,14 @@ public function monitoring(Request $request)
                     'expired_date' => $dataBulanan->expired_date ? $dataBulanan->expired_date->format('Y-m-d H:i:s') : null,
                     'realization_quantitative' => $realization,
                     'realization_note' => $dataBulanan->realization_note,
-                    'target_quantitative' => $target, // PERBAIKAN: Biarkan target apa adanya (bisa string atau angka)
+                    'target_quantitative' => $formatTargetQuantitative($target), // PERBAIKAN: Format target sesuai jenis data
                     'target_notes' => $dataBulanan->target_notes,
                     'residual_risk_level_dampak' => $dataBulanan->residual_risk_level_dampak,
                     'residual_risk_level_kemungkinan' => $dataBulanan->residual_risk_level_kemungkinan,
                     'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                     'residual_risk_level_risiko' => $dataBulanan->residual_risk_level_risiko,
                     'residual_risk_level_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
-                    'realization_percentage' => $percentage . '%',
+                    'realization_percentage' => $percentage !== null ? $percentage . '%' : '-',
                     'is_finalize' => (bool) $dataBulanan->is_finalize,
                     'finalized_at' => $dataBulanan->finalized_at,
                     'finalized_by' => $dataBulanan->finalized_by,

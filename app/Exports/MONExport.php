@@ -525,12 +525,12 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             ],
             [
                 "column" => "J",
-                "name" => "BULAN ".$this->monthName." %",
+                "name" => " % s/d BULAN".$this->monthName,
                 "start_row" => "6"
             ],
             [
                 "column" => "K",
-                "name" => "TARGET TAHUN %",
+                "name" => "% TARGET TAHUN ".$this->year,
                 "start_row" => "6"
             ],
             [

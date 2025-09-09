@@ -29,6 +29,7 @@ class TrRiskMonthly extends Model
         'realization_option_position',
 
         'target_quantitative',
+        'target_kualitatif',
         'target_option',
         'target_other',
         'target_notes',

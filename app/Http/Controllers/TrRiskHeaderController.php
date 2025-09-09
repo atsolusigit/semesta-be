@@ -214,6 +214,7 @@ public function index(Request $request)
 
             'target_satu_tahun_option' => $item->target_satu_tahun_option ?? null,
             'target_satu_tahun_option_name' => $item->optionTargetSatuTahun->name ?? '',
+            'target_satu_tahun_option_type' => $item->optionTargetSatuTahun->type ?? null,
             'target_satu_tahun_notes' => $item->target_satu_tahun_notes ?? '',
             'target_satu_tahun_position' => $item->optionTargetSatuTahun->position ?? 0,
             "target_satu_tahun_type" => $item->optionTargetSatuTahun->type ?? null,
@@ -335,9 +336,13 @@ public function show($id)
         $dataBulanan = $data->monthlyData->firstWhere('month', $i);
 
         if ($dataBulanan) {
-            $target = $dataBulanan->target_quantitative ?? 0;
-            $realization = $dataBulanan->realization_quantitative ?? 0;
+            // Safe numeric conversion untuk perhitungan
+            $target = is_numeric($dataBulanan->target_quantitative) ? (float)$dataBulanan->target_quantitative : 0;
+            $realization = is_numeric($dataBulanan->realization_quantitative) ? (float)$dataBulanan->realization_quantitative : 0;
             $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+
+            // Logika untuk menentukan is_edit pada data monthly
+            $isEditMonthly = !((bool) $dataBulanan->is_finalize); // Tidak bisa edit jika sudah finalize
 
             $monthly[] = [
                 'bulan' => $i,
@@ -346,6 +351,7 @@ public function show($id)
                 'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                 'realization_percentage' => $percentage . '%',
                 'is_finalized' => (bool) $dataBulanan->is_finalize,
+                'is_edit' => $isEditMonthly,
                 'monthly_data' => $dataBulanan,
             ];
 
@@ -368,6 +374,7 @@ public function show($id)
                 'residual_risk_level_risiko' => $dataBulanan->residual_risk_level_risiko,
                 'residual_risk_level_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                 'is_finalize' => (bool) $dataBulanan->is_finalize,
+                'is_edit' => $isEditMonthly,
                 'finalized_at' => $dataBulanan->finalized_at,
                 'finalized_by' => $dataBulanan->finalized_by,
                 'created_at' => $dataBulanan->created_at,
@@ -394,6 +401,7 @@ public function show($id)
                 'residual_risk_posisi_risiko_color' => null,
                 'realization_percentage' => '0%',
                 'is_finalized' => false,
+                'is_edit' => true, // Data kosong masih bisa diedit
                 'monthly_data' => null,
             ];
 
@@ -416,6 +424,7 @@ public function show($id)
                 'residual_risk_level_risiko' => null,
                 'residual_risk_level_risiko_color' => null,
                 'is_finalize' => false,
+                'is_edit' => true, // Data kosong masih bisa diedit
                 'finalized_at' => null,
                 'finalized_by' => null,
                 'created_at' => null,
@@ -442,6 +451,10 @@ public function show($id)
             ->toArray();
     }
 
+    // Logika untuk menentukan is_edit pada data header
+    // Tidak bisa edit jika status sudah approved
+    $isEditHeader = $data->status !== 'approved';
+
     // Siapkan data utama
     $orderedData = [
         'id' => $data->id,
@@ -462,10 +475,10 @@ public function show($id)
         // Grup target satu tahun
         'target_satu_tahun_option' => $data->target_satu_tahun_option ?? null,
         'target_satu_tahun_option_name' => $data->optionTargetSatuTahun->name ?? '',
+        'target_satu_tahun_option_type' => $data->optionTargetSatuTahun->type ?? null,
         'target_satu_tahun_notes' => $data->target_satu_tahun_notes ?? '',
         'target_satu_tahun_position' => $data->optionTargetSatuTahun->position ?? 0,
         "target_satu_tahun_type" => $data->optionTargetSatuTahun->type ?? '',
-        // 'target_quantitative_satu_tahun' => number_format($data->target_quantitative_satu_tahun, 0, ',', '.'),
         'target_quantitative_satu_tahun' => format_target_quantitative($data->target_quantitative_satu_tahun),
 
         'biaya_perlakuan_risiko' => number_format($data->biaya_perlakuan_risiko, 0, ',', '.'),
@@ -476,6 +489,7 @@ public function show($id)
         'residual_target_posisi_risiko_color' => $residualTargetColor,
         'department_id' => $data->department_id,
         'year' => $data->year,
+        'is_edit' => $isEditHeader, // Properti untuk menentukan apakah header bisa diedit
         'created_at' => $data->created_at,
         'updated_at' => $data->updated_at,
 
@@ -1271,7 +1285,7 @@ private function buildResponse($riskHeader)
         'rrDampak:id,label',
         'rrKemungkinan:id,label',
         'department:id,name',
-        'optionTargetSatuTahun:id,name,position',
+        'optionTargetSatuTahun:id,name,position,type',
         'createdBy:id,username',
     ]);
 
@@ -1300,7 +1314,8 @@ private function buildResponse($riskHeader)
         'mitigasi' => clean_string($riskHeader->mitigasi),
         'target_satu_tahun_option' => $riskHeader->target_satu_tahun_option,
         'target_satu_tahun_notes' => clean_string($riskHeader->target_satu_tahun_notes),
-        'target_satu_tahun_type' => $riskHeader->optionTargetSatuTahun ? $riskHeader->optionTargetSatuTahun->name : null,
+        'target_satu_tahun_name' => $riskHeader->optionTargetSatuTahun ? $riskHeader->optionTargetSatuTahun->name : null,
+        'target_satu_tahun_type' => optional($riskHeader->optionTargetSatuTahun)->type,
         'target_quantitative_satu_tahun' => $formattedTarget,
         'biaya_perlakuan_risiko' => $riskHeader->biaya_perlakuan_risiko ? number_format($riskHeader->biaya_perlakuan_risiko, 0, ',', '.') : null,
         'department_id' => $riskHeader->department_id,

@@ -18,7 +18,7 @@ class TrRiskMonthlyController extends Controller
   public function index()
 {
     $data = TrRiskMonthly::with([
-        'header',
+        'header.optionTargetSatuTahun', // Tambahkan relasi untuk target_satu_tahun_type
         'riskCode:id,name',
         'rrLevelDampak',
         'rrLevelKemungkinan',
@@ -54,6 +54,8 @@ class TrRiskMonthlyController extends Controller
             if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
                 $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 0, ',', '.');
             }
+            // Tambahkan target_satu_tahun_type
+            $arr['header']['target_satu_tahun_type'] = $item->header->optionTargetSatuTahun->type ?? '';
         }
 
         // Remove null optional fields
@@ -116,10 +118,11 @@ class TrRiskMonthlyController extends Controller
 
     return json(200, true, 'List data', 'Data risk monthly berhasil diambil.', $cleaned);
 }
+
 public function show($id)
 {
     $data = TrRiskMonthly::with([
-        'header',
+        'header.optionTargetSatuTahun', // Tambahkan relasi untuk target_satu_tahun_type
         'riskCode:id,name',
         'rrLevelDampak',
         'rrLevelKemungkinan',
@@ -155,6 +158,8 @@ public function show($id)
             if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
                 $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 0, ',', '.');
             }
+            // Tambahkan target_satu_tahun_type
+            $arr['header']['target_satu_tahun_type'] = $data->header->optionTargetSatuTahun->type ?? '';
         }
 
     // Bersihkan field opsional jika null
@@ -208,13 +213,13 @@ public function show($id)
 
 public function getByHeader($headerId)
 {
-    $header = TrRiskHeader::find($headerId);
+    $header = TrRiskHeader::with('optionTargetSatuTahun')->find($headerId); // Tambahkan relasi
     if (!$header) {
         return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
     }
 
     $data = TrRiskMonthly::with([
-        'header',
+        'header.optionTargetSatuTahun', // Tambahkan relasi untuk target_satu_tahun_type
         'riskCode:id,name',
         'rrLevelDampak',
         'rrLevelKemungkinan',
@@ -240,6 +245,8 @@ public function getByHeader($headerId)
             if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
                 $arr['header']['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $arr['header']['biaya_perlakuan_risiko']), 0, ',', '.');
             }
+            // Tambahkan target_satu_tahun_type
+            $arr['header']['target_satu_tahun_type'] = $item->header->optionTargetSatuTahun->type ?? '';
         }
 
         // Format angka pada level monthly
@@ -309,19 +316,20 @@ public function getByHeader($headerId)
 
     // Convert header ke array dan format angka
     $headerArray = $header->toArray();
-      if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
-                $arr['header']['target_quantitative_satu_tahun'] = format_target_quantitative($arr['header']['target_quantitative_satu_tahun']);
-            }
+    if (isset($headerArray['target_quantitative_satu_tahun']) && $headerArray['target_quantitative_satu_tahun']) {
+        $headerArray['target_quantitative_satu_tahun'] = format_target_quantitative($headerArray['target_quantitative_satu_tahun']);
+    }
     if (isset($headerArray['biaya_perlakuan_risiko']) && $headerArray['biaya_perlakuan_risiko']) {
         $headerArray['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $headerArray['biaya_perlakuan_risiko']), 0, ',', '.');
     }
+    // Tambahkan target_satu_tahun_type ke headerArray
+    $headerArray['target_satu_tahun_type'] = $header->optionTargetSatuTahun->type ?? '';
 
     return json(200, true, 'Data Ditemukan', 'Data monthly untuk header berhasil diambil.', [
         'header' => $headerArray,
         'monthly_data' => $cleaned,
     ]);
 }
-
 
     public function updateResidualAndFinalize(Request $request, $id)
 {
@@ -767,6 +775,46 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
         return json(400, false, $bulkValidation['title'], $bulkValidation['message'], $bulkValidation['data']);
     }
 
+    // Deteksi tipe target dari header (Kuantitatif / Kualitatif)
+    $targetType = $header->optionTargetSatuTahun ? $header->optionTargetSatuTahun->type : 'Kuantitatif';
+
+    // Validasi type sesuai dengan data yang dikirim - cek kedua field name
+    foreach ($request->monthly_data as $index => $monthData) {
+        $hasQualitativeField = (isset($monthData['target_kualitatif']) && !empty($monthData['target_kualitatif'])) ||
+                              (isset($monthData['target_qualitatif']) && !empty($monthData['target_qualitatif']));
+
+        if ($targetType === 'Kuantitatif' && $hasQualitativeField) {
+            return json(400, false, 'Type Tidak Sesuai', 'Maaf type tidak sesuai. Header ini bertipe Kuantitatif, tidak dapat mengisi field target_kualitatif.', [
+                'header_id' => $headerId,
+                'expected_type' => 'Kuantitatif',
+                'received_type' => 'Kualitatif',
+                'error_index' => $index,
+                'detected_target_type' => $targetType
+            ]);
+        }
+
+        if ($targetType === 'Kualitatif' && !$hasQualitativeField) {
+            return json(400, false, 'Type Tidak Sesuai', 'Maaf type tidak sesuai. Header ini bertipe Kualitatif, field target_kualitatif harus diisi.', [
+                'header_id' => $headerId,
+                'expected_type' => 'Kualitatif',
+                'received_type' => 'Kuantitatif',
+                'error_index' => $index,
+                'detected_target_type' => $targetType
+            ]);
+        }
+    }
+
+    // MAPPING: Convert target_qualitatif ke target_kualitatif untuk konsistensi database
+    $originalData = $request->all();
+    if (isset($originalData['monthly_data'])) {
+        foreach ($originalData['monthly_data'] as &$monthData) {
+            if (isset($monthData['target_qualitatif'])) {
+                $monthData['target_kualitatif'] = $monthData['target_qualitatif'];
+                unset($monthData['target_qualitatif']);
+            }
+        }
+    }
+
     if ($hasMonthField) {
         $validationRules = [
             'monthly_data' => 'required|array|min:1|max:12',
@@ -776,6 +824,11 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
             'require_all_months' => 'nullable|boolean',
             'update_mode' => 'nullable|string|in:selective,complete',
         ];
+
+        // Tambahan validasi kalau tipenya Kualitatif - gunakan target_kualitatif
+        if ($targetType === 'Kualitatif') {
+            $validationRules['monthly_data.*.target_kualitatif'] = 'required|string|max:255';
+        }
     } else {
         $validationRules = [
             'monthly_data' => 'required|array|min:1|max:12',
@@ -785,19 +838,34 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
             'update_mode' => 'nullable|string|in:selective,complete',
         ];
 
+        if ($targetType === 'Kualitatif') {
+            $validationRules['monthly_data.*.target_kualitatif'] = 'required|string|max:255';
+        }
+
         if ($request->require_all_months === true) {
             $validationRules['monthly_data'] = 'required|array|size:12';
         }
     }
 
-    $validation = check_validation($request->all(), $validationRules);
+    // Validasi dengan data yang sudah dimapping
+    $validation = check_validation($originalData, $validationRules);
     if ($validation[0] == 1) {
         $errors = $validation[1]->getData(true)['data'] ?? [];
         return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
     }
 
     $updateMode = $request->update_mode ?? 'complete';
-    $processedData = process_bulk_monthly_data($request->monthly_data, $hasMonthField);
+
+    // FORCE MAPPING: Untuk data processing, map target_qualitatif ke target_kualitatif
+    $dataForProcessing = array_map(function($item) {
+        if (isset($item['target_qualitatif'])) {
+            $item['target_kualitatif'] = $item['target_qualitatif'];
+            unset($item['target_qualitatif']);
+        }
+        return $item;
+    }, $request->monthly_data);
+
+    $processedData = process_bulk_monthly_data($dataForProcessing, $hasMonthField);
     $existingMonthly = TrRiskMonthly::where('header_id', $headerId)->get()->keyBy('month');
 
     $bulkValidationResult = validate_bulk_monthly_constraints(
@@ -830,6 +898,35 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
             auth()->id()
         );
 
+        // FORCE UPDATE: Pastikan target_kualitatif tersimpan untuk tipe Kualitatif
+        if ($targetType === 'Kualitatif') {
+            foreach ($request->monthly_data as $index => $originalData) {
+                $targetKualitatif = null;
+
+                // Cek kedua kemungkinan nama field
+                if (isset($originalData['target_kualitatif']) && !empty($originalData['target_kualitatif'])) {
+                    $targetKualitatif = $originalData['target_kualitatif'];
+                } elseif (isset($originalData['target_qualitatif']) && !empty($originalData['target_qualitatif'])) {
+                    $targetKualitatif = $originalData['target_qualitatif'];
+                }
+
+                if ($targetKualitatif) {
+                    // Tentukan bulan
+                    $month = isset($originalData['month']) ? $originalData['month'] : ($index + 1);
+
+                    // Force update langsung ke database
+                    DB::table('tr_risk_monthly')
+                        ->where('header_id', $headerId)
+                        ->where('month', $month)
+                        ->update([
+                            'target_kualitatif' => $targetKualitatif,
+                            'updated_at' => now(),
+                            'updated_by' => auth()->id()
+                        ]);
+                }
+            }
+        }
+
         // Load uploads untuk header ini
         $header->load('uploads');
 
@@ -851,18 +948,22 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
         // Format data pada updated_data
         if (isset($result['updated_data']) && is_array($result['updated_data'])) {
             foreach ($result['updated_data'] as &$item) {
-                // Clean string target_quantitative
                 if (isset($item['target_quantitative'])) {
                     $item['target_quantitative'] = clean_string($item['target_quantitative']);
                 }
 
-                // Format data dalam header jika ada
+                if ($targetType === 'Kualitatif' && isset($item['target_kualitatif'])) {
+                    $item['target_kualitatif'] = clean_string($item['target_kualitatif']);
+                }
+
                 if (isset($item['header'])) {
                     if (isset($item['header']['target_quantitative_satu_tahun']) && $item['header']['target_quantitative_satu_tahun']) {
                         $item['header']['target_quantitative_satu_tahun'] = clean_string($item['header']['target_quantitative_satu_tahun']);
                     }
                     if (isset($item['header']['biaya_perlakuan_risiko'])) {
-                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko'] ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.') : '0';
+                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko']
+                            ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.')
+                            : '0';
                     }
                 }
 
@@ -897,18 +998,22 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
         // Format data pada created_data
         if (isset($result['created_data']) && is_array($result['created_data'])) {
             foreach ($result['created_data'] as &$item) {
-                // Clean string target_quantitative
                 if (isset($item['target_quantitative'])) {
                     $item['target_quantitative'] = clean_string($item['target_quantitative']);
                 }
 
-                // Format data dalam header jika ada
+                if ($targetType === 'Kualitatif' && isset($item['target_kualitatif'])) {
+                    $item['target_kualitatif'] = clean_string($item['target_kualitatif']);
+                }
+
                 if (isset($item['header'])) {
                     if (isset($item['header']['target_quantitative_satu_tahun']) && $item['header']['target_quantitative_satu_tahun']) {
                         $item['header']['target_quantitative_satu_tahun'] = clean_string($item['header']['target_quantitative_satu_tahun']);
                     }
                     if (isset($item['header']['biaya_perlakuan_risiko'])) {
-                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko'] ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.') : '0';
+                        $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko']
+                            ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.')
+                            : '0';
                     }
                 }
 
@@ -952,55 +1057,6 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
             'header_id' => $headerId,
             'error' => $e->getMessage()
         ]);
-    }
-}
-
-    public function finalize(Request $request, $id)
-{
-    $data = TrRiskMonthly::with('header')->find($id);
-    if (!$data) {
-        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
-    }
-
-    // Cek apakah data monthly atau entry-nya sudah difinalisasi
-    if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
-        return json(400, false, 'Tidak Bisa Finalisasi', 'Data sudah difinalisasi sebelumnya dari sisi bulanan atau entry.', null);
-    }
-
-    // Validasi kelengkapan data sebelum finalisasi
-    $validationResult = validate_monthly_data_for_finalization($data);
-    if (!$validationResult['valid']) {
-        return json(400, false, 'Data Tidak Lengkap', $validationResult['message'], $validationResult['missing_fields']);
-    }
-
-    DB::beginTransaction();
-    try {
-        $data->is_finalize = true;
-        $data->finalized_at = Carbon::now();
-        $data->finalized_by = auth()->id() ?? null;
-        $data->save();
-
-        $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position']);
-
-        // Handle file uploads jika ada
-        if ($request->has('uploaded_files')) {
-            process_risk_monthly_file_uploads($request->uploaded_files, $data);
-        }
-
-        DB::commit();
-
-        $dataArray = clean_monthly_data($data->toArray());
-
-        $warnings = [];
-        if ($data->month == 12 && $data->status_risiko === 'open') {
-            $warnings[] = "Risiko di bulan Desember masih open. Ini akan menjadi tindak lanjut di tahun " . ($data->header->year + 1);
-        }
-
-        return json(200, true, 'Berhasil Difinalisasi', 'Data risk monthly berhasil difinalisasi.', $dataArray, $warnings);
-
-    } catch (\Throwable $e) {
-        DB::rollBack();
-        return json(500, false, 'Gagal Difinalisasi', 'Terjadi kesalahan sistem.', $e->getMessage());
     }
 }
 

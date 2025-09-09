@@ -502,13 +502,14 @@ public function show($id)
 public function store(Request $request)
 {
     // ============================================
-    // VALIDASI WAJIB: HANYA BOLEH 11 FIELD DASAR
+    // VALIDASI WAJIB: HANYA BOLEH 12 FIELD DASAR
     // ============================================
 
     $allowedFields = [
         'department_id',
         'risk_code',
         'jenis_risiko',
+        'year',
         'sasaran',
         'peristiwa_risiko',
         'penyebab_risiko',
@@ -522,7 +523,6 @@ public function store(Request $request)
     $forbiddenFields = [
         'internal_control',
         'mitigasi',
-        'year',
         'target_quantitative_satu_tahun',
         'target_satu_tahun_option',
         'target_satu_tahun_notes',
@@ -550,7 +550,7 @@ public function store(Request $request)
             'code' => 404,
             'status' => false,
             'title' => 'AKSES DITOLAK',
-            'message' => 'MAAF! Anda hanya diizinkan mengisi 11 field dasar saja. 7 field tambahan hanya bisa diisi setelah data 11 field disetujui.',
+            'message' => 'MAAF! Anda hanya diizinkan mengisi 12 field dasar saja. 6 field tambahan hanya bisa diisi setelah data 12 field disetujui.',
             'data' => [
                 'violations' => $violations,
                 'allowed_fields' => $allowedFields,
@@ -565,10 +565,11 @@ public function store(Request $request)
     // ============================================
 
     $validator = Validator::make($request->all(), [
-        // 11 field wajib untuk penyimpanan awal
+        // 12 field wajib untuk penyimpanan awal
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
         'jenis_risiko' => 'required|string',
+        'year' => 'required|integer',
         'sasaran' => 'required|string',
         'peristiwa_risiko' => 'required|string',
         'penyebab_risiko' => 'required|string',
@@ -612,7 +613,7 @@ public function store(Request $request)
             $data['department_id'] = $currentUser->department_id;
         }
 
-        // Status selalu pending untuk 11 field
+        // Status selalu pending untuk 12 field
         $data['status'] = 'pending';
         $data['is_complete'] = false;
 
@@ -647,7 +648,7 @@ public function store(Request $request)
 
         $riskHeader = TrRiskHeader::create($data);
 
-        // Selalu buat approval entry untuk 11 field
+        // Selalu buat approval entry untuk 12 field
         $currentUser = auth()->user();
         $jabatanId = null;
 
@@ -660,7 +661,7 @@ public function store(Request $request)
 
         \App\Models\MstApproval::create([
             'document_id' => $riskHeader->id,
-            'tahun' => date('Y'),
+            'tahun' => $data['year'], // Gunakan year dari request
             'posisi' => 1,
             'jabatan_id' => $jabatanId,
             'status' => 'pending',
@@ -707,12 +708,13 @@ public function store(Request $request)
             'process_code' => $riskHeader->process_code ?? null,
             'status' => $riskHeader->status,
             'is_complete' => $riskHeader->is_complete ?? false,
+            'year' => $riskHeader->year,
             'updated_at' => $riskHeader->updated_at,
             'created_at' => $riskHeader->created_at,
             'created_by' => $riskHeader->created_by,
             'created_by_name' => $createdByName,
 
-            // 7 field tambahan selalu NULL di response store
+            // 6 field tambahan selalu NULL di response store
             'internal_control' => null,
             'mitigasi' => null,
             'target_satu_tahun_option' => null,
@@ -720,7 +722,6 @@ public function store(Request $request)
             'target_satu_tahun_type' => null,
             'target_quantitative_satu_tahun' => null,
             'biaya_perlakuan_risiko' => null,
-            'year' => null,
             'target_satu_tahun_position' => null,
             'approval_notes' => null,
             'approved_by' => null,
@@ -730,7 +731,7 @@ public function store(Request $request)
         // Tambahkan relasi
         $this->addRelationsToResponse($riskHeader, $responseData);
 
-        $message = 'Risk header (11 field dasar) berhasil disimpan dan menunggu persetujuan. Setelah disetujui, 11 field akan terkunci dan Anda dapat melengkapi 7 field sisanya melalui proses update.';
+        $message = 'Risk header (12 field dasar) berhasil disimpan dan menunggu persetujuan. Setelah disetujui, 12 field akan terkunci dan Anda dapat melengkapi 6 field sisanya melalui proses update.';
 
         return json(200, true, 'Berhasil Disimpan', $message, $responseData);
 
@@ -749,11 +750,10 @@ public function update(Request $request, $id)
     }
 
     // Cek apakah data sudah complete dan approved (tidak bisa diubah sama sekali)
-    // Jika status approved dan semua 7 field tambahan sudah terisi, maka data sudah final
+    // Jika status approved dan semua 6 field tambahan sudah terisi, maka data sudah final
     $isDataComplete = $riskHeader->status === 'approved' &&
                      !empty($riskHeader->internal_control) &&
                      !empty($riskHeader->mitigasi) &&
-                     !empty($riskHeader->year) &&
                      !empty($riskHeader->target_quantitative_satu_tahun) &&
                      !empty($riskHeader->target_satu_tahun_option) &&
                      !empty($riskHeader->target_satu_tahun_notes) &&
@@ -770,17 +770,17 @@ public function update(Request $request, $id)
     $currentStatus = $riskHeader->status;
     $isComplete = $riskHeader->is_complete ?? false;
 
-    // Skenario 1: 11 field sudah di-approve, hanya boleh isi 7 field tambahan
+    // Skenario 1: 12 field sudah di-approve, hanya boleh isi 6 field tambahan
     if ($currentStatus === 'approved' && !$isComplete) {
         return $this->handleApprovedPartialUpdate($request, $riskHeader);
     }
 
-    // Skenario 2: 11 field di-reject, hanya boleh update 11 field (7 field harus kosong)
+    // Skenario 2: 12 field di-reject, hanya boleh update 12 field (6 field harus kosong)
     if ($currentStatus === 'rejected') {
         return $this->handleRejectedUpdate($request, $riskHeader);
     }
 
-    // Skenario 3: Status pending, boleh update 11 field
+    // Skenario 3: Status pending, boleh update 12 field
     if ($currentStatus === 'pending') {
         return $this->handlePendingUpdate($request, $riskHeader);
     }
@@ -790,11 +790,10 @@ public function update(Request $request, $id)
 
 private function handleApprovedPartialUpdate(Request $request, $riskHeader)
 {
-    // 11 field sudah approved, HANYA BOLEH ISI 7 FIELD TAMBAHAN
+    // 12 field sudah approved, HANYA BOLEH ISI 6 FIELD TAMBAHAN
     $allowedFields = [
         'internal_control',
         'mitigasi',
-        'year',
         'target_quantitative_satu_tahun',
         'target_satu_tahun_option',
         'target_satu_tahun_notes',
@@ -802,7 +801,7 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
     ];
 
     $forbiddenFields = [
-        'risk_code', 'jenis_risiko', 'sasaran', 'peristiwa_risiko', 'penyebab_risiko',
+        'risk_code', 'jenis_risiko', 'year', 'sasaran', 'peristiwa_risiko', 'penyebab_risiko',
         'dampak_risiko', 'inherent_risk_level_dampak', 'inherent_risk_level_kemungkinan',
         'residual_target_level_dampak', 'residual_target_level_kemungkinan', 'department_id'
     ];
@@ -828,7 +827,7 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
             'code' => 404,
             'status' => false,
             'title' => 'AKSES DITOLAK',
-            'message' => '11 field dasar sudah disetujui dan tidak dapat diubah. Anda hanya boleh mengisi 7 field tambahan.',
+            'message' => '12 field dasar sudah disetujui dan tidak dapat diubah. Anda hanya boleh mengisi 6 field tambahan.',
             'data' => [
                 'violations' => $violations,
                 'allowed_fields' => $allowedFields,
@@ -838,7 +837,7 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
         ], 404);
     }
 
-    // Validasi 7 field tambahan (wajib diisi)
+    // Validasi 6 field tambahan (wajib diisi)
     $validator = Validator::make($request->all(), [
         'internal_control' => 'required|string',
         'mitigasi' => 'required|string',
@@ -846,11 +845,10 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
         'target_satu_tahun_notes' => 'required|string',
         'target_quantitative_satu_tahun' => 'required|string|max:500',
         'biaya_perlakuan_risiko' => 'required|numeric',
-        'year' => 'required|integer',
     ]);
 
     if ($validator->fails()) {
-        return json(400, false, 'Validasi Gagal', 'Semua 7 field tambahan wajib diisi.', $validator->errors());
+        return json(400, false, 'Validasi Gagal', 'Semua 6 field tambahan wajib diisi.', $validator->errors());
     }
 
     try {
@@ -864,7 +862,7 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
             }
         }
 
-        // Set status menjadi approved dan complete setelah 7 field diisi
+        // Set status menjadi approved dan complete setelah 6 field diisi
         $updateData['status'] = 'approved';
         $updateData['is_complete'] = true;
         $updateData['approved_by'] = auth()->id();
@@ -894,7 +892,7 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
         $riskHeader->refresh();
         $responseData = $this->buildResponse($riskHeader);
 
-        return json(200, true, 'Berhasil Dilengkapi', 'Risk header berhasil dilengkapi dengan 7 field tambahan. Data sekarang sudah final dan tidak dapat diubah lagi.', $responseData);
+        return json(200, true, 'Berhasil Dilengkapi', 'Risk header berhasil dilengkapi dengan 6 field tambahan. Data sekarang sudah final dan tidak dapat diubah lagi.', $responseData);
 
     } catch (\Exception $e) {
         DB::rollBack();
@@ -904,12 +902,13 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
 
 private function handleRejectedUpdate(Request $request, $riskHeader)
 {
-    // Data di-reject, HANYA BOLEH UPDATE 11 FIELD, 7 FIELD HARUS KOSONG
+    // Data di-reject, HANYA BOLEH UPDATE 12 FIELD, 6 FIELD HARUS KOSONG
     $allowedFields = [
         'department_id',
         'risk_code',
         'jenis_risiko',
         'sasaran',
+        'year',
         'peristiwa_risiko',
         'penyebab_risiko',
         'dampak_risiko',
@@ -922,7 +921,6 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
     $forbiddenFields = [
         'internal_control',
         'mitigasi',
-        'year',
         'target_quantitative_satu_tahun',
         'target_satu_tahun_option',
         'target_satu_tahun_notes',
@@ -950,7 +948,7 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
             'code' => 404,
             'status' => false,
             'title' => 'AKSES DITOLAK',
-            'message' => 'Data ditolak. Anda hanya boleh memperbaiki 11 field dasar saja. 7 field tambahan tidak boleh diisi.',
+            'message' => 'Data ditolak. Anda hanya boleh memperbaiki 12 field dasar saja. 6 field tambahan tidak boleh diisi.',
             'data' => [
                 'violations' => $violations,
                 'allowed_fields' => $allowedFields,
@@ -960,12 +958,13 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
         ], 404);
     }
 
-    // Validasi 11 field dasar
+    // Validasi 12 field dasar
     $validator = Validator::make($request->all(), [
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
         'jenis_risiko' => 'required|string',
         'sasaran' => 'required|string',
+        'year' => 'required|integer',
         'peristiwa_risiko' => 'required|string',
         'penyebab_risiko' => 'required|string',
         'dampak_risiko' => 'required|string',
@@ -977,7 +976,7 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
     ]);
 
     if ($validator->fails()) {
-        return json(400, false, 'Validasi Gagal', 'Validasi 11 field dasar gagal.', $validator->errors());
+        return json(400, false, 'Validasi Gagal', 'Validasi 12 field dasar gagal.', $validator->errors());
     }
 
     try {
@@ -994,10 +993,9 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
         $updateData['created_by'] = auth()->id();
         $updateData['created_by_role'] = auth()->user()->role_id;
 
-        // PAKSA kosongkan 7 field tambahan
+        // PAKSA kosongkan 6 field tambahan
         $updateData['internal_control'] = null;
         $updateData['mitigasi'] = null;
-        $updateData['year'] = null;
         $updateData['target_quantitative_satu_tahun'] = null;
         $updateData['target_satu_tahun_option'] = null;
         $updateData['target_satu_tahun_notes'] = null;
@@ -1055,6 +1053,7 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
         $existingApproval = \App\Models\MstApproval::where('document_id', $riskHeader->id)->first();
         if ($existingApproval) {
             $existingApproval->update([
+                'tahun' => $updateData['year'], // Gunakan year dari request
                 'jabatan_id' => $jabatanId,
                 'status' => 'pending',
                 'tanggal' => null,
@@ -1077,12 +1076,13 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
 
 private function handlePendingUpdate(Request $request, $riskHeader)
 {
-    // Status pending, HANYA BOLEH UPDATE 11 FIELD, 7 FIELD HARUS KOSONG
+    // Status pending, HANYA BOLEH UPDATE 12 FIELD, 6 FIELD HARUS KOSONG
     $allowedFields = [
         'department_id',
         'risk_code',
         'jenis_risiko',
         'sasaran',
+        'year',
         'peristiwa_risiko',
         'penyebab_risiko',
         'dampak_risiko',
@@ -1095,7 +1095,6 @@ private function handlePendingUpdate(Request $request, $riskHeader)
     $forbiddenFields = [
         'internal_control',
         'mitigasi',
-        'year',
         'target_quantitative_satu_tahun',
         'target_satu_tahun_option',
         'target_satu_tahun_notes',
@@ -1122,7 +1121,7 @@ private function handlePendingUpdate(Request $request, $riskHeader)
             'code' => 404,
             'status' => false,
             'title' => 'AKSES DITOLAK',
-            'message' => 'Data masih pending. Anda hanya boleh mengubah 11 field dasar saja. 7 field tambahan tidak boleh diisi.',
+            'message' => 'Data masih pending. Anda hanya boleh mengubah 12 field dasar saja. 6 field tambahan tidak boleh diisi.',
             'data' => [
                 'violations' => $violations,
                 'allowed_fields' => $allowedFields,
@@ -1132,12 +1131,13 @@ private function handlePendingUpdate(Request $request, $riskHeader)
         ], 404);
     }
 
-    // Validasi 11 field dasar
+    // Validasi 12 field dasar
     $validator = Validator::make($request->all(), [
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
         'jenis_risiko' => 'required|string',
         'sasaran' => 'required|string',
+        'year' => 'required|integer',
         'peristiwa_risiko' => 'required|string',
         'penyebab_risiko' => 'required|string',
         'dampak_risiko' => 'required|string',
@@ -1149,7 +1149,7 @@ private function handlePendingUpdate(Request $request, $riskHeader)
     ]);
 
     if ($validator->fails()) {
-        return json(400, false, 'Validasi Gagal', 'Validasi 11 field dasar gagal.', $validator->errors());
+        return json(400, false, 'Validasi Gagal', 'Validasi 12 field dasar gagal.', $validator->errors());
     }
 
     try {
@@ -1167,10 +1167,9 @@ private function handlePendingUpdate(Request $request, $riskHeader)
         $updateData['created_by'] = auth()->id();
         $updateData['created_by_role'] = auth()->user()->role_id;
 
-        // PAKSA kosongkan 7 field tambahan untuk memastikan
+        // PAKSA kosongkan 6 field tambahan untuk memastikan
         $updateData['internal_control'] = null;
         $updateData['mitigasi'] = null;
-        $updateData['year'] = null;
         $updateData['target_quantitative_satu_tahun'] = null;
         $updateData['target_satu_tahun_option'] = null;
         $updateData['target_satu_tahun_notes'] = null;
@@ -1231,6 +1230,7 @@ private function handlePendingUpdate(Request $request, $riskHeader)
         $existingApproval = \App\Models\MstApproval::where('document_id', $riskHeader->id)->first();
         if ($existingApproval) {
             $existingApproval->update([
+                'tahun' => $updateData['year'], // Gunakan year dari request
                 'jabatan_id' => $jabatanId,
                 'status' => 'pending',
                 'tanggal' => null,
@@ -1240,7 +1240,7 @@ private function handlePendingUpdate(Request $request, $riskHeader)
             // Jika tidak ada, buat baru
             \App\Models\MstApproval::create([
                 'document_id' => $riskHeader->id,
-                'tahun' => date('Y'),
+                'tahun' => $updateData['year'], // Gunakan year dari request
                 'posisi' => 1, // Selalu 1 untuk single level
                 'jabatan_id' => $jabatanId,
                 'status' => 'pending',
@@ -1705,6 +1705,7 @@ public function getPendingApproval(Request $request)
 
             return [
                 'id' => $riskHeader->id,
+                'year' => $riskHeader->year,
                 'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
                 'risk_codes' => $riskCodes,
                 'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
@@ -1720,7 +1721,6 @@ public function getPendingApproval(Request $request)
                     'id' => $riskHeader->department->id,
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
-                'year' => $riskHeader->year,
                 'status' => $riskHeader->status,
                 'created_at' => $riskHeader->created_at,
                 'created_by_name' => $createdByName,
@@ -1804,7 +1804,7 @@ public function approveRiskHeader(Request $request, $id)
             \Log::warning("Error handling approvedBy: {$e->getMessage()}");
         }
 
-        return json(200, true, 'Berhasil Disetujui', '11 field dasar berhasil disetujui dan terkunci. Silakan lengkapi 7 field tambahan untuk menyelesaikan data.', [
+        return json(200, true, 'Berhasil Disetujui', '12 field dasar berhasil disetujui dan terkunci. Silakan lengkapi 6 field tambahan untuk menyelesaikan data.', [
             'id' => $riskHeader->id,
             'status' => $riskHeader->status,
             'is_complete' => $riskHeader->is_complete,
@@ -1812,11 +1812,10 @@ public function approveRiskHeader(Request $request, $id)
             'approved_by' => $riskHeader->approved_by,
             'approved_by_name' => $approvedByName,
             'approved_at' => $riskHeader->approved_at,
-            'next_step' => 'Silakan isi 7 field tambahan melalui proses update',
+            'next_step' => 'Silakan isi 6 field tambahan melalui proses update',
             'fields_to_complete' => [
                 'internal_control',
                 'mitigasi',
-                'year',
                 'target_quantitative_satu_tahun',
                 'target_satu_tahun_option',
                 'target_satu_tahun_notes',
@@ -1887,7 +1886,6 @@ public function rejectRiskHeader(Request $request, $id)
         $riskHeader->update([
             'internal_control' => null,
             'mitigasi' => null,
-            'year' => null,
             'target_quantitative_satu_tahun' => null,
             'target_satu_tahun_option' => null,
             'target_satu_tahun_notes' => null,
@@ -1908,7 +1906,7 @@ public function rejectRiskHeader(Request $request, $id)
             \Log::warning("Error handling approvedBy: {$e->getMessage()}");
         }
 
-        return json(200, true, 'Berhasil Ditolak', 'Risk header berhasil ditolak. Silakan perbaiki 11 field dasar sesuai catatan penolakan.', [
+        return json(200, true, 'Berhasil Ditolak', 'Risk header berhasil ditolak. Silakan perbaiki 12 field dasar sesuai catatan penolakan.', [
             'id' => $riskHeader->id,
             'status' => $riskHeader->status,
             'is_complete' => $riskHeader->is_complete,
@@ -1916,14 +1914,14 @@ public function rejectRiskHeader(Request $request, $id)
             'rejected_by' => $riskHeader->approved_by,
             'rejected_by_name' => $rejectedByName,
             'rejected_at' => $riskHeader->approved_at,
-            'next_step' => 'Perbaiki 11 field dasar dan submit ulang untuk review',
+            'next_step' => 'Perbaiki 12 field dasar dan submit ulang untuk review',
             'editable_fields' => [
-                'department_id', 'risk_code', 'jenis_risiko', 'sasaran', 'peristiwa_risiko', 'penyebab_risiko',
+                'department_id', 'risk_code', 'jenis_risiko', 'year', 'sasaran', 'peristiwa_risiko', 'penyebab_risiko',
                 'dampak_risiko', 'inherent_risk_level_dampak', 'inherent_risk_level_kemungkinan',
                 'residual_target_level_dampak', 'residual_target_level_kemungkinan'
             ],
             'locked_fields' => [
-                'internal_control', 'mitigasi', 'year', 'target_quantitative_satu_tahun',
+                'internal_control', 'mitigasi', 'target_quantitative_satu_tahun',
                 'target_satu_tahun_option', 'target_satu_tahun_notes', 'biaya_perlakuan_risiko'
             ]
         ]);
@@ -2007,6 +2005,7 @@ public function getRejectedData(Request $request)
 
             return [
                 'id' => $riskHeader->id,
+                'year' => $riskHeader->year,
                 'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
                 'risk_codes' => $riskCodes,
                 'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
@@ -2022,7 +2021,6 @@ public function getRejectedData(Request $request)
                     'id' => $riskHeader->department->id,
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
-                'year' => $riskHeader->year,
                 'status' => $riskHeader->status,
                 'approval_notes' => clean_string($riskHeader->approval_notes),
                 'rejected_by' => $riskHeader->approved_by,

@@ -265,7 +265,7 @@
                 <th rowspan="2" class="col-control">INTERNAL CONTROL</th>
                 <th rowspan="2" class="col-amount">TARGET s/d BULAN {{ strtoupper($monthName) }}</th>
                 <th rowspan="2" class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th rowspan="2" class="col-percent">%</th>
+                <th rowspan="2" class="col-percent">% s/d Bulan {{ strtoupper($monthName) }}</th>
                 <th colspan="4">RESIDUAL RISK</th>
                 <th rowspan="2" class="col-amount">TARGET 1 TAHUN</th>
                 <th rowspan="2" class="col-amount">REALISASI S/D BULAN {{ strtoupper($monthName) }}</th>

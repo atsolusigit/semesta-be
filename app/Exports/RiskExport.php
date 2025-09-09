@@ -78,9 +78,38 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
     }
 
     private function formatCurrency($value)
-{
-    return 'Rp.' . number_format($value, 0, ',', '.');
-}
+    {
+        // Jika value kosong atau null, return kosong
+        if (empty($value)) {
+            return '';
+        }
+
+        // Jika value berupa string yang mengandung huruf, return as is
+        if (is_string($value) && preg_match('/[a-zA-Z]/', $value)) {
+            return $value;
+        }
+
+        // Ekstrak angka dari string jika ada
+        if (is_string($value)) {
+            // Ambil hanya angka dan titik/koma dari string
+            $numericValue = preg_replace('/[^\d.,]/', '', $value);
+            $numericValue = str_replace(',', '.', $numericValue);
+
+            // Jika setelah ekstraksi tidak ada angka, return string asli
+            if (empty($numericValue) || !is_numeric($numericValue)) {
+                return $value;
+            }
+
+            $value = floatval($numericValue);
+        }
+
+        // Pastikan value adalah numeric sebelum format
+        if (!is_numeric($value)) {
+            return $value; // Return original value jika bukan numeric
+        }
+
+        return 'Rp.' . number_format(floatval($value), 0, ',', '.');
+    }
 
     public function array(): array
     {
@@ -375,7 +404,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                     ],
                     [
                         "column" => "O",
-                        "name" => "%"
+                        "name" => "% s/d BULAN " . strtoupper($this->monthName)
                     ],
                     [
                         "column" => "T",

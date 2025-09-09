@@ -178,11 +178,49 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
-     * Format currency value
+     * Format currency value - now handles both string and numeric input
      */
-    private function formatCurrency(float $amount): string
+    private function formatCurrency($amount): string
     {
-        return 'Rp.' . number_format($amount, 0, ',', '.');
+        // Handle null or empty values
+        if ($amount === null || $amount === '') {
+            return 'Rp.0';
+        }
+
+        // If it's already a string that looks like formatted currency, return as is
+        if (is_string($amount) && (strpos($amount, 'Rp.') === 0 || !is_numeric($amount))) {
+            return $amount;
+        }
+
+        // Convert to float for numeric formatting
+        $numericAmount = is_numeric($amount) ? (float)$amount : 0;
+
+        return 'Rp.' . number_format($numericAmount, 0, ',', '.');
+    }
+
+    /**
+     * Safe numeric conversion - handles both string and numeric input
+     */
+    private function toNumeric($value): float
+    {
+        if ($value === null || $value === '') {
+            return 0;
+        }
+
+        // If it's already numeric, return as float
+        if (is_numeric($value)) {
+            return (float)$value;
+        }
+
+        // If it's a string, try to extract numeric value
+        if (is_string($value)) {
+            // Remove currency symbols and formatting
+            $cleaned = preg_replace('/[^\d.,\-]/', '', $value);
+            $cleaned = str_replace(',', '.', $cleaned);
+            return is_numeric($cleaned) ? (float)$cleaned : 0;
+        }
+
+        return 0;
     }
 
     /**
@@ -253,10 +291,11 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             // Get monthly data safely
             $monthly = $header->monthlyData?->first();
 
-            // Get values with null safety and proper casting
-            $targetBulanan = (float)($monthly->target_quantitative ?? 0);
-            $realisasiBulanan = (float)($monthly->realization_quantitative ?? 0);
-            $targetTahunan = (float)($header->target_quantitative_satu_tahun ?? 0);
+            // Get values with null safety and proper conversion
+            $targetBulanan = $this->toNumeric($monthly->target_quantitative ?? 0);
+            $realisasiBulanan = $this->toNumeric($monthly->realization_quantitative ?? 0);
+            $targetTahunan = $this->toNumeric($header->target_quantitative_satu_tahun ?? 0);
+
             // Calculate percentages
             $percentageBulanan = $this->calculatePercentage($realisasiBulanan, $targetBulanan);
             $percentageTahunan = $this->calculatePercentage($realisasiBulanan, $targetTahunan);
@@ -267,10 +306,10 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $header->jenis_risiko ?? '',                                     // 3. JENIS RISIKO
                 $header->peristiwa_risiko ?? '',                                 // 4. PERISTIWA RISIKO
                 $header->penyebab_risiko ?? '',                                  // 5. PENYEBAB RISIKO
-                $this->formatCurrency($monthly->target_quantitative ?? 0),                                                  // 6. TARGET BULAN
-                $this->formatCurrency($monthly->realization_quantitative ?? 0),                                               // 7. REALISASI BULAN
-                $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0),                                                  // 8. TARGET 1 TAHUN
-                $this->formatCurrency($monthly->realization_quantitative ?? 0),                                               // 9. REALISASI BULAN (duplikasi)
+                $this->formatCurrency($monthly->target_quantitative ?? 0),       // 6. TARGET BULAN
+                $this->formatCurrency($monthly->realization_quantitative ?? 0),  // 7. REALISASI BULAN
+                $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0), // 8. TARGET 1 TAHUN
+                $this->formatCurrency($monthly->realization_quantitative ?? 0),  // 9. REALISASI BULAN (duplikasi)
                 $percentageBulanan . '%',                                        // 10. BULAN %
                 $percentageTahunan . '%',                                        // 11. TARGET TAHUN %
                 $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),     // 12. BIAYA PERLAKUAN

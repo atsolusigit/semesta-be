@@ -48,7 +48,9 @@ class ExportRiskController extends Controller
                     'id',
                     'header_id',
                     'target_quantitative',
+                    'target_option',
                     'realization_quantitative',
+                    'realization_option',
                     'residual_risk_level_dampak',
                     'residual_risk_level_kemungkinan',
                     'residual_risk_posisi_risiko',
@@ -89,6 +91,8 @@ class ExportRiskController extends Controller
             // Other fields
             'internal_control',
             'target_quantitative_satu_tahun',
+            'target_satu_tahun_option',
+            'mitigasi',
             'biaya_perlakuan_risiko'
         ])
         // Filter berdasarkan department jika ada
@@ -99,16 +103,7 @@ class ExportRiskController extends Controller
         ->when($this->shouldFilterByUserDepartment(), function ($query) {
             $query->where('department_id', Auth::user()->department_id);
         })
-        ->when(!empty($filterYear) || !empty($filterMonth), function ($query) use ($filterYear, $filterMonth) {
-            $query->whereHas('monthlyData', function ($q) use ($filterYear, $filterMonth) {
-                if (!empty($filterYear)) {
-                    $q->whereYear('start_date', $filterYear);
-                }
-                if (!empty($filterMonth)) {
-                    $q->where('month', $filterMonth);
-                }
-            });
-        })
+        // PERBAIKAN: Hapus whereHas karena kita ingin semua header, biarkan filter monthlyData di relation
         ->orderBy('risk_code')
         ->get();
 
@@ -197,68 +192,100 @@ class ExportRiskController extends Controller
      * Prepare data untuk Risk Register PDF
      */
     private function getRiskRegisterData($headers, $monthName, $year)
-    {
-        $data = [];
-        $no = 1;
+{
+    $data = [];
+    $no = 1;
 
-        foreach ($headers as $header) {
-            $monthly = $header->monthlyData->first();
+    foreach ($headers as $header) {
+        $monthly = $header->monthlyData->first();
 
-            if (!$monthly) {
-                $target = 0;
-                $realization = 0;
-                $percentage = 0;
-                $monthlyData = (object) [
-                    'target_quantitative' => 0,
-                    'realization_quantitative' => 0,
-                    'residual_risk_level_dampak' => '',
-                    'residual_risk_level_kemungkinan' => '',
-                    'residual_risk_posisi_risiko' => '',
-                    'residual_risk_level_risiko' => '',
-                    'realization_note' => '',
-                    'status_risiko' => '',
-                ];
-            } else {
-                $target = $monthly->target_quantitative ?? 0;
-                $realization = $monthly->realization_quantitative ?? 0;
-                $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
-                $monthlyData = $monthly;
-            }
-
-            $data[] = [
-                'no' => $no++,
-                'risk_code' => $header->risk_code ?? '',
-                'jenis_risiko' => $header->jenis_risiko ?? '',
-                'sasaran' => $header->sasaran ?? '',
-                'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
-                'penyebab_risiko' => $header->penyebab_risiko ?? '',
-                'dampak_risiko' => $header->dampak_risiko ?? '',
-                'inherent_risk_level_dampak' => $header->inherent_risk_level_dampak ?? '',
-                'inherent_risk_level_kemungkinan' => $header->inherent_risk_level_kemungkinan ?? '',
-                'inherent_risk_posisi_risiko' => $header->inherent_risk_posisi_risiko ?? '',
-                'inherent_risk_level_risiko' => $header->inherent_risk_level_risiko ?? '',
-                'internal_control' => $header->internal_control ?? '',
-                'target_bulan' => $this->formatCurrency($target),
-                'realisasi_bulan' => $this->formatCurrency($realization),
-                'percentage' => $percentage . '%',
-                'residual_risk_level_dampak' => $monthlyData->residual_risk_level_dampak ?? '',
-                'residual_risk_level_kemungkinan' => $monthlyData->residual_risk_level_kemungkinan ?? '',
-                'residual_risk_posisi_risiko' => $monthlyData->residual_risk_posisi_risiko ?? '',
-                'residual_risk_level_risiko' => $monthlyData->residual_risk_level_risiko ?? '',
-                'target_1_tahun' => $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0),
-                'realisasi_duplicate' => $this->formatCurrency($realization),
-                'residual_target_level_dampak' => $header->residual_target_level_dampak ?? '',
-                'residual_target_level_kemungkinan' => $header->residual_target_level_kemungkinan ?? '',
-                'residual_target_posisi_risiko' => $header->residual_target_posisi_risiko ?? '',
-                'residual_target_level_risiko' => $header->residual_target_level_risiko ?? '',
-                'perlakuan_risiko' => $monthlyData->realization_note ?? '',
-                'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
-                'status_risiko' => $monthlyData->status_risiko ?? '',
+        if (!$monthly) {
+            $targetBulan = '0';
+            $realisasiBulan = '0';
+            $percentage = 0;
+            $monthlyData = (object) [
+                'target_quantitative' => '0',
+                'target_option' => null,
+                'realization_quantitative' => '0',
+                'realization_option' => null,
+                'residual_risk_level_dampak' => '',
+                'residual_risk_level_kemungkinan' => '',
+                'residual_risk_posisi_risiko' => '',
+                'residual_risk_level_risiko' => '',
+                'residual_target_level_dampak' => '',
+                'residual_target_level_kemungkinan' => '',
+                'residual_target_posisi_risiko' => '',
+                'residual_target_level_risiko' => '',
+                'realization_note' => '',
+                'status_risiko' => '',
             ];
+        } else {
+            // format target & realisasi bulanan
+            $targetBulan = $this->formatValueWithOption($monthly->target_quantitative ?? '0', $monthly->target_option);
+            $realisasiBulan = $this->formatValueWithOption($monthly->realization_quantitative ?? '0', $monthly->realization_option);
+
+            // hitung persentase jika numeric
+            // $targetNumeric = is_numeric($monthly->target_quantitative) ? (float)$monthly->target_quantitative : 0;
+            $targetNumeric = is_numeric(str_replace('.', '', $monthly->target_quantitative))
+            ? (float)str_replace('.', '', $monthly->target_quantitative)
+            : 0;
+            // $realisasiNumeric = is_numeric($monthly->realization_quantitative) ? (float)$monthly->realization_quantitative : 0;
+            $realisasiNumeric = is_numeric(str_replace('.', '', $monthly->realization_quantitative))
+            ? (float)str_replace('.', '', $monthly->realization_quantitative)
+            : 0;
+            $percentage = ($targetNumeric > 0) ? round(($realisasiNumeric / $targetNumeric) * 100, 2) : 0;
+
+            $monthlyData = $monthly;
         }
 
-        return $data;
+        // Target 1 Tahun (header)
+        $target1Tahun = $this->formatValueWithOption(
+            $header->target_quantitative_satu_tahun ?? '0',
+            $header->target_satu_tahun_option
+        );
+
+        // Residual Target → ambil dari monthly kalau ada, fallback ke header
+        $residualTarget = [
+            'dampak'      => $monthlyData->residual_target_level_dampak ?? $header->residual_target_level_dampak ?? '',
+            'kemungkinan' => $monthlyData->residual_target_level_kemungkinan ?? $header->residual_target_level_kemungkinan ?? '',
+            'posisi'      => $monthlyData->residual_target_posisi_risiko ?? $header->residual_target_posisi_risiko ?? '',
+            'level'       => $monthlyData->residual_target_level_risiko ?? $header->residual_target_level_risiko ?? '',
+        ];
+
+        $data[] = [
+            'no' => $no++,
+            'risk_code' => $header->risk_code ?? '',
+            'jenis_risiko' => $header->jenis_risiko ?? '',
+            'sasaran' => $header->sasaran ?? '',
+            'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
+            'penyebab_risiko' => $header->penyebab_risiko ?? '',
+            'dampak_risiko' => $header->dampak_risiko ?? '',
+            'inherent_risk_level_dampak' => $header->inherent_risk_level_dampak ?? '',
+            'inherent_risk_level_kemungkinan' => $header->inherent_risk_level_kemungkinan ?? '',
+            'inherent_risk_posisi_risiko' => $header->inherent_risk_posisi_risiko ?? '',
+            'inherent_risk_level_risiko' => $header->inherent_risk_level_risiko ?? '',
+            'internal_control' => $header->internal_control ?? '',
+            'target_bulan' => $targetBulan,
+            'realisasi_bulan' => $realisasiBulan,
+            'percentage' => $percentage . '%',
+            'residual_risk_level_dampak' => $monthlyData->residual_risk_level_dampak ?? '',
+            'residual_risk_level_kemungkinan' => $monthlyData->residual_risk_level_kemungkinan ?? '',
+            'residual_risk_posisi_risiko' => $monthlyData->residual_risk_posisi_risiko ?? '',
+            'residual_risk_level_risiko' => $monthlyData->residual_risk_level_risiko ?? '',
+            'target_1_tahun' => $target1Tahun,
+            'realisasi_duplicate' => $realisasiBulan, // bisa ganti ke realisasi 1 tahun kalau ada field-nya
+            'residual_target_level_dampak' => $residualTarget['dampak'],
+            'residual_target_level_kemungkinan' => $residualTarget['kemungkinan'],
+            'residual_target_posisi_risiko' => $residualTarget['posisi'],
+            'residual_target_level_risiko' => $residualTarget['level'],
+            'perlakuan_risiko' => $header->mitigasi ?? '',
+            'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
+            'status_risiko' => $monthlyData->status_risiko ?? '',
+        ];
     }
+
+    return $data;
+}
 
     /**
      * Prepare data untuk Monitoring PDF
@@ -271,12 +298,28 @@ class ExportRiskController extends Controller
         foreach ($headers as $header) {
             $monthly = $header->monthlyData?->first();
 
-            $targetBulanan = (float)($monthly->target_quantitative ?? 0);
-            $realisasiBulanan = (float)($monthly->realization_quantitative ?? 0);
-            $targetTahunan = (float)($header->target_quantitative_satu_tahun ?? 0);
+            // Format dengan option untuk target dan realisasi bulanan
+            $targetBulan = $monthly ?
+                $this->formatValueWithOption($monthly->target_quantitative ?? '0', $monthly->target_option) :
+                '0';
 
-            $percentageBulanan = $targetBulanan > 0 ? round(($realisasiBulanan / $targetBulanan) * 100, 2) : 0;
-            $percentageTahunan = $targetTahunan > 0 ? round(($realisasiBulanan / $targetTahunan) * 100, 2) : 0;
+            $realisasiBulan = $monthly ?
+                $this->formatValueWithOption($monthly->realization_quantitative ?? '0', $monthly->realization_option) :
+                '0';
+
+            // Format target tahunan dengan option
+            $targetTahunan = $this->formatValueWithOption(
+                $header->target_quantitative_satu_tahun ?? '0',
+                $header->target_satu_tahun_option
+            );
+
+            // Perhitungan percentage hanya jika numeric
+            $targetBulananNumeric = $monthly && is_numeric($monthly->target_quantitative) ? (float)$monthly->target_quantitative : 0;
+            $realisasiBulananNumeric = $monthly && is_numeric($monthly->realization_quantitative) ? (float)$monthly->realization_quantitative : 0;
+            $targetTahunanNumeric = is_numeric($header->target_quantitative_satu_tahun) ? (float)$header->target_quantitative_satu_tahun : 0;
+
+            $percentageBulanan = $targetBulananNumeric > 0 ? round(($realisasiBulananNumeric / $targetBulananNumeric) * 100, 2) : 0;
+            $percentageTahunan = $targetTahunanNumeric > 0 ? round(($realisasiBulananNumeric / $targetTahunanNumeric) * 100, 2) : 0;
 
             $data[] = [
                 'no' => $no++,
@@ -284,10 +327,10 @@ class ExportRiskController extends Controller
                 'jenis_risiko' => $header->jenis_risiko ?? '',
                 'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
                 'penyebab_risiko' => $header->penyebab_risiko ?? '',
-                'target_bulan' => $this->formatCurrency($targetBulanan),
-                'realisasi_bulan' => $this->formatCurrency($realisasiBulanan),
-                'target_1_tahun' => $this->formatCurrency($targetTahunan),
-                'realisasi_duplicate' => $this->formatCurrency($realisasiBulanan),
+                'target_bulan' => $targetBulan,
+                'realisasi_bulan' => $realisasiBulan,
+                'target_1_tahun' => $targetTahunan,
+                'realisasi_duplicate' => $realisasiBulan,
                 'percentage_bulan' => $percentageBulanan . '%',
                 'percentage_tahun' => $percentageTahunan . '%',
                 'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
@@ -398,6 +441,53 @@ class ExportRiskController extends Controller
         return $colorMap;
     }
 
+    /**
+     * Format value with option untuk menentukan mata uang atau format lainnya
+     */
+    private function formatValueWithOption($value, $optionId)
+    {
+        if (empty($value) || $value === '0') {
+            return '0';
+        }
+
+        // Jika tidak ada option atau option kosong, return value as is
+        if (empty($optionId)) {
+            return $value;
+        }
+
+        try {
+            // Get option dari database
+            $option = \DB::table('mst_option')->where('id', $optionId)->first();
+
+            if (!$option) {
+                return $value;
+            }
+
+            // Jika value adalah numeric dan option adalah mata uang (id 1-4 biasanya mata uang)
+            if (is_numeric($value) && in_array($optionId, [1, 2, 3, 4])) {
+                switch ($optionId) {
+                    case 1: // Rupiah
+                        return 'Rp.' . number_format((float)$value, 0, ',', '.');
+                    case 2: // Euro
+                        return '€' . number_format((float)$value, 2, ',', '.');
+                    case 3: // Dollar
+                        return '$' . number_format((float)$value, 2, ',', '.');
+                    case 4: // Yen
+                        return '¥' . number_format((float)$value, 0, ',', '.');
+                    default:
+                        return $value;
+                }
+            } else {
+                // Jika bukan numeric atau bukan mata uang, return value as is
+                return $value;
+            }
+
+        } catch (\Exception $e) {
+            // Jika error, return value original
+            return $value;
+        }
+    }
+
     private function formatCurrency($value)
     {
         return 'Rp.' . number_format($value, 0, ',', '.');
@@ -479,7 +569,9 @@ class ExportRiskController extends Controller
                         'id',
                         'header_id',
                         'target_quantitative',
+                        'target_option',
                         'realization_quantitative',
+                        'realization_option',
                         'residual_risk_level_dampak',
                         'residual_risk_level_kemungkinan',
                         'residual_risk_posisi_risiko',
@@ -511,6 +603,8 @@ class ExportRiskController extends Controller
                 'residual_target_posisi_risiko',
                 'residual_target_level_risiko',
                 'target_quantitative_satu_tahun',
+                'target_satu_tahun_option',
+                'mitigasi',
                 'biaya_perlakuan_risiko'
             ])
             ->when(!is_null($filterDepartment), function ($query) use ($filterDepartment) {
@@ -519,16 +613,7 @@ class ExportRiskController extends Controller
             ->when($this->shouldFilterByUserDepartment(), function ($query) {
                 $query->where('department_id', Auth::user()->department_id);
             })
-            ->when(!empty($filterYear) || !empty($filterMonth), function ($query) use ($filterYear, $filterMonth) {
-                $query->whereHas('monthlyData', function ($q) use ($filterYear, $filterMonth) {
-                    if (!empty($filterYear)) {
-                        $q->whereYear('start_date', $filterYear);
-                    }
-                    if (!empty($filterMonth)) {
-                        $q->where('month', $filterMonth);
-                    }
-                });
-            })
+            // PERBAIKAN: Hapus whereHas juga di preview
             ->when($id, function ($query) use ($id) {
                 if ($id > 0) {
                     $query->where('id', $id);

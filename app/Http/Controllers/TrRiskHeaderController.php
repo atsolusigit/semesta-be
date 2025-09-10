@@ -221,6 +221,7 @@ public function index(Request $request)
             'target_quantitative_satu_tahun' => format_target_quantitative($item->target_quantitative_satu_tahun),
 
             'biaya_perlakuan_risiko' => number_format($biayaPerlakuan, 0, ',', '.'),
+            'mitigasi' => $item->mitigasi ?? '',
             'residual_target_level_dampak' => $item->residual_target_level_dampak ?? 0,
             'residual_target_level_kemungkinan' => $item->residual_target_level_kemungkinan ?? 0,
             'residual_target_posisi_risiko' => $item->residual_target_posisi_risiko ?? '',
@@ -482,6 +483,7 @@ public function show($id)
         'target_quantitative_satu_tahun' => format_target_quantitative($data->target_quantitative_satu_tahun),
 
         'biaya_perlakuan_risiko' => number_format($data->biaya_perlakuan_risiko, 0, ',', '.'),
+        'mitigasi' => $data->mitigasi ?? '',
         'residual_target_level_dampak' => $data->residual_target_level_dampak ?? 0,
         'residual_target_level_kemungkinan' => $data->residual_target_level_kemungkinan ?? 0,
         'residual_target_posisi_risiko' => $data->residual_target_posisi_risiko ?? '',

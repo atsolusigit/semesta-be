@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\MstHeatmap;
 
-
 class TrRiskMonthly extends Model
 {
     protected $table = 'tr_risk_monthly';
@@ -23,6 +22,7 @@ class TrRiskMonthly extends Model
         'is_confirmed',
 
         'realization_quantitative',
+        'realization_kualitatif',
         'realization_option',
         'realization_other',
         'realization_note',
@@ -56,8 +56,6 @@ class TrRiskMonthly extends Model
     protected $casts = [
         'start_date' => 'date',
         'expired_date' => 'date',
-        'realization_quantitative' => 'decimal:2',
-        // 'target_quantitative' => 'decimal:2',
         'is_finalize' => 'boolean',
     ];
 
@@ -82,12 +80,21 @@ class TrRiskMonthly extends Model
         return $this->hasMany(TrRiskMonthlyUpload::class, 'risk_monthly_id');
     }
 
-     public function riskCode(): BelongsTo
+    // Perbaikan relasi risk code (support multiple ID)
+    public function riskCodes()
     {
-        return $this->belongsTo(MstRiskCode::class, 'risk_code', 'id');
+        $ids = $this->risk_code_array;
+        return MstRiskCode::whereIn('id', $ids)->get();
     }
 
-   public function residualHeatmap()
+    // Getter risk_code jadi array otomatis
+    public function getRiskCodeArrayAttribute()
+    {
+        if (!$this->risk_code) return [];
+        return array_filter(explode(',', $this->risk_code));
+    }
+
+    public function residualHeatmap()
     {
         return $this->belongsTo(MstHeatmapRiskRange::class, 'residual_risk_posisi_risiko', 'id');
     }
@@ -104,29 +111,17 @@ class TrRiskMonthly extends Model
         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
     }
 
-    // optional relations for entries
-//       public function entriesQuantitative()
-//     {
-//         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
-//     }
-//   public function entriesResidual()
-//     {
-//         return $this->hasMany(TrRiskMonthlyEntry::class, 'monthly_id');
-//     }
-
     public function createdBy() {
-    return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by');
     }
     public function updatedBy() {
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-
     // =====================================
     // HEATMAP RELATIONS (UPDATED)
     // =====================================
 
-    // Residual bulanan
     public function rrLevelDampak(): BelongsTo
     {
         return $this->belongsTo(MstHeatmapDampak::class, 'residual_risk_level_dampak');
@@ -137,7 +132,6 @@ class TrRiskMonthly extends Model
         return $this->belongsTo(MstHeatmapKemungkinan::class, 'residual_risk_level_kemungkinan');
     }
 
-    // Residual akhir tahun
     public function rrYearLevelDampak(): BelongsTo
     {
         return $this->belongsTo(MstHeatmapDampak::class, 'residual_risk_satutahun_level_dampak');
@@ -152,10 +146,10 @@ class TrRiskMonthly extends Model
     // OPTION RELATIONS (realization & target)
     // =====================================
 
-   public function targetOption(): BelongsTo
-{
-    return $this->belongsTo(MstOption::class, 'target_option');
-}
+    public function targetOption(): BelongsTo
+    {
+        return $this->belongsTo(MstOption::class, 'target_option');
+    }
 
     public function targetOptionPosition(): BelongsTo
     {
@@ -163,9 +157,9 @@ class TrRiskMonthly extends Model
     }
 
     public function realizationOption(): BelongsTo
-{
-    return $this->belongsTo(MstOption::class, 'realization_option');
-}
+    {
+        return $this->belongsTo(MstOption::class, 'realization_option');
+    }
 
     public function realizationOptionPosition(): BelongsTo
     {

@@ -80,35 +80,45 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
     private function formatCurrency($value)
     {
         // Jika value kosong atau null, return kosong
-        if (empty($value)) {
+        if (empty($value) || $value === null || $value === '') {
             return '';
         }
 
-        // Jika value berupa string yang mengandung huruf, return as is
+        // Jika value berupa string yang mengandung huruf (bukan angka), return as is
         if (is_string($value) && preg_match('/[a-zA-Z]/', $value)) {
             return $value;
+        }
+
+        // Jika sudah numeric, langsung format
+        if (is_numeric($value)) {
+            $numericValue = floatval($value);
+            return 'Rp.' . number_format($numericValue, 0, ',', '.');
         }
 
         // Ekstrak angka dari string jika ada
         if (is_string($value)) {
             // Ambil hanya angka dan titik/koma dari string
             $numericValue = preg_replace('/[^\d.,]/', '', $value);
-            $numericValue = str_replace(',', '.', $numericValue);
 
-            // Jika setelah ekstraksi tidak ada angka, return string asli
-            if (empty($numericValue) || !is_numeric($numericValue)) {
+            // Jika tidak ada angka sama sekali, return string asli
+            if (empty($numericValue)) {
                 return $value;
             }
 
-            $value = floatval($numericValue);
+            // Replace koma dengan titik untuk decimal
+            $numericValue = str_replace(',', '.', $numericValue);
+
+            // Jika setelah ekstraksi tidak numeric, return string asli
+            if (!is_numeric($numericValue)) {
+                return $value;
+            }
+
+            $numericValue = floatval($numericValue);
+            return 'Rp.' . number_format($numericValue, 0, ',', '.');
         }
 
-        // Pastikan value adalah numeric sebelum format
-        if (!is_numeric($value)) {
-            return $value; // Return original value jika bukan numeric
-        }
-
-        return 'Rp.' . number_format(floatval($value), 0, ',', '.');
+        // Fallback - return original value
+        return $value;
     }
 
     public function array(): array
@@ -137,7 +147,14 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
             } else {
                 $target = $monthly->target_quantitative ?? 0;
                 $realization = $monthly->realization_quantitative ?? 0;
-                $percentage = ($target > 0) ? round(($realization / $target) * 100, 2) : 0;
+
+                // Fix division by zero or string issue
+                if (is_numeric($target) && is_numeric($realization) && floatval($target) > 0) {
+                    $percentage = round((floatval($realization) / floatval($target)) * 100, 2);
+                } else {
+                    $percentage = 0;
+                }
+
                 $monthlyData = $monthly;
             }
 

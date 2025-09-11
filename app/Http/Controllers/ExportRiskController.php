@@ -91,6 +91,7 @@ class ExportRiskController extends Controller
             // Other fields
             'internal_control',
             'target_quantitative_satu_tahun',
+            'target_satu_tahun_notes',
             'target_satu_tahun_option',
             'mitigasi',
             'biaya_perlakuan_risiko'
@@ -200,57 +201,45 @@ class ExportRiskController extends Controller
         $monthly = $header->monthlyData->first();
 
         if (!$monthly) {
-            $targetBulan = '0';
-            $realisasiBulan = '0';
+            $targetBulan = '';
+            $realisasiBulan = '';
             $percentage = 0;
             $monthlyData = (object) [
-                'target_quantitative' => '0',
-                'target_option' => null,
-                'realization_quantitative' => '0',
-                'realization_option' => null,
+                'target_quantitative' => 0,
+                'target_kualitatif' => '',
+                'realization_quantitative' => 0,
+                'realization_kualitatif' => '',
                 'residual_risk_level_dampak' => '',
                 'residual_risk_level_kemungkinan' => '',
                 'residual_risk_posisi_risiko' => '',
                 'residual_risk_level_risiko' => '',
-                'residual_target_level_dampak' => '',
-                'residual_target_level_kemungkinan' => '',
-                'residual_target_posisi_risiko' => '',
-                'residual_target_level_risiko' => '',
                 'realization_note' => '',
                 'status_risiko' => '',
             ];
         } else {
-            // format target & realisasi bulanan
+            // Format target bulan menggunakan formatValueWithOption yang sudah ada
             $targetBulan = $this->formatValueWithOption($monthly->target_quantitative ?? '0', $monthly->target_option);
+
+            // Format realisasi bulan menggunakan formatValueWithOption yang sudah ada
             $realisasiBulan = $this->formatValueWithOption($monthly->realization_quantitative ?? '0', $monthly->realization_option);
 
-            // hitung persentase jika numeric
-            // $targetNumeric = is_numeric($monthly->target_quantitative) ? (float)$monthly->target_quantitative : 0;
+            // Hitung persentase seperti yang sudah ada di method asli
             $targetNumeric = is_numeric(str_replace('.', '', $monthly->target_quantitative))
-            ? (float)str_replace('.', '', $monthly->target_quantitative)
-            : 0;
-            // $realisasiNumeric = is_numeric($monthly->realization_quantitative) ? (float)$monthly->realization_quantitative : 0;
+                ? (float)str_replace('.', '', $monthly->target_quantitative)
+                : 0;
             $realisasiNumeric = is_numeric(str_replace('.', '', $monthly->realization_quantitative))
-            ? (float)str_replace('.', '', $monthly->realization_quantitative)
-            : 0;
+                ? (float)str_replace('.', '', $monthly->realization_quantitative)
+                : 0;
             $percentage = ($targetNumeric > 0) ? round(($realisasiNumeric / $targetNumeric) * 100, 2) : 0;
 
             $monthlyData = $monthly;
         }
 
-        // Target 1 Tahun (header)
+        // Target 1 Tahun menggunakan formatValueWithOption yang sudah ada
         $target1Tahun = $this->formatValueWithOption(
             $header->target_quantitative_satu_tahun ?? '0',
             $header->target_satu_tahun_option
         );
-
-        // Residual Target → ambil dari monthly kalau ada, fallback ke header
-        $residualTarget = [
-            'dampak'      => $monthlyData->residual_target_level_dampak ?? $header->residual_target_level_dampak ?? '',
-            'kemungkinan' => $monthlyData->residual_target_level_kemungkinan ?? $header->residual_target_level_kemungkinan ?? '',
-            'posisi'      => $monthlyData->residual_target_posisi_risiko ?? $header->residual_target_posisi_risiko ?? '',
-            'level'       => $monthlyData->residual_target_level_risiko ?? $header->residual_target_level_risiko ?? '',
-        ];
 
         $data[] = [
             'no' => $no++,
@@ -273,14 +262,15 @@ class ExportRiskController extends Controller
             'residual_risk_posisi_risiko' => $monthlyData->residual_risk_posisi_risiko ?? '',
             'residual_risk_level_risiko' => $monthlyData->residual_risk_level_risiko ?? '',
             'target_1_tahun' => $target1Tahun,
-            'realisasi_duplicate' => $realisasiBulan, // bisa ganti ke realisasi 1 tahun kalau ada field-nya
-            'residual_target_level_dampak' => $residualTarget['dampak'],
-            'residual_target_level_kemungkinan' => $residualTarget['kemungkinan'],
-            'residual_target_posisi_risiko' => $residualTarget['posisi'],
-            'residual_target_level_risiko' => $residualTarget['level'],
+            'realisasi_duplicate' => $realisasiBulan,
+            'residual_target_level_dampak' => $header->residual_target_level_dampak ?? '',
+            'residual_target_level_kemungkinan' => $header->residual_target_level_kemungkinan ?? '',
+            'residual_target_posisi_risiko' => $header->residual_target_posisi_risiko ?? '',
+            'residual_target_level_risiko' => $header->residual_target_level_risiko ?? '',
             'perlakuan_risiko' => $header->mitigasi ?? '',
             'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
             'status_risiko' => $monthlyData->status_risiko ?? '',
+            'target_satu_tahun_notes' => $header->target_satu_tahun_notes ?? '',
         ];
     }
 
@@ -291,58 +281,64 @@ class ExportRiskController extends Controller
      * Prepare data untuk Monitoring PDF
      */
     private function getMonitoringData($headers, $monthName, $year)
-    {
-        $data = [];
-        $no = 1;
+{
+    $data = [];
+    $no = 1;
 
-        foreach ($headers as $header) {
-            $monthly = $header->monthlyData?->first();
+    foreach ($headers as $header) {
+        $monthly = $header->monthlyData?->first();
 
-            // Format dengan option untuk target dan realisasi bulanan
-            $targetBulan = $monthly ?
-                $this->formatValueWithOption($monthly->target_quantitative ?? '0', $monthly->target_option) :
-                '0';
+        // Format menggunakan formatValueWithOption yang sudah ada
+        $targetBulan = $monthly ?
+            $this->formatValueWithOption($monthly->target_quantitative ?? '0', $monthly->target_option) :
+            '0';
 
-            $realisasiBulan = $monthly ?
-                $this->formatValueWithOption($monthly->realization_quantitative ?? '0', $monthly->realization_option) :
-                '0';
+        $realisasiBulan = $monthly ?
+            $this->formatValueWithOption($monthly->realization_quantitative ?? '0', $monthly->realization_option) :
+            '0';
 
-            // Format target tahunan dengan option
-            $targetTahunan = $this->formatValueWithOption(
-                $header->target_quantitative_satu_tahun ?? '0',
-                $header->target_satu_tahun_option
-            );
+        // Format target tahunan menggunakan formatValueWithOption yang sudah ada
+        $targetTahunan = $this->formatValueWithOption(
+            $header->target_quantitative_satu_tahun ?? '0',
+            $header->target_satu_tahun_option
+        );
 
-            // Perhitungan percentage hanya jika numeric
-            $targetBulananNumeric = $monthly && is_numeric($monthly->target_quantitative) ? (float)$monthly->target_quantitative : 0;
-            $realisasiBulananNumeric = $monthly && is_numeric($monthly->realization_quantitative) ? (float)$monthly->realization_quantitative : 0;
-            $targetTahunanNumeric = is_numeric($header->target_quantitative_satu_tahun) ? (float)$header->target_quantitative_satu_tahun : 0;
+        // Perhitungan percentage seperti yang sudah ada
+        $targetBulananNumeric = $monthly && is_numeric($monthly->target_quantitative) ? (float)$monthly->target_quantitative : 0;
+        $realisasiBulananNumeric = $monthly && is_numeric($monthly->realization_quantitative) ? (float)$monthly->realization_quantitative : 0;
+        $targetTahunanNumeric = is_numeric($header->target_quantitative_satu_tahun) ? (float)$header->target_quantitative_satu_tahun : 0;
 
-            $percentageBulanan = $targetBulananNumeric > 0 ? round(($realisasiBulananNumeric / $targetBulananNumeric) * 100, 2) : 0;
-            $percentageTahunan = $targetTahunanNumeric > 0 ? round(($realisasiBulananNumeric / $targetTahunanNumeric) * 100, 2) : 0;
+        $percentageBulanan = $targetBulananNumeric > 0 ? round(($realisasiBulananNumeric / $targetBulananNumeric) * 100, 2) : 0;
+        $percentageTahunan = $targetTahunanNumeric > 0 ? round(($realisasiBulananNumeric / $targetTahunanNumeric) * 100, 2) : 0;
 
-            $data[] = [
-                'no' => $no++,
-                'risk_code' => $header->risk_code ?? '',
-                'jenis_risiko' => $header->jenis_risiko ?? '',
-                'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
-                'penyebab_risiko' => $header->penyebab_risiko ?? '',
-                'target_bulan' => $targetBulan,
-                'realisasi_bulan' => $realisasiBulan,
-                'target_1_tahun' => $targetTahunan,
-                'realisasi_duplicate' => $realisasiBulan,
-                'percentage_bulan' => $percentageBulanan . '%',
-                'percentage_tahun' => $percentageTahunan . '%',
-                'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
-                'level_dampak' => $header->residual_target_level_dampak ?? '',
-                'level_kemungkinan' => $header->residual_target_level_kemungkinan ?? '',
-                'posisi_risiko' => $header->residual_target_posisi_risiko ?? '',
-                'level_risiko' => $header->residual_target_level_risiko ?? ''
-            ];
-        }
+        // Pastikan evaluasi perlakuan risiko diambil dengan benar
+        $evaluasiPerlakuanRisiko = $header->target_satu_tahun_notes ?? '';
 
-        return $data;
+        $data[] = [
+            'no' => $no++,
+            'risk_code' => $header->risk_code ?? '',
+            'jenis_risiko' => $header->jenis_risiko ?? '',
+            'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
+            'penyebab_risiko' => $header->penyebab_risiko ?? '',
+            'target_bulan' => $targetBulan,
+            'realisasi_bulan' => $realisasiBulan,
+            'target_1_tahun' => $targetTahunan,
+            'realisasi_duplicate' => $realisasiBulan,
+            'percentage_bulan' => $percentageBulanan . '%',
+            'percentage_tahun' => $percentageTahunan . '%',
+            'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
+            'level_dampak' => $header->residual_target_level_dampak ?? '',
+            'level_kemungkinan' => $header->residual_target_level_kemungkinan ?? '',
+            'posisi_risiko' => $header->residual_target_posisi_risiko ?? '',
+            'level_risiko' => $header->residual_target_level_risiko ?? '',
+            'target_satu_tahun_notes' => $evaluasiPerlakuanRisiko,
+            'evaluasi_perlakuan_risiko' => $evaluasiPerlakuanRisiko,
+            'evaluasi_perlakuan' => $evaluasiPerlakuanRisiko,
+        ];
     }
+
+    return $data;
+}
 
     /**
      * Prepare data untuk Heatmap PDF
@@ -604,6 +600,7 @@ class ExportRiskController extends Controller
                 'residual_target_level_risiko',
                 'target_quantitative_satu_tahun',
                 'target_satu_tahun_option',
+                'target_satu_tahun_notes',
                 'mitigasi',
                 'biaya_perlakuan_risiko'
             ])

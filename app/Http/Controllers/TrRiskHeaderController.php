@@ -261,8 +261,10 @@ public function index(Request $request)
                     'expired_date' => $dataBulanan->expired_date ? $dataBulanan->expired_date->format('Y-m-d H:i:s') : null,
                     // Return original value untuk display
                     'realization_quantitative' => $dataBulanan->realization_quantitative,
+                    'realization_kualitatif' => $dataBulanan->realization_kualitatif,
                     'realization_note' => $dataBulanan->realization_note,
                     'target_quantitative' => $dataBulanan->target_quantitative,
+                    'target_kualitatif' => $dataBulanan->target_kualitatif,
                     'target_notes' => $dataBulanan->target_notes,
                     'residual_risk_level_dampak' => $dataBulanan->residual_risk_level_dampak,
                     'residual_risk_level_kemungkinan' => $dataBulanan->residual_risk_level_kemungkinan,

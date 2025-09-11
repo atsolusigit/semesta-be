@@ -121,6 +121,54 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
         return $value;
     }
 
+    private function formatTarget($quantitative, $qualitative)
+    {
+        $result = '';
+
+        // Format quantitative jika ada
+        if (!empty($quantitative) && $quantitative !== null && $quantitative !== '') {
+            if (is_numeric($quantitative) && floatval($quantitative) > 0) {
+                $result .= $this->formatCurrency($quantitative);
+            } else {
+                $result .= $quantitative;
+            }
+        }
+
+        // Format qualitative jika ada
+        if (!empty($qualitative) && $qualitative !== null && $qualitative !== '') {
+            if (!empty($result)) {
+                $result .= "\n"; // Line break untuk memisahkan
+            }
+            $result .= $qualitative;
+        }
+
+        return $result;
+    }
+
+    private function formatTargetBulan($monthly)
+    {
+        if (!$monthly) {
+            return '';
+        }
+
+        return $this->formatTarget(
+            $monthly->target_quantitative ?? '',
+            $monthly->target_kualitatif ?? ''
+        );
+    }
+
+    private function formatRealizationBulan($monthly)
+    {
+        if (!$monthly) {
+            return '';
+        }
+
+        return $this->formatTarget(
+            $monthly->realization_quantitative ?? '',
+            $monthly->realization_kualitatif ?? ''
+        );
+    }
+
     public function array(): array
     {
         $data = [];
@@ -136,7 +184,9 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $monthlyData = (object) [
                     'id' => 'NO_MONTHLY',
                     'target_quantitative' => 0,
+                    'target_kualitatif' => '',
                     'realization_quantitative' => 0,
+                    'realization_kualitatif' => '',
                     'residual_risk_level_dampak' => '',
                     'residual_risk_level_kemungkinan' => '',
                     'residual_risk_posisi_risiko' => '',
@@ -158,13 +208,23 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $monthlyData = $monthly;
             }
 
+            // Ambil risk code dari relasi mst_risk_code
+            $riskCode = '';
+            if (isset($header->riskCode) && $header->riskCode) {
+                $riskCode = $header->riskCode->code ?? '';
+            } else if (isset($header->risk_code_id)) {
+                // Fallback: query langsung jika relasi tidak di-load
+                $riskCodeData = DB::table('mst_risk_code')->where('id', $header->risk_code_id)->first();
+                $riskCode = $riskCodeData->code ?? '';
+            }
+
             $data[] = [
                 // DEBUG COLUMNS - Keep for now
                 // $header->id, // Header ID
                 // $monthlyData->id ?? 'NO_MONTHLY', // Monthly ID
 
                 $no++, // No
-                $header->risk_code ?? '', // Kode Risiko
+                $riskCode, // Kode Risiko - FIXED: ambil dari relasi mst_risk_code
                 $header->jenis_risiko ?? '', // Jenis Risiko
                 $header->sasaran ?? '', // Sasaran
                 $header->peristiwa_risiko ?? '', // Peristiwa Risiko
@@ -178,8 +238,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $header->inherent_risk_level_risiko ?? '',
 
                 $header->internal_control ?? '', // Internal Control
-                $this->formatCurrency($target),           // Target Bulan
-                $this->formatCurrency($realization),      // Realisasi Bulan
+                $this->formatTargetBulan($monthlyData),           // Target Bulan (Quantitative + Qualitative)
+                $this->formatRealizationBulan($monthlyData),      // Realisasi Bulan (Quantitative + Qualitative)
                 $percentage . '%', // Persentase Bulan
 
                 // Residual Risk Saat Ini (4 kolom)
@@ -188,8 +248,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $monthlyData->residual_risk_posisi_risiko ?? '',
                 $monthlyData->residual_risk_level_risiko ?? '',
 
-                $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0), // Target 1 Tahun
-                $this->formatCurrency($realization),                                // Realisasi (duplicate)
+                $this->formatTarget($header->target_quantitative_satu_tahun ?? 0, $header->target_kualitatif_satu_tahun ?? ''), // Target 1 Tahun (Combined)
+                $this->formatRealizationBulan($monthlyData),                                // Realisasi (duplicate)
 
                 // Residual Target Risk (4 kolom)
                 $header->residual_target_level_dampak ?? '',
@@ -197,7 +257,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $header->residual_target_posisi_risiko ?? '',
                 $header->residual_target_level_risiko ?? '',
 
-                $monthlyData->realization_note ?? '', // Perlakuan Risiko
+                // $monthlyData->realization_note ?? '', // Perlakuan Risiko
+                $header->mitigasi ?? '', // Perlakuan Risiko
                 $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),         // Biaya Perlakuan
 
 
@@ -471,8 +532,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                     'K' => 8,   // LEVEL
 
                     'L' => 30,  // INTERNAL CONTROL (lebih lebar)
-                    'M' => 12,  // TARGET BULAN
-                    'N' => 12,  // REALISASI BULAN
+                    'M' => 15,  // TARGET BULAN (lebih lebar untuk kombinasi)
+                    'N' => 15,  // REALISASI BULAN (lebih lebar untuk kombinasi)
                     'O' => 5,   // % (lebih kecil)
 
                     // RESIDUAL RISK SAAT INI
@@ -481,8 +542,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                     'R' => 6,   // POSISI
                     'S' => 8,   // LEVEL
 
-                    'T' => 12,  // TARGET 1 TAHUN
-                    'U' => 12,  // REALISASI
+                    'T' => 15,  // TARGET 1 TAHUN (lebih lebar untuk kombinasi)
+                    'U' => 15,  // REALISASI (lebih lebar untuk kombinasi)
 
                     // RESIDUAL TARGET RISK
                     'V' => 6,   // DAMPAK
@@ -609,10 +670,23 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                     ]);
                 }
 
+                // Khusus untuk kolom yang menggabungkan quantitative dan qualitative
+                $combinedColumns = ['M', 'N', 'T', 'U']; // Target Bulan, Realisasi Bulan, Target 1 Tahun, Realisasi
+                foreach ($combinedColumns as $col) {
+                    $sheet->getStyle($col . $dataStartRow . ':' . $col . $totalRows)->applyFromArray([
+                        'alignment' => [
+                            'vertical' => Alignment::VERTICAL_TOP,
+                            'horizontal' => Alignment::HORIZONTAL_LEFT,
+                            'wrapText' => true,
+                            'shrinkToFit' => false
+                        ]
+                    ]);
+                }
+
                 // Set row heights
                 $sheet->getRowDimension(7)->setRowHeight(50); // Header row lebih tinggi
                 for ($row = $dataStartRow; $row <= $totalRows; $row++) {
-                    $sheet->getRowDimension($row)->setRowHeight(60); // Set minimum height untuk wrap text
+                    $sheet->getRowDimension($row)->setRowHeight(80); // Set height lebih tinggi untuk kombinasi data
                 }
             }
         ];

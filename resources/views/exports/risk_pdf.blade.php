@@ -265,7 +265,7 @@
                 <th rowspan="2" class="col-control">INTERNAL CONTROL</th>
                 <th rowspan="2" class="col-amount">TARGET s/d BULAN {{ strtoupper($monthName) }}</th>
                 <th rowspan="2" class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th rowspan="2" class="col-percent">% s/d Bulan {{ strtoupper($monthName) }}</th>
+                <th rowspan="2" class="col-percent">%</th>
                 <th colspan="4">RESIDUAL RISK</th>
                 <th rowspan="2" class="col-amount">TARGET 1 TAHUN</th>
                 <th rowspan="2" class="col-amount">REALISASI S/D BULAN {{ strtoupper($monthName) }}</th>
@@ -334,7 +334,7 @@
         </tbody>
     </table>
 
-   <!-- HALAMAN 2: MONITORING RISIKO -->
+  <!-- HALAMAN 2: MONITORING RISIKO -->
 @php
     use Carbon\Carbon;
 
@@ -378,6 +378,7 @@
                 <th rowspan="3" class="col-percent" style="vertical-align: middle;">TARGET TAHUN %</th>
                 <th rowspan="3" class="col-amount" style="vertical-align: middle;">BIAYA PERLAKUAN RISIKO</th>
                 <th colspan="4">RESIDUAL TARGET RISK</th>
+                <th rowspan="3" class="col-treatment" style="vertical-align: middle;">EVALUASI PERLAKUAN RISIKO</th>
             </tr>
             <tr>
                 <th colspan="4">TAHUN {{ $year }}<br>{{ $triwulan }}<br>BULAN {{ strtoupper($monthName) }}</th>
@@ -412,6 +413,7 @@
                 <td class="text-center">{{ $row['level_kemungkinan'] }}</td>
                 <td class="text-center">{{ $row['posisi_risiko'] }}</td>
                 <td class="text-center risk-level-cell" data-level="{{ $row['level_risiko'] }}">{{ $row['level_risiko'] }}</td>
+                <td class="text-left">{{ $row['evaluasi_perlakuan'] ?? '' }}</td>
             </tr>
             @endforeach
         </tbody>

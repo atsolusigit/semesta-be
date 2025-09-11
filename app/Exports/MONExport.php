@@ -49,7 +49,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         'High' => 'FF0000'
     ];
 
-    // Column configurations
+    // Column configurations - Hanya menambah kolom R untuk Evaluasi Perlakuan Risiko
     private const COLUMN_WIDTHS = [
         'A' => 5,   // NO
         'B' => 12,  // KODE RISIKO
@@ -62,11 +62,12 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         'I' => 12,  // % BULANAN
         'J' => 12,  // % TAHUNAN
         'K' => 12,  // BIAYA
-        'L' => 18,  // LEVEL DAMPAK
-        'M' => 15,  // LEVEL KEMUNGKINAN
-        'N' => 15,  // POSISI RISIKO
-        'O' => 12,  // LEVEL RISIKO
-        'p' => 12
+        'L' => 25,  // EVALUASI PERLAKUAN RISIKO - KEMBALI KE POSISI ASLI
+        'M' => 18,  // LEVEL DAMPAK
+        'N' => 15,  // LEVEL KEMUNGKINAN
+        'O' => 15,  // POSISI RISIKO
+        'P' => 12,  // LEVEL RISIKO
+        'Q' => 25   // EVALUASI PERLAKUAN RISIKO - POSISI BARU
     ];
 
     /**
@@ -240,22 +241,12 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             [''], // Empty row
             [''], // Empty row
             [''], // Empty row
-            // [
-            //     '', '', '', '',
-            //     'WAKTU PELAKSANAAN', '', '', '', '', '', '',
-            //     'RESIDUAL TARGET RISK', '', '', ''
-            // ],
-            // [
-            //     '', '', '', '',
-            //     "TAHUN {$this->year}", '', '', '', '', '', '',
-            //     '', '', '', ''
-            // ],
             $this->buildColumnHeaders()
         ];
     }
 
     /**
-     * Build column headers
+     * Build column headers - Hanya memindahkan Evaluasi Perlakuan Risiko ke akhir
      */
     private function buildColumnHeaders(): array
     {
@@ -275,12 +266,13 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             'LEVEL DAMPAK',
             'LEVEL KEMUNGKINAN',
             'POSISI RISIKO',
-            'LEVEL RISIKO'
+            'LEVEL RISIKO',
+            'EVALUASI PERLAKUAN RISIKO' // DIPINDAH KE AKHIR
         ];
     }
 
     /**
-     * Build data rows from headers
+     * Build data rows from headers - Hanya memindahkan Evaluasi Perlakuan Risiko ke akhir
      */
     private function buildDataRows(): array
     {
@@ -316,7 +308,8 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
                 $header->residual_target_level_dampak ?? '',                     // 13. LEVEL DAMPAK
                 $header->residual_target_level_kemungkinan ?? '',                // 14. LEVEL KEMUNGKINAN
                 $header->residual_target_posisi_risiko ?? '',                    // 15. POSISI RISIKO
-                $header->residual_target_level_risiko ?? ''                      // 16. LEVEL RISIKO
+                $header->residual_target_level_risiko ?? '',                     // 16. LEVEL RISIKO
+                $header->target_satu_tahun_notes ?? ''                           // 17. EVALUASI PERLAKUAN RISIKO (DIPINDAH KE AKHIR)
             ];
 
             $no++;
@@ -350,10 +343,6 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
 
             // Sub headers with background
             10 => $this->getSubHeaderStyle(),
-            // 7 => $this->getSubHeaderStyle(),
-
-            // Column headers
-            // 7 => $this->getColumnHeaderStyle()
         ];
     }
 
@@ -440,19 +429,15 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
-     * Merge cells for headers
+     * Merge cells for headers - Update range ke Q untuk menampung kolom baru
      */
     private function mergeCells(Worksheet $sheet): void
     {
         $mergeRanges = [
-            'A1:O1', // KERTAS KERJA MONITORING RISIKO
-            'A2:O2', // PT. KAWASAN BERIKAT NUSANTARA
-            'A3:O3', // UNIT KERJA
-            'A4:O4', // PERIODE
-            // 'E6:K6', // WAKTU PELAKSANAAN
-            // 'E7:K7', // TAHUN
-            // 'L6:O6', // RESIDUAL TARGET RISK
-            // 'L7:O7'  // Empty cell untuk RESIDUAL TARGET RISK
+            'A1:Q1', // KERTAS KERJA MONITORING RISIKO
+            'A2:Q2', // PT. KAWASAN BERIKAT NUSANTARA
+            'A3:Q3', // UNIT KERJA
+            'A4:Q4', // PERIODE
         ];
 
         foreach ($mergeRanges as $range) {
@@ -483,7 +468,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             ],
             [
                 "range_start" => "M6",
-                "range_end" => "P7",
+                "range_end" => "P7", // RESIDUAL TARGET RISK hanya M-P (tidak termasuk Q)
                 "name" => "RESIDUAL TARGET RISK"
             ],
         );
@@ -494,7 +479,6 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
 
             $this->setHeaderHorizontalStyle($sheet, $value['range_start'].':'.$value['range_end'], 'FFd8e4bc', 8, true);
         }
-        //merge header horizontal (for inherent risk, residual risk and residual target)
 
         //merge header vertical
         $mergeVertical = array(
@@ -525,7 +509,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             ],
             [
                 "column" => "J",
-                "name" => " % s/d BULAN".$this->monthName,
+                "name" => " % s/d BULAN ".$this->monthName,
                 "start_row" => "6"
             ],
             [
@@ -558,6 +542,11 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
                 "name" => "LEVEL RISIKO",
                 "start_row" => "8"
             ],
+            [
+                "column" => "Q",
+                "name" => "EVALUASI PERLAKUAN RISIKO", // KOLOM Q TERPISAH
+                "start_row" => "6"
+            ],
         );
 
         foreach ($mergeVertical as $value) {
@@ -566,7 +555,6 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
 
             $this->setHeaderHorizontalStyle($sheet, $value['column'].$value['start_row'].':'.$value['column'].'10', 'FFd8e4bc', 8, true);
         }
-        //merge header vertical
     }
 
     /**
@@ -580,12 +568,12 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
-     * Apply styling to data rows
+     * Apply styling to data rows - Update range ke Q
      */
     private function applyDataRowStyling(Worksheet $sheet): void
     {
         $lastRow = self::HEADER_ROWS + $this->headers->count();
-        $dataRange = "A" . self::DATA_START_ROW . ":P{$lastRow}";
+        $dataRange = "A" . self::DATA_START_ROW . ":Q{$lastRow}";
 
         $sheet->getStyle($dataRange)->applyFromArray([
             'borders' => [
@@ -602,21 +590,21 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
-     * Apply column-specific alignments
+     * Apply column-specific alignments - Menambah kolom Q untuk left alignment
      */
     private function applyColumnAlignments(Worksheet $sheet): void
     {
         $lastRow = self::HEADER_ROWS + $this->headers->count();
 
         // Center alignment untuk nomor, kode, target, realisasi, persentase, dan level
-        $centerColumns = ['A', 'B', 'E', 'F', 'G', 'H', 'I', 'J', 'L', 'M', 'N', 'O', 'P'];
+        $centerColumns = ['A', 'B', 'F', 'G', 'H', 'I', 'J', 'K', 'M', 'N', 'O', 'P'];
         foreach ($centerColumns as $col) {
             $range = "{$col}" . self::DATA_START_ROW . ":{$col}{$lastRow}";
             $sheet->getStyle($range)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
 
         // Left alignment untuk kolom text yang panjang
-        $leftColumns = ['C', 'D', 'E']; // Jenis dan Penyebab Risiko
+        $leftColumns = ['C', 'D', 'E', 'Q']; // Q untuk Evaluasi Perlakuan Risiko
         foreach ($leftColumns as $col) {
             $range = "{$col}" . self::DATA_START_ROW . ":{$col}{$lastRow}";
             $sheet->getStyle($range)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
@@ -628,7 +616,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
-     * Apply colors to risk level column
+     * Apply colors to risk level column - Tetap di kolom P
      */
     private function applyRiskLevelColors(Worksheet $sheet): void
     {
@@ -638,7 +626,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
             $levelRisiko = $header->residual_target_level_risiko ?? '';
             $color = $this->getRiskColor($levelRisiko);
 
-            // Apply color ke kolom O (Level Risiko)
+            // Apply color ke kolom P (Level Risiko)
             $sheet->getStyle("P{$rowIndex}")->applyFromArray([
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,

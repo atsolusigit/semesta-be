@@ -6,11 +6,7 @@ WORKDIR /app
 
 COPY . /app
 
-RUN install-php-extensions \
-    pcntl \
-    zip \
-    pdo_mysql \
-    gd
+RUN docker-php-ext-install pcntl pdo_mysql zip gd
 
 RUN curl -sS https://getcomposer.org/installer | php && \
     php composer.phar install --no-dev --optimize-autoloader

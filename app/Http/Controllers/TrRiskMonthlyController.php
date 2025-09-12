@@ -52,8 +52,10 @@ class TrRiskMonthlyController extends Controller
                 $arr['realization_quantitative'] = number_format((float)$arr['realization_quantitative'], 0, ',', '.');
             }
         }
-        if (isset($arr['target_quantitative']) && $arr['target_quantitative']) {
-            $arr['target_quantitative'] = number_format((float)$arr['target_quantitative'], 0, ',', '.');
+        if (isset($arr['target_quantitative']) && $arr['target_quantitative'] !== null && $arr['target_quantitative'] !== '') {
+            if (is_numeric($arr['target_quantitative'])) {
+                $arr['target_quantitative'] = number_format((float)$arr['target_quantitative'], 0, ',', '.');
+            }
         }
 
         // Format angka pada header
@@ -104,9 +106,17 @@ class TrRiskMonthlyController extends Controller
                     $realizationQuantitative = number_format((float)$realizationQuantitative, 0, ',', '.');
                 }
             }
+
+            $targetQuantitative = $entry['target_quantitative'];
+            if ($targetQuantitative !== null && $targetQuantitative !== '') {
+                if (is_numeric($targetQuantitative)) {
+                    $targetQuantitative = number_format((float)$targetQuantitative, 0, ',', '.');
+                }
+            }
+
             return [
                 'id' => $entry['id'],
-                'target_quantitative' => $entry['target_quantitative'],
+                'target_quantitative' => $targetQuantitative,
                 'realization_quantitative' => $realizationQuantitative,
                 'target_notes' => $entry['target_notes'],
                 'realization_notes' => $entry['realization_note'],
@@ -161,8 +171,10 @@ public function show($id)
         }
     }
 
-    if (isset($arr['target_quantitative']) && $arr['target_quantitative']) {
-        $arr['target_quantitative'] = number_format((float)$arr['target_quantitative'], 0, ',', '.');
+    if (isset($arr['target_quantitative']) && $arr['target_quantitative'] !== null && $arr['target_quantitative'] !== '') {
+        if (is_numeric($arr['target_quantitative'])) {
+            $arr['target_quantitative'] = number_format((float)$arr['target_quantitative'], 0, ',', '.');
+        }
     }
 
     // Format angka pada header jika ada
@@ -252,8 +264,10 @@ public function getByHeader($headerId)
             }
         }
 
-        if (isset($arr['target_quantitative']) && $arr['target_quantitative']) {
-            $arr['target_quantitative'] = number_format((float)str_replace(',', '', $arr['target_quantitative']), 0, ',', '.');
+        if (isset($arr['target_quantitative']) && $arr['target_quantitative'] !== null && $arr['target_quantitative'] !== '') {
+            if (is_numeric(str_replace(',', '', $arr['target_quantitative']))) {
+                $arr['target_quantitative'] = number_format((float)str_replace(',', '', $arr['target_quantitative']), 0, ',', '.');
+            }
         }
 
         if (is_null($arr['target_option_position'] ?? null)) unset($arr['target_option_position']);
@@ -292,9 +306,17 @@ public function getByHeader($headerId)
                     $realizationQuantitative = number_format((float)str_replace(',', '', $realizationQuantitative), 0, ',', '.');
                 }
             }
+
+            $targetQuantitative = $entry['target_quantitative'];
+            if ($targetQuantitative !== null && $targetQuantitative !== '') {
+                if (is_numeric(str_replace(',', '', $targetQuantitative))) {
+                    $targetQuantitative = number_format((float)str_replace(',', '', $targetQuantitative), 0, ',', '.');
+                }
+            }
+
             return [
                 'id' => $entry['id'],
-                'target_quantitative' => $entry['target_quantitative'],
+                'target_quantitative' => $targetQuantitative,
                 'realization_quantitative' => $realizationQuantitative,
                 'target_notes' => $entry['target_notes'],
                 'realization_notes' => $entry['realization_note'],

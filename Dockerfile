@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY . /app
 
-# install system dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     libzip-dev \
     libpng-dev \
@@ -21,9 +21,12 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd zip pdo_mysql pcntl
+# Install helper
+RUN curl -sSL https://install-php-extensions.github.io/install-php-extensions.sh -o /usr/local/bin/install-php-extensions \
+    && chmod +x /usr/local/bin/install-php-extensions
+
+# Install PHP extensions
+RUN install-php-extensions gd zip pdo_mysql pcntl
 
 RUN curl -sS https://getcomposer.org/installer | php && \
     php composer.phar install --no-dev --optimize-autoloader

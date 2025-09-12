@@ -6,23 +6,24 @@ WORKDIR /app
 
 COPY . /app
 
-# install dependencies & helper
+# install system dependencies
 RUN apt-get update && apt-get install -y \
     libzip-dev \
     libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
     libonig-dev \
     libxml2-dev \
     zip \
     unzip \
     curl \
     git \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# install install-php-extensions helper
-RUN curl -sSL https://install-php-extensions.github.io/install-php-extensions.sh | bash
-
-# install extensions
-RUN install-php-extensions pcntl zip pdo_mysql gd
+# install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd zip pdo_mysql pcntl
 
 RUN curl -sS https://getcomposer.org/installer | php && \
     php composer.phar install --no-dev --optimize-autoloader

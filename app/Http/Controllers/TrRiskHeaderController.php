@@ -355,12 +355,11 @@ public function show($id)
             $query->orderBy('month', 'asc')->with(['uploads', 'createdBy', 'updatedBy']);
         }
     ])
-    // Filter hanya data yang sudah di-approve
-    ->where('status', 'approved')
+    // Hapus filter status agar bisa menampilkan semua status
     ->find($id);
 
     if (!$data) {
-        return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan atau belum disetujui.', null);
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
     }
 
     $inherentColor = get_color_by_position($data->inherent_risk_posisi_risiko);
@@ -508,7 +507,7 @@ public function show($id)
 
     // Tentukan risk status berdasarkan kondisi
     $riskStatus = $data->status;
-           if ($isHeaderComplete && $allMonthsFinalized) {
+    if ($isHeaderComplete && $allMonthsFinalized) {
         $riskStatus = 'close'; // Otomatis close jika semua data lengkap dan finalisasi
     } elseif ($data->status === 'approved' && !$isHeaderComplete) {
         $riskStatus = 'pending'; // Approved tapi data header belum lengkap
@@ -518,8 +517,8 @@ public function show($id)
     // *** AKHIR TAMBAHAN BARU ***
 
     // Logika untuk menentukan is_edit pada data header
-    // Tidak bisa edit jika status sudah approved
-    $isEditHeader = $data->status !== 'approved';
+    // Perbaiki: Sesuaikan logika is_edit berdasarkan semua kemungkinan status
+    $isEditHeader = !in_array($data->status, ['approved', 'close']);
 
     // Siapkan data utama
     $orderedData = [

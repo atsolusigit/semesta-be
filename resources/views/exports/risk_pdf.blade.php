@@ -211,7 +211,7 @@
 
         /* ==== Lebar kolom Risk Register sesuai nama asli ==== */
         .col-no { width: 3%; }
-        .col-code { width: 4%; }
+        .col-code { width: 8%; }
         .col-type { width: 8%; }
         .col-target { width: 10%; }
         .col-event { width: 12%; }

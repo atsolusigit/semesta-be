@@ -52,8 +52,8 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     // Column configurations - Hanya menambah kolom R untuk Evaluasi Perlakuan Risiko
     private const COLUMN_WIDTHS = [
         'A' => 5,   // NO
-        'B' => 12,  // KODE RISIKO
-        'C' => 15,  // JENIS RISIKO
+        'B' => 20,  // KODE RISIKO
+        'C' => 20,  // JENIS RISIKO
         'D' => 25,  // PENYEBAB RISIKO
         'E' => 25,  // TARGET BULANAN
         'F' => 15,  // REALISASI BULANAN
@@ -272,51 +272,101 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
-     * Build data rows from headers - Hanya memindahkan Evaluasi Perlakuan Risiko ke akhir
-     */
-    private function buildDataRows(): array
-    {
-        $dataRows = [];
-        $no = 1;
+ * Build data rows from headers - Hanya memindahkan Evaluasi Perlakuan Risiko ke akhir
+ */
+private function buildDataRows(): array
+{
+    $dataRows = [];
+    $no = 1;
 
-        foreach ($this->headers as $header) {
-            // Get monthly data safely
-            $monthly = $header->monthlyData?->first();
+    foreach ($this->headers as $header) {
+        // Get monthly data safely
+        $monthly = $header->monthlyData?->first();
 
-            // Get values with null safety and proper conversion
-            $targetBulanan = $this->toNumeric($monthly->target_quantitative ?? 0);
-            $realisasiBulanan = $this->toNumeric($monthly->realization_quantitative ?? 0);
-            $targetTahunan = $this->toNumeric($header->target_quantitative_satu_tahun ?? 0);
+        // --- Resolve risk name (robust) ---
+        $riskName = '';
 
-            // Calculate percentages
-            $percentageBulanan = $this->calculatePercentage($realisasiBulanan, $targetBulanan);
-            $percentageTahunan = $this->calculatePercentage($realisasiBulanan, $targetTahunan);
+        // 1) Jika ada field risk_name langsung gunakan
+        if (!empty($header->risk_name)) {
+            $riskName = $header->risk_name;
+        }
+        // 2) Jika relasi riskCode sudah di-load, ambil namanya
+        elseif (isset($header->riskCode) && $header->riskCode && is_iterable($header->riskCode) && count($header->riskCode) > 0) {
+            $riskName = collect($header->riskCode)->pluck('name')->filter()->implode(', ');
+        }
+        // 3) Jika ada field risk_code (bisa berupa JSON string, "1,2", array, atau numeric)
+        elseif (!empty($header->risk_code)) {
+            $codesField = $header->risk_code;
+            $ids = [];
 
-            $dataRows[] = [
-                $no,                                                              // 1. NO auto increment
-                $header->risk_code ?? '',                                        // 2. KODE RISIKO
-                $header->jenis_risiko ?? '',                                     // 3. JENIS RISIKO
-                $header->peristiwa_risiko ?? '',                                 // 4. PERISTIWA RISIKO
-                $header->penyebab_risiko ?? '',                                  // 5. PENYEBAB RISIKO
-                $this->formatCurrency($monthly->target_quantitative ?? 0),       // 6. TARGET BULAN
-                $this->formatCurrency($monthly->realization_quantitative ?? 0),  // 7. REALISASI BULAN
-                $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0), // 8. TARGET 1 TAHUN
-                $this->formatCurrency($monthly->realization_quantitative ?? 0),  // 9. REALISASI BULAN (duplikasi)
-                $percentageBulanan . '%',                                        // 10. BULAN %
-                $percentageTahunan . '%',                                        // 11. TARGET TAHUN %
-                $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),     // 12. BIAYA PERLAKUAN
-                $header->residual_target_level_dampak ?? '',                     // 13. LEVEL DAMPAK
-                $header->residual_target_level_kemungkinan ?? '',                // 14. LEVEL KEMUNGKINAN
-                $header->residual_target_posisi_risiko ?? '',                    // 15. POSISI RISIKO
-                $header->residual_target_level_risiko ?? '',                     // 16. LEVEL RISIKO
-                $header->target_satu_tahun_notes ?? ''                           // 17. EVALUASI PERLAKUAN RISIKO (DIPINDAH KE AKHIR)
-            ];
+            if (is_string($codesField)) {
+                $decoded = json_decode($codesField, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $ids = $decoded;
+                } elseif (strpos($codesField, ',') !== false) {
+                    $ids = array_map('trim', explode(',', $codesField));
+                } else {
+                    $ids = [$codesField];
+                }
+            } elseif (is_array($codesField) || $codesField instanceof \Illuminate\Support\Collection) {
+                $ids = (array)$codesField;
+            } elseif (is_numeric($codesField)) {
+                $ids = [$codesField];
+            }
 
-            $no++;
+            // sanitize & cast to int
+            $ids = array_filter($ids, function($v) { return $v !== null && $v !== ''; });
+            if (!empty($ids)) {
+                $ids = array_map('intval', $ids);
+                $riskCodes = DB::table('mst_risk_code')
+                    ->whereIn('id', $ids)
+                    ->orderBy('id')
+                    ->pluck('name');
+                $riskName = $riskCodes->implode(', ');
+            }
         }
 
-        return $dataRows;
+        // 4) fallback: pakai jenis_risiko kalau masih kosong
+        if (empty($riskName)) {
+            $riskName = $header->jenis_risiko ?? '';
+        }
+        // --- end resolve ---
+
+        // Get values with null safety and proper conversion
+        $targetBulanan = $this->toNumeric($monthly->target_quantitative ?? 0);
+        $realisasiBulanan = $this->toNumeric($monthly->realization_quantitative ?? 0);
+        $targetTahunan = $this->toNumeric($header->target_quantitative_satu_tahun ?? 0);
+
+        // Calculate percentages
+        $percentageBulanan = $this->calculatePercentage($realisasiBulanan, $targetBulanan);
+        $percentageTahunan = $this->calculatePercentage($realisasiBulanan, $targetTahunan);
+
+        $dataRows[] = [
+            $no,                                                              // 1. NO auto increment
+            $riskName,                                                        // 2. KODE RISIKO (HANYA NAME)
+            $header->jenis_risiko ?? '',                                     // 3. JENIS RISIKO
+            $header->peristiwa_risiko ?? '',                                 // 4. PERISTIWA RISIKO
+            $header->penyebab_risiko ?? '',                                  // 5. PENYEBAB RISIKO
+            $this->formatCurrency($monthly->target_quantitative ?? 0),       // 6. TARGET BULAN
+            $this->formatCurrency($monthly->realization_quantitative ?? 0),  // 7. REALISASI BULAN
+            $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0), // 8. TARGET 1 TAHUN
+            $this->formatCurrency($monthly->realization_quantitative ?? 0),  // 9. REALISASI BULAN (duplikasi)
+            $percentageBulanan . '%',                                        // 10. BULAN %
+            $percentageTahunan . '%',                                        // 11. TARGET TAHUN %
+            $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),     // 12. BIAYA PERLAKUAN
+            $header->residual_target_level_dampak ?? '',                     // 13. LEVEL DAMPAK
+            $header->residual_target_level_kemungkinan ?? '',                // 14. LEVEL KEMUNGKINAN
+            $header->residual_target_posisi_risiko ?? '',                    // 15. POSISI RISIKO
+            $header->residual_target_level_risiko ?? '',                     // 16. LEVEL RISIKO
+            $monthly->realization_note ?? ''                                 // 17. EVALUASI PERLAKUAN RISIKO (DIPINDAH KE AKHIR)
+        ];
+
+        $no++;
     }
+
+    return $dataRows;
+}
+
 
     /**
      * Main array method for export

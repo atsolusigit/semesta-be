@@ -169,6 +169,52 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
         );
     }
 
+   private function getRiskCodeName($header)
+{
+    // Kalau sudah ada relasi riskCode
+    if (isset($header->riskCode) && $header->riskCode && $header->riskCode->isNotEmpty()) {
+        return $header->riskCode->map(function ($code) {
+            return (!empty($code->code) ? $code->code . ' - ' : '') . $code->name;
+        })->implode(', ');
+    }
+
+    if (!empty($header->risk_code)) {
+        $riskCodeIds = $header->risk_code;
+
+        // Coba decode JSON
+        if (is_string($riskCodeIds)) {
+            $decoded = json_decode($riskCodeIds, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $riskCodeIds = $decoded;
+            }
+        }
+
+        // String dengan koma → array
+        if (is_string($riskCodeIds) && str_contains($riskCodeIds, ',')) {
+            $riskCodeIds = explode(',', $riskCodeIds);
+        }
+
+        // Single id → array
+        if (is_numeric($riskCodeIds)) {
+            $riskCodeIds = [$riskCodeIds];
+        }
+
+        if (is_array($riskCodeIds) && !empty($riskCodeIds)) {
+            $riskCodes = DB::table('mst_risk_code')
+                ->whereIn('id', $riskCodeIds)
+                ->orderBy('id')
+                ->get(['name']);
+
+            return $riskCodes->map(function ($rc) {
+                return (!empty($rc->code) ? $rc->code . ' - ' : '') . $rc->name;
+            })->implode(', ');
+        }
+    }
+
+    return '';
+}
+
+
     public function array(): array
     {
         $data = [];
@@ -208,23 +254,12 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $monthlyData = $monthly;
             }
 
-            // Ambil risk code dari relasi mst_risk_code
-            $riskCode = '';
-            if (isset($header->riskCode) && $header->riskCode) {
-                $riskCode = $header->riskCode->code ?? '';
-            } else if (isset($header->risk_code_id)) {
-                // Fallback: query langsung jika relasi tidak di-load
-                $riskCodeData = DB::table('mst_risk_code')->where('id', $header->risk_code_id)->first();
-                $riskCode = $riskCodeData->code ?? '';
-            }
+            // Get risk code name menggunakan method yang sudah diperbaiki
+            $riskCode = $this->getRiskCodeName($header);
 
             $data[] = [
-                // DEBUG COLUMNS - Keep for now
-                // $header->id, // Header ID
-                // $monthlyData->id ?? 'NO_MONTHLY', // Monthly ID
-
                 $no++, // No
-                $riskCode, // Kode Risiko - FIXED: ambil dari relasi mst_risk_code
+                $riskCode, // Kode Risiko - FIXED: ambil name dari relasi mst_risk_code
                 $header->jenis_risiko ?? '', // Jenis Risiko
                 $header->sasaran ?? '', // Sasaran
                 $header->peristiwa_risiko ?? '', // Peristiwa Risiko
@@ -257,10 +292,8 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $header->residual_target_posisi_risiko ?? '',
                 $header->residual_target_level_risiko ?? '',
 
-                // $monthlyData->realization_note ?? '', // Perlakuan Risiko
                 $header->mitigasi ?? '', // Perlakuan Risiko
                 $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),         // Biaya Perlakuan
-
 
                 // Residual Target Risk (duplicate - 4 kolom)
                 $header->residual_target_level_dampak ?? '',
@@ -288,9 +321,6 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
             [], // baris kosong
             [], // baris kosong
             [
-                // DEBUG COLUMNS - Keep for now
-                // 'Header ID',
-                // 'Monthly ID',
                 'NO',
                 'KODE RISIKO',
                 'JENIS RISIKO',
@@ -401,10 +431,10 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $sheet = $event->sheet->getDelegate();
 
                 // Merge cells untuk header
-                $sheet->mergeCells('A1:AH1'); // KERTAS KERJA RISK REGISTER (updated untuk include debug columns)
-                $sheet->mergeCells('A2:AH2'); // PT. KAWASAN BERIKAT NUSANTARA
-                $sheet->mergeCells('A3:AH3'); // unit kerja
-                $sheet->mergeCells('A4:AH4'); // periode
+                $sheet->mergeCells('A1:AF1'); // KERTAS KERJA RISK REGISTER
+                $sheet->mergeCells('A2:AF2'); // PT. KAWASAN BERIKAT NUSANTARA
+                $sheet->mergeCells('A3:AF3'); // unit kerja
+                $sheet->mergeCells('A4:AF4'); // periode
 
                 //merge header horizontal (for inherent risk, residual risk and residual target)
                 $mergeHorizontal = array(
@@ -518,7 +548,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 $columnWidths = [
                     // MAIN COLUMNS
                     'A' => 4,   // NO (lebih kecil)
-                    'B' => 6,   // KODE RISIKO (lebih kecil)
+                    'B' => 15,  // KODE RISIKO (lebih lebar untuk multiple codes)
                     'C' => 20,  // JENIS RISIKO
                     'D' => 25,  // SASARAN (lebih lebar)
                     'E' => 25,  // PERISTIWA RISIKO (lebih lebar)
@@ -568,7 +598,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                     $sheet->getColumnDimension($column)->setWidth($width);
                 }
 
-                // Apply colors to risk level cells (update column references)
+                // Apply colors to risk level cells
                 $dataStartRow = 8;
                 $totalRows = count($this->headers) + $dataStartRow - 1;
                 for ($row = $dataStartRow; $row <= $totalRows; $row++) {
@@ -577,7 +607,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                         $header = $this->headers[$dataIndex];
                         $monthly = $header->monthlyData->first();
 
-                        // Color Inherent Risk Level (column K - adjusted for debug columns)
+                        // Color Inherent Risk Level (column K)
                         $inherentLevel = $header->inherent_risk_level_risiko ?? '';
                         if ($inherentLevel) {
                             $color = $this->getRiskColor($inherentLevel);
@@ -589,7 +619,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                             ]);
                         }
 
-                        // Color Residual Risk Level Saat Ini (column S - adjusted for debug columns)
+                        // Color Residual Risk Level Saat Ini (column S)
                         if ($monthly) {
                             $residualLevel = $monthly->residual_risk_level_risiko ?? '';
                             if ($residualLevel) {
@@ -603,7 +633,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                             }
                         }
 
-                        // Color Residual Target Risk (column Y & AE - adjusted for debug columns)
+                        // Color Residual Target Risk (column Y & AE)
                         $targetLevel = $header->residual_target_level_risiko ?? '';
                         if ($targetLevel) {
                             $color = $this->getRiskColor($targetLevel);
@@ -623,7 +653,7 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                     }
                 }
 
-                // Apply borders to all data (update range for debug columns)
+                // Apply borders to all data
                 $sheet->getStyle('A6:AF' . $totalRows)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
@@ -653,12 +683,12 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                 ]);
 
                 // Center align untuk kolom tertentu saja
-                $sheet->getStyle('A' . $dataStartRow . ':C' . $totalRows)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER); // Debug + NO
+                $sheet->getStyle('A' . $dataStartRow . ':C' . $totalRows)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER); // NO
                 $sheet->getStyle('O' . $dataStartRow . ':Q' . $totalRows)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER); // Target, Realisasi, %
                 $sheet->getStyle('V' . $dataStartRow . ':W' . $totalRows)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER); // Target 1 Tahun, Realisasi
 
                 // Khusus untuk kolom dengan teks panjang, pastikan wrap text dan height otomatis
-                $longTextColumns = ['F', 'G', 'H', 'I', 'N', 'AB']; // Sasaran, Peristiwa, Penyebab, Dampak, Internal Control, Perlakuan Risiko
+                $longTextColumns = ['D', 'E', 'F', 'G', 'L', 'Z']; // Sasaran, Peristiwa, Penyebab, Dampak, Internal Control, Perlakuan Risiko
                 foreach ($longTextColumns as $col) {
                     $sheet->getStyle($col . $dataStartRow . ':' . $col . $totalRows)->applyFromArray([
                         'alignment' => [
@@ -682,6 +712,16 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
                         ]
                     ]);
                 }
+
+                // Khusus untuk kolom kode risiko agar bisa wrap multiple codes
+                $sheet->getStyle('B' . $dataStartRow . ':B' . $totalRows)->applyFromArray([
+                    'alignment' => [
+                        'vertical' => Alignment::VERTICAL_TOP,
+                        'horizontal' => Alignment::HORIZONTAL_LEFT,
+                        'wrapText' => true,
+                        'shrinkToFit' => false
+                    ]
+                ]);
 
                 // Set row heights
                 $sheet->getRowDimension(7)->setRowHeight(50); // Header row lebih tinggi

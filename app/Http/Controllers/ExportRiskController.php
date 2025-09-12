@@ -8,6 +8,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\MultiSheetRiskExport;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
 
 class ExportRiskController extends Controller
 {
@@ -41,7 +42,6 @@ class ExportRiskController extends Controller
 
         // Ambil data header dengan semua field yang diperlukan untuk semua export
         $headers = TrRiskHeader::with([
-            'riskCode:id,name',
             'department:id,name',
             'monthlyData' => function ($q) use ($filterYear, $filterMonth) {
                 $q->select([
@@ -108,6 +108,9 @@ class ExportRiskController extends Controller
         ->orderBy('risk_code')
         ->get();
 
+        // Setelah data di-load, tambahkan risk code names secara manual
+        $this->loadRiskCodeNames($headers);
+
         // Kalau tidak ada data
         if ($headers->isEmpty()) {
             return response()->json([
@@ -135,6 +138,38 @@ class ExportRiskController extends Controller
                 'message' => 'Gagal melakukan export',
                 'data' => ['error' => $e->getMessage()]
             ], 500);
+        }
+    }
+
+    /**
+     * Load risk code names untuk multiple risk codes
+     */
+    private function loadRiskCodeNames($headers)
+    {
+        foreach ($headers as $header) {
+            if (!empty($header->risk_code)) {
+                // Parse risk_code jika berupa JSON string
+                $riskCodeIds = is_string($header->risk_code) ?
+                    json_decode($header->risk_code, true) : $header->risk_code;
+
+                if (is_array($riskCodeIds)) {
+                    // Query multiple risk codes
+                    $riskCodes = \DB::table('mst_risk_code')
+                        ->whereIn('id', $riskCodeIds)
+                        ->get(['id', 'name']);
+
+                    $header->riskCode = $riskCodes;
+                } else {
+                    // Single risk code
+                    $riskCode = \DB::table('mst_risk_code')
+                        ->where('id', $riskCodeIds)
+                        ->first(['id', 'name']);
+
+                    $header->riskCode = $riskCode ? collect([$riskCode]) : collect([]);
+                }
+            } else {
+                $header->riskCode = collect([]);
+            }
         }
     }
 
@@ -243,7 +278,7 @@ class ExportRiskController extends Controller
 
         $data[] = [
             'no' => $no++,
-            'risk_code' => $header->risk_code ?? '',
+            'risk_code' => $this->getRiskCodeName($header),
             'jenis_risiko' => $header->jenis_risiko ?? '',
             'sasaran' => $header->sasaran ?? '',
             'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
@@ -270,7 +305,7 @@ class ExportRiskController extends Controller
             'perlakuan_risiko' => $header->mitigasi ?? '',
             'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
             'status_risiko' => $monthlyData->status_risiko ?? '',
-            'target_satu_tahun_notes' => $header->target_satu_tahun_notes ?? '',
+            'realization_note' => $monthlyData->realization_note ?? '',
         ];
     }
 
@@ -311,12 +346,12 @@ class ExportRiskController extends Controller
         $percentageBulanan = $targetBulananNumeric > 0 ? round(($realisasiBulananNumeric / $targetBulananNumeric) * 100, 2) : 0;
         $percentageTahunan = $targetTahunanNumeric > 0 ? round(($realisasiBulananNumeric / $targetTahunanNumeric) * 100, 2) : 0;
 
-        // Pastikan evaluasi perlakuan risiko diambil dengan benar
-        $evaluasiPerlakuanRisiko = $header->target_satu_tahun_notes ?? '';
+        // PERBAIKAN: Ambil evaluasi perlakuan risiko dari field realization_note (singular)
+        $evaluasiPerlakuanRisiko = $monthly?->realization_note ?? '';
 
         $data[] = [
             'no' => $no++,
-            'risk_code' => $header->risk_code ?? '',
+            'risk_code' => $this->getRiskCodeName($header),
             'jenis_risiko' => $header->jenis_risiko ?? '',
             'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
             'penyebab_risiko' => $header->penyebab_risiko ?? '',
@@ -338,6 +373,50 @@ class ExportRiskController extends Controller
     }
 
     return $data;
+}
+private function getRiskCodeName($header)
+{
+    // Kalau sudah ada relasi riskCode
+    if (isset($header->riskCode) && $header->riskCode && $header->riskCode->isNotEmpty()) {
+        return $header->riskCode->map(function ($code) {
+            return (!empty($code->code) ? $code->code . ' - ' : '') . $code->name;
+        })->implode(', ');
+    }
+
+    if (!empty($header->risk_code)) {
+        $riskCodeIds = $header->risk_code;
+
+        // Coba decode JSON
+        if (is_string($riskCodeIds)) {
+            $decoded = json_decode($riskCodeIds, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $riskCodeIds = $decoded;
+            }
+        }
+
+        // String dengan koma → array
+        if (is_string($riskCodeIds) && str_contains($riskCodeIds, ',')) {
+            $riskCodeIds = explode(',', $riskCodeIds);
+        }
+
+        // Single id → array
+        if (is_numeric($riskCodeIds)) {
+            $riskCodeIds = [$riskCodeIds];
+        }
+
+        if (is_array($riskCodeIds) && !empty($riskCodeIds)) {
+            $riskCodes = DB::table('mst_risk_code')
+                ->whereIn('id', $riskCodeIds)
+                ->orderBy('id')
+                ->get(['name']);
+
+            return $riskCodes->map(function ($rc) {
+                return (!empty($rc->code) ? $rc->code . ' - ' : '') . $rc->name;
+            })->implode(', ');
+        }
+    }
+
+    return '';
 }
 
     /**
@@ -558,7 +637,6 @@ class ExportRiskController extends Controller
 
         try {
             $headers = TrRiskHeader::with([
-                'riskCode:id,name',
                 'department:id,name',
                 'monthlyData' => function ($q) use ($filterYear, $filterMonth) {
                     $q->select([
@@ -618,6 +696,9 @@ class ExportRiskController extends Controller
             })
             ->limit(10)
             ->get();
+
+            // Load risk code names untuk preview juga
+            $this->loadRiskCodeNames($headers);
 
             return response()->json([
                 'status' => 200,

@@ -235,6 +235,7 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/r
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->put('/risk-header/{id}', [TrRiskHeaderController::class, 'update']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/risk-monitoring', [TrRiskHeaderController::class, 'monitoring']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->post('/risk-headers/{id}/submit', [TrRiskHeaderController::class, 'submit']);
 
 // // ===================== RISK HEADER (SCALABLE) =====================
 // Route::middleware(['auth:api'])->group(function () {

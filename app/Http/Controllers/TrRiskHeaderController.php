@@ -1789,7 +1789,7 @@ public function getPendingApproval(Request $request)
             'department:id,name',
             'optionTargetSatuTahun:id,name,position',
             'createdBy:id,username',
-        ])->where('status', 'draft'); // UBAH dari 'pending' ke 'draft'
+        ]) ->where('status', 'submit');  // Hanya ambil yang statusnya 'submit'
 
         // PAKSA FILTER DEPARTMENT untuk role 2 dan 3
         if ($user->role_id == 2 || $user->role_id == 3) {
@@ -1841,6 +1841,8 @@ public function getPendingApproval(Request $request)
 
             return [
                 'id' => $riskHeader->id,
+                'department_id' => $riskHeader->department_id,
+                'department_name' => $riskHeader->department ? clean_string($riskHeader->department->name) : null,
                 'year' => $riskHeader->year,
                 'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
                 'risk_codes' => $riskCodes,
@@ -1857,7 +1859,7 @@ public function getPendingApproval(Request $request)
                     'id' => $riskHeader->department->id,
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
-                'status' => $riskHeader->status,
+                'risk_status' => $riskHeader->status,
                 'created_at' => $riskHeader->created_at,
                 'created_by_name' => $createdByName,
                 'target_quantitative_satu_tahun' => format_target_quantitative($riskHeader->target_quantitative_satu_tahun),
@@ -2089,7 +2091,7 @@ public function getRejectedData(Request $request)
             'optionTargetSatuTahun:id,name,position',
             'createdBy:id,username',
             'approvedBy:id,username'
-        ])->where('status', 'rejected');
+        ])->where('status', 'rejected'); // Hanya ambil yang statusnya 'rejected'
 
         // PAKSA FILTER DEPARTMENT untuk role 2 dan 3
         if ($user->role_id == 2 || $user->role_id == 3) {
@@ -2145,6 +2147,8 @@ public function getRejectedData(Request $request)
             return [
                 'id' => $riskHeader->id,
                 'year' => $riskHeader->year,
+                'department_id' => $riskHeader->department_id,
+                'department_name' => $riskHeader->department ? clean_string($riskHeader->department->name) : null,
                 'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
                 'risk_codes' => $riskCodes,
                 'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
@@ -2160,7 +2164,7 @@ public function getRejectedData(Request $request)
                     'id' => $riskHeader->department->id,
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
-                'status' => $riskHeader->status,
+                'risk_status' => $riskHeader->status,
                 'approval_notes' => clean_string($riskHeader->approval_notes),
                 'rejected_by' => $riskHeader->approved_by,
                 'rejected_by_name' => $approvedByName,

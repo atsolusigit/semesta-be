@@ -47,9 +47,11 @@ class ExportRiskController extends Controller
                 $q->select([
                     'id',
                     'header_id',
+                    'target_kualitatif',
                     'target_quantitative',
                     'target_option',
                     'realization_quantitative',
+                    'realization_kualitatif',
                     'realization_option',
                     'residual_risk_level_dampak',
                     'residual_risk_level_kemungkinan',
@@ -224,6 +226,37 @@ class ExportRiskController extends Controller
 
     return $pdf->download($filename);
 }
+
+    /**
+     * Format value with option untuk menentukan mata uang atau format lainnya
+     */
+    private function formatValueWithOption($value, $option = null)
+    {
+        if (empty($value) && $value !== 0 && $value !== '0') {
+            return '';
+        }
+
+        // Jika value adalah string numeric, convert ke number dulu
+        if (is_string($value) && is_numeric($value)) {
+            $value = (float)$value;
+        }
+
+        switch ($option) {
+            case 'currency':
+            case 'rupiah':
+                return $this->formatCurrency($value);
+            case 'percent':
+            case 'percentage':
+                return $value . '%';
+            default:
+                // Jika numeric tapi tidak ada option khusus, format sebagai number biasa
+                if (is_numeric($value)) {
+                    return number_format($value, 0, ',', '.');
+                }
+                return $value;
+        }
+    }
+
     /**
      * Prepare data untuk Risk Register PDF
      */
@@ -252,28 +285,27 @@ class ExportRiskController extends Controller
                 'status_risiko' => '',
             ];
         } else {
-            // Format target bulan menggunakan formatValueWithOption yang sudah ada
-            $targetBulan = $this->formatValueWithOption($monthly->target_quantitative ?? '0', $monthly->target_option);
+            // PERBAIKAN: Gunakan formatTargetBulan dan formatRealizationBulan
+            $targetBulan = $this->formatTargetBulan($monthly);
+            $realisasiBulan = $this->formatRealizationBulan($monthly);
 
-            // Format realisasi bulan menggunakan formatValueWithOption yang sudah ada
-            $realisasiBulan = $this->formatValueWithOption($monthly->realization_quantitative ?? '0', $monthly->realization_option);
+            // Hitung persentase
+            $target = $monthly->target_quantitative ?? 0;
+            $realization = $monthly->realization_quantitative ?? 0;
 
-            // Hitung persentase seperti yang sudah ada di method asli
-            $targetNumeric = is_numeric(str_replace('.', '', $monthly->target_quantitative))
-                ? (float)str_replace('.', '', $monthly->target_quantitative)
-                : 0;
-            $realisasiNumeric = is_numeric(str_replace('.', '', $monthly->realization_quantitative))
-                ? (float)str_replace('.', '', $monthly->realization_quantitative)
-                : 0;
-            $percentage = ($targetNumeric > 0) ? round(($realisasiNumeric / $targetNumeric) * 100, 2) : 0;
+            if (is_numeric($target) && is_numeric($realization) && floatval($target) > 0) {
+                $percentage = round((floatval($realization) / floatval($target)) * 100, 2);
+            } else {
+                $percentage = 0;
+            }
 
             $monthlyData = $monthly;
         }
 
-        // Target 1 Tahun menggunakan formatValueWithOption yang sudah ada
-        $target1Tahun = $this->formatValueWithOption(
-            $header->target_quantitative_satu_tahun ?? '0',
-            $header->target_satu_tahun_option
+        // PERBAIKAN: Format target 1 tahun menggunakan method formatTarget
+        $target1Tahun = $this->formatTarget(
+            $header->target_quantitative_satu_tahun ?? 0,
+            $header->target_kualitatif_satu_tahun ?? ''
         );
 
         $data[] = [
@@ -312,6 +344,7 @@ class ExportRiskController extends Controller
     return $data;
 }
 
+
     /**
      * Prepare data untuk Monitoring PDF
      */
@@ -323,22 +356,17 @@ class ExportRiskController extends Controller
     foreach ($headers as $header) {
         $monthly = $header->monthlyData?->first();
 
-        // Format menggunakan formatValueWithOption yang sudah ada
-        $targetBulan = $monthly ?
-            $this->formatValueWithOption($monthly->target_quantitative ?? '0', $monthly->target_option) :
-            '0';
+        // PERBAIKAN: Gunakan formatTargetBulan dan formatRealizationBulan
+        $targetBulan = $this->formatTargetBulan($monthly);
+        $realisasiBulan = $this->formatRealizationBulan($monthly);
 
-        $realisasiBulan = $monthly ?
-            $this->formatValueWithOption($monthly->realization_quantitative ?? '0', $monthly->realization_option) :
-            '0';
-
-        // Format target tahunan menggunakan formatValueWithOption yang sudah ada
-        $targetTahunan = $this->formatValueWithOption(
-            $header->target_quantitative_satu_tahun ?? '0',
-            $header->target_satu_tahun_option
+        // PERBAIKAN: Format target tahunan menggunakan method formatTarget
+        $targetTahunan = $this->formatTarget(
+            $header->target_quantitative_satu_tahun ?? 0,
+            $header->target_kualitatif_satu_tahun ?? ''
         );
 
-        // Perhitungan percentage seperti yang sudah ada
+        // Perhitungan percentage
         $targetBulananNumeric = $monthly && is_numeric($monthly->target_quantitative) ? (float)$monthly->target_quantitative : 0;
         $realisasiBulananNumeric = $monthly && is_numeric($monthly->realization_quantitative) ? (float)$monthly->realization_quantitative : 0;
         $targetTahunanNumeric = is_numeric($header->target_quantitative_satu_tahun) ? (float)$header->target_quantitative_satu_tahun : 0;
@@ -346,7 +374,6 @@ class ExportRiskController extends Controller
         $percentageBulanan = $targetBulananNumeric > 0 ? round(($realisasiBulananNumeric / $targetBulananNumeric) * 100, 2) : 0;
         $percentageTahunan = $targetTahunanNumeric > 0 ? round(($realisasiBulananNumeric / $targetTahunanNumeric) * 100, 2) : 0;
 
-        // PERBAIKAN: Ambil evaluasi perlakuan risiko dari field realization_note (singular)
         $evaluasiPerlakuanRisiko = $monthly?->realization_note ?? '';
 
         $data[] = [
@@ -374,50 +401,157 @@ class ExportRiskController extends Controller
 
     return $data;
 }
-private function getRiskCodeName($header)
+
+private function formatTargetBulan($monthly)
 {
-    // Kalau sudah ada relasi riskCode
-    if (isset($header->riskCode) && $header->riskCode && $header->riskCode->isNotEmpty()) {
-        return $header->riskCode->map(function ($code) {
-            return (!empty($code->code) ? $code->code . ' - ' : '') . $code->name;
-        })->implode(', ');
+    if (!$monthly) {
+        return '';
     }
 
-    if (!empty($header->risk_code)) {
-        $riskCodeIds = $header->risk_code;
+    $quantitative = $monthly->target_quantitative ?? '';
+    $kualitatif = $monthly->target_kualitatif ?? '';
 
-        // Coba decode JSON
-        if (is_string($riskCodeIds)) {
-            $decoded = json_decode($riskCodeIds, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $riskCodeIds = $decoded;
-            }
+    // Jika target_kualitatif ada isi dan bukan kosong/null, berarti data kualitatif
+    if (!empty($kualitatif) && $kualitatif !== null && trim($kualitatif) !== '') {
+        $result = '';
+
+        // Tampilkan persentase dari target_kualitatif dulu (di atas)
+        $result = $kualitatif;
+        // Tambahkan % jika belum ada dan numeric
+        if (is_numeric($kualitatif)) {
+            $result .= '%';
         }
 
-        // String dengan koma → array
-        if (is_string($riskCodeIds) && str_contains($riskCodeIds, ',')) {
-            $riskCodeIds = explode(',', $riskCodeIds);
+        // Tampilkan deskripsi kualitatif dari target_quantitative (di bawah)
+        if (!empty($quantitative)) {
+            $result .= "\n"; // Line break untuk memisahkan
+            $result .= $quantitative;
         }
 
-        // Single id → array
-        if (is_numeric($riskCodeIds)) {
-            $riskCodeIds = [$riskCodeIds];
-        }
+        return $result;
+    }
 
-        if (is_array($riskCodeIds) && !empty($riskCodeIds)) {
-            $riskCodes = DB::table('mst_risk_code')
-                ->whereIn('id', $riskCodeIds)
-                ->orderBy('id')
-                ->get(['name']);
-
-            return $riskCodes->map(function ($rc) {
-                return (!empty($rc->code) ? $rc->code . ' - ' : '') . $rc->name;
-            })->implode(', ');
+    // Jika target_kualitatif kosong/null, berarti data quantitative murni
+    if (!empty($quantitative)) {
+        if (is_numeric($quantitative)) {
+            return $this->formatCurrency($quantitative);
+        } else {
+            return $quantitative;
         }
     }
 
     return '';
 }
+
+private function formatRealizationBulan($monthly)
+{
+    if (!$monthly) {
+        return '';
+    }
+
+    $quantitative = $monthly->realization_quantitative ?? '';
+    $kualitatif = $monthly->realization_kualitatif ?? '';
+
+    // Jika realization_kualitatif ada isi dan bukan kosong/null, berarti data kualitatif
+    if (!empty($kualitatif) && $kualitatif !== null && trim($kualitatif) !== '') {
+        $result = '';
+
+        // Tampilkan persentase dari realization_kualitatif dulu (di atas)
+        $result = $kualitatif;
+        // Tambahkan % jika belum ada dan numeric
+        if (is_numeric($kualitatif)) {
+            $result .= '%';
+        }
+
+        // Tampilkan deskripsi kualitatif dari realization_quantitative (di bawah)
+        if (!empty($quantitative)) {
+            $result .= "\n"; // Line break untuk memisahkan
+            $result .= $quantitative;
+        }
+
+        return $result;
+    }
+
+    // Jika realization_kualitatif kosong/null, berarti data quantitative murni
+    if (!empty($quantitative)) {
+        if (is_numeric($quantitative)) {
+            return $this->formatCurrency($quantitative);
+        } else {
+            return $quantitative;
+        }
+    }
+
+    return '';
+}
+
+private function formatTarget($quantitative, $qualitative)
+{
+    $result = '';
+
+    // Format quantitative jika ada
+    if (!empty($quantitative) && $quantitative !== null && $quantitative !== '') {
+        if (is_numeric($quantitative) && floatval($quantitative) > 0) {
+            $result .= $this->formatCurrency($quantitative);
+        } else {
+            $result .= $quantitative;
+        }
+    }
+
+    // Format qualitative jika ada
+    if (!empty($qualitative) && $qualitative !== null && $qualitative !== '') {
+        if (!empty($result)) {
+            $result .= "\n"; // Line break untuk memisahkan
+        }
+        $result .= $qualitative;
+    }
+
+    return $result;
+}
+
+    private function getRiskCodeName($header)
+    {
+        // Kalau sudah ada relasi riskCode
+        if (isset($header->riskCode) && $header->riskCode && $header->riskCode->isNotEmpty()) {
+            return $header->riskCode->map(function ($code) {
+                return (!empty($code->code) ? $code->code . ' - ' : '') . $code->name;
+            })->implode(', ');
+        }
+
+        if (!empty($header->risk_code)) {
+            $riskCodeIds = $header->risk_code;
+
+            // Coba decode JSON
+            if (is_string($riskCodeIds)) {
+                $decoded = json_decode($riskCodeIds, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $riskCodeIds = $decoded;
+                }
+            }
+
+            // String dengan koma → array
+            if (is_string($riskCodeIds) && str_contains($riskCodeIds, ',')) {
+                $riskCodeIds = explode(',', $riskCodeIds);
+            }
+
+            // Single id → array
+            if (is_numeric($riskCodeIds)) {
+                $riskCodeIds = [$riskCodeIds];
+            }
+
+            if (is_array($riskCodeIds) && !empty($riskCodeIds)) {
+                $riskCodes = DB::table('mst_risk_code')
+                    ->whereIn('id', $riskCodeIds)
+                    ->orderBy('id')
+                    ->get(['name']);
+
+                return $riskCodes->map(function ($rc) {
+                    return (!empty($rc->code) ? $rc->code . ' - ' : '') . $rc->name;
+                })->implode(', ');
+            }
+        }
+
+        return '';
+    }
 
     /**
      * Prepare data untuk Heatmap PDF
@@ -516,53 +650,6 @@ private function getRiskCodeName($header)
         return $colorMap;
     }
 
-    /**
-     * Format value with option untuk menentukan mata uang atau format lainnya
-     */
-    private function formatValueWithOption($value, $optionId)
-    {
-        if (empty($value) || $value === '0') {
-            return '0';
-        }
-
-        // Jika tidak ada option atau option kosong, return value as is
-        if (empty($optionId)) {
-            return $value;
-        }
-
-        try {
-            // Get option dari database
-            $option = \DB::table('mst_option')->where('id', $optionId)->first();
-
-            if (!$option) {
-                return $value;
-            }
-
-            // Jika value adalah numeric dan option adalah mata uang (id 1-4 biasanya mata uang)
-            if (is_numeric($value) && in_array($optionId, [1, 2, 3, 4])) {
-                switch ($optionId) {
-                    case 1: // Rupiah
-                        return 'Rp.' . number_format((float)$value, 0, ',', '.');
-                    case 2: // Euro
-                        return '€' . number_format((float)$value, 2, ',', '.');
-                    case 3: // Dollar
-                        return '$' . number_format((float)$value, 2, ',', '.');
-                    case 4: // Yen
-                        return '¥' . number_format((float)$value, 0, ',', '.');
-                    default:
-                        return $value;
-                }
-            } else {
-                // Jika bukan numeric atau bukan mata uang, return value as is
-                return $value;
-            }
-
-        } catch (\Exception $e) {
-            // Jika error, return value original
-            return $value;
-        }
-    }
-
     private function formatCurrency($value)
     {
         return 'Rp.' . number_format($value, 0, ',', '.');
@@ -642,9 +729,11 @@ private function getRiskCodeName($header)
                     $q->select([
                         'id',
                         'header_id',
+                        'target_kualitatif',
                         'target_quantitative',
                         'target_option',
                         'realization_quantitative',
+                        'realization_kualitatif',
                         'realization_option',
                         'residual_risk_level_dampak',
                         'residual_risk_level_kemungkinan',

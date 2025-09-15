@@ -128,9 +128,10 @@ class TrRiskHeader extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-        public function createdBy()
+       public function createdBy()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by')
+                    ->select(['id', 'name', 'username']);
     }
 
     public function updatedBy()

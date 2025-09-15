@@ -953,6 +953,29 @@ if (!function_exists('get_decrypted_username')) {
     }
 }
 
+if (!function_exists('get_decrypted_name')) {
+    function get_decrypted_name($userObject)
+    {
+        if (!$userObject || empty($userObject->id)) {
+            return 'User Tidak diketahui';
+        }
+
+        try {
+            $row = \DB::select("
+                SELECT CAST(AES_DECRYPT(name, CONCAT('SM', ?)) AS CHAR) as result
+                FROM users WHERE id = ? LIMIT 1
+            ", [$userObject->id, $userObject->id]);
+
+            if ($row && !empty($row[0]->result)) {
+                return clean_string($row[0]->result);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Error decrypt name for user ID {$userObject->id}: " . $e->getMessage());
+        }
+
+        return 'User Tidak diketahui';
+    }
+}
 
 if (!function_exists('get_month_name')) {
     /**

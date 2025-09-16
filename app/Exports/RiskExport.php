@@ -145,29 +145,89 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
         return $result;
     }
 
-    private function formatTargetBulan($monthly)
-    {
-        if (!$monthly) {
-            return '';
-        }
-
-        return $this->formatTarget(
-            $monthly->target_quantitative ?? '',
-            $monthly->target_kualitatif ?? ''
-        );
+  // Perbaikan untuk method formatTargetBulan di RiskExport.php
+private function formatTargetBulan($monthly)
+{
+    if (!$monthly) {
+        return '';
     }
 
-    private function formatRealizationBulan($monthly)
-    {
-        if (!$monthly) {
-            return '';
+    $quantitative = $monthly->target_quantitative ?? '';
+    $kualitatif = $monthly->target_kualitatif ?? '';
+
+    // Jika target_kualitatif ada isi dan bukan kosong/null, berarti data kualitatif
+    if (!empty($kualitatif) && $kualitatif !== null && trim($kualitatif) !== '') {
+        $result = '';
+
+        // Tampilkan persentase dari target_kualitatif dulu (di atas)
+        $result = $kualitatif;
+        // Tambahkan % jika belum ada dan numeric
+        if (is_numeric($kualitatif)) {
+            $result .= '%';
         }
 
-        return $this->formatTarget(
-            $monthly->realization_quantitative ?? '',
-            $monthly->realization_kualitatif ?? ''
-        );
+        // Tampilkan deskripsi kualitatif dari target_quantitative (di bawah)
+        if (!empty($quantitative)) {
+            $result .= "\n"; // Line break untuk memisahkan
+            $result .= $quantitative;
+        }
+
+        return $result;
     }
+
+    // Jika target_kualitatif kosong/null, berarti data quantitative murni
+    if (!empty($quantitative)) {
+        if (is_numeric($quantitative)) {
+            return $this->formatCurrency($quantitative);
+        } else {
+            return $quantitative;
+        }
+    }
+
+    return '';
+}
+
+// Perbaikan untuk method formatRealizationBulan di RiskExport.php
+private function formatRealizationBulan($monthly)
+{
+    if (!$monthly) {
+        return '';
+    }
+
+    $quantitative = $monthly->realization_quantitative ?? '';
+    $kualitatif = $monthly->realization_kualitatif ?? '';
+
+    // Jika realization_kualitatif ada isi dan bukan kosong/null, berarti data kualitatif
+    if (!empty($kualitatif) && $kualitatif !== null && trim($kualitatif) !== '') {
+        $result = '';
+
+        // Tampilkan persentase dari realization_kualitatif dulu (di atas)
+        $result = $kualitatif;
+        // Tambahkan % jika belum ada dan numeric
+        if (is_numeric($kualitatif)) {
+            $result .= '%';
+        }
+
+        // Tampilkan deskripsi kualitatif dari realization_quantitative (di bawah)
+        if (!empty($quantitative)) {
+            $result .= "\n"; // Line break untuk memisahkan
+            $result .= $quantitative;
+        }
+
+        return $result;
+    }
+
+    // Jika realization_kualitatif kosong/null, berarti data quantitative murni
+    if (!empty($quantitative)) {
+        if (is_numeric($quantitative)) {
+            return $this->formatCurrency($quantitative);
+        } else {
+            return $quantitative;
+        }
+    }
+
+    return '';
+}
 
    private function getRiskCodeName($header)
 {
@@ -222,6 +282,14 @@ class RiskExport implements FromArray, WithHeadings, WithTitle, WithStyles, With
 
         foreach ($this->headers as $header) {
             $monthly = $header->monthlyData->first();
+
+        //             // Debug tambahan
+        // \Log::info("Header ID: " . $header->id);
+        // \Log::info("Monthly data count: " . $header->monthlyData->count());
+        // if ($monthly) {
+        //     \Log::info("Monthly ID: " . $monthly->id);
+        //     \Log::info("Monthly raw data: " . json_encode($monthly->toArray()));
+        // }
 
             if (!$monthly) {
                 $target = 0;

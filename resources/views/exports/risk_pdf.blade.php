@@ -219,8 +219,8 @@
         .col-impact { width: 12%; }
         .col-level { width: 4%; }
         .col-control { width: 15%; }
-        .col-amount { width: 6%; }
-        .col-percent { width: 3%; }
+        .col-amount { width: 10%; }
+        .col-percent { width: 8%; }
         .col-treatment { width: 15%; }
         .col-status { width: 6%; }
 
@@ -265,7 +265,7 @@
                 <th rowspan="2" class="col-control">INTERNAL CONTROL</th>
                 <th rowspan="2" class="col-amount">TARGET s/d BULAN {{ strtoupper($monthName) }}</th>
                 <th rowspan="2" class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th rowspan="2" class="col-percent">%</th>
+                <th rowspan="2" class="col-percent">% s/d BULAN {{ strtoupper($monthName) }}</th>
                 <th colspan="4">RESIDUAL RISK</th>
                 <th rowspan="2" class="col-amount">TARGET 1 TAHUN</th>
                 <th rowspan="2" class="col-amount">REALISASI S/D BULAN {{ strtoupper($monthName) }}</th>
@@ -309,15 +309,15 @@
                 <td class="text-center">{{ $row['inherent_risk_posisi_risiko'] }}</td>
                 <td class="text-center risk-level-cell" data-level="{{ $row['inherent_risk_level_risiko'] }}">{{ $row['inherent_risk_level_risiko'] }}</td>
                 <td class="text-left">{{ $row['internal_control'] }}</td>
-                <td class="text-right">{{ $row['target_bulan'] }}</td>
-                <td class="text-right">{{ $row['realisasi_bulan'] }}</td>
+                <td class="text-center">{{ $row['target_bulan'] }}</td>
+                <td class="text-center">{{ $row['realisasi_bulan'] }}</td>
                 <td class="text-center">{{ $row['percentage'] }}</td>
                 <td class="text-center">{{ $row['residual_risk_level_dampak'] }}</td>
                 <td class="text-center">{{ $row['residual_risk_level_kemungkinan'] }}</td>
                 <td class="text-center">{{ $row['residual_risk_posisi_risiko'] }}</td>
                 <td class="text-center risk-level-cell" data-level="{{ $row['residual_risk_level_risiko'] }}">{{ $row['residual_risk_level_risiko'] }}</td>
-                <td class="text-right">{{ $row['target_1_tahun'] }}</td>
-                <td class="text-right">{{ $row['realisasi_duplicate'] }}</td>
+                <td class="text-left">{{ $row['target_1_tahun'] }}</td>
+                <td class="text-center">{{ $row['realisasi_duplicate'] }}</td>
                 <td class="text-center">{{ $row['residual_target_level_dampak'] }}</td>
                 <td class="text-center">{{ $row['residual_target_level_kemungkinan'] }}</td>
                 <td class="text-center">{{ $row['residual_target_posisi_risiko'] }}</td>
@@ -374,8 +374,8 @@
                 <th rowspan="3" class="col-event" style="vertical-align: middle;">PERISTIWA RISIKO</th>
                 <th rowspan="3" class="col-cause" style="vertical-align: middle;">PENYEBAB RISIKO</th>
                 <th colspan="4">WAKTU PELAKSANAAN</th>
-                <th rowspan="3" class="col-percent" style="vertical-align: middle;">BULAN {{ strtoupper($monthName) }} %</th>
-                <th rowspan="3" class="col-percent" style="vertical-align: middle;">TARGET TAHUN %</th>
+                <th rowspan="3" class="col-percent" style="vertical-align: middle;">% s/d BULAN {{ strtoupper($monthName) }}</th>
+                <th rowspan="3" class="col-percent" style="vertical-align: middle;">% TARGET TAHUN {{ $year }}</th>
                 <th rowspan="3" class="col-amount" style="vertical-align: middle;">BIAYA PERLAKUAN RISIKO</th>
                 <th colspan="4">RESIDUAL TARGET RISK</th>
                 <th rowspan="3" class="col-treatment" style="vertical-align: middle;">EVALUASI PERLAKUAN RISIKO</th>
@@ -402,13 +402,13 @@
                 <td class="text-left">{{ $row['jenis_risiko'] }}</td>
                 <td class="text-left">{{ $row['peristiwa_risiko'] }}</td>
                 <td class="text-left">{{ $row['penyebab_risiko'] }}</td>
-                <td class="text-right">{{ $row['target_bulan'] }}</td>
-                <td class="text-right">{{ $row['realisasi_bulan'] }}</td>
-                <td class="text-right">{{ $row['target_1_tahun'] }}</td>
-                <td class="text-right">{{ $row['realisasi_duplicate'] }}</td>
+                <td class="text-center">{{ $row['target_bulan'] }}</td>
+                <td class="text-center">{{ $row['realisasi_bulan'] }}</td>
+                <td class="text-left">{{ $row['target_1_tahun'] }}</td>
+                <td class="text-center">{{ $row['realisasi_duplicate'] }}</td>
                 <td class="text-center">{{ $row['percentage_bulan'] }}</td>
                 <td class="text-center">{{ $row['percentage_tahun'] }}</td>
-                <td class="text-right">{{ $row['biaya_perlakuan'] }}</td>
+                <td class="text-left">{{ $row['biaya_perlakuan'] }}</td>
                 <td class="text-center">{{ $row['level_dampak'] }}</td>
                 <td class="text-center">{{ $row['level_kemungkinan'] }}</td>
                 <td class="text-center">{{ $row['posisi_risiko'] }}</td>

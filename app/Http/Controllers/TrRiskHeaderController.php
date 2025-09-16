@@ -268,9 +268,9 @@ public function index(Request $request)
             'updated_at' => $item->updated_at ? $item->updated_at->toISOString() : null,
 
             'created_by' => $item->created_by ?? null,
-            'created_by_name' => get_decrypted_username($item->createdBy),
+            'created_by_name' => get_decrypted_name($item->createdBy),
             'updated_by' => $item->updated_by ?? null,
-            'updated_by_name' => get_decrypted_username($item->updatedBy),
+            'updated_by_name' => get_decrypted_name($item->updatedBy),
 
             'ir_dampak' => $item->irDampak ?? null,
             'ir_kemungkinan' => $item->irKemungkinan ?? null,
@@ -416,8 +416,8 @@ public function show($id)
                 'created_at' => $dataBulanan->created_at,
                 'updated_at' => $dataBulanan->updated_at,
                 // Tambahkan created_by_name dan updated_by_name menggunakan helper yang sudah ada
-                'created_by_name' => $dataBulanan->createdBy ? clean_string(get_decrypted_username($dataBulanan->createdBy)) : 'Unknown User',
-                'updated_by_name' => $dataBulanan->updatedBy ? clean_string(get_decrypted_username($dataBulanan->updatedBy)) : 'Unknown User',
+                'created_by_name' => $dataBulanan->createdBy ? clean_string(get_decrypted_name($dataBulanan->createdBy)) : 'Unknown User',
+                'updated_by_name' => $dataBulanan->updatedBy ? clean_string(get_decrypted_name($dataBulanan->updatedBy)) : 'Unknown User',
                 'uploads' => $dataBulanan->uploads ? $dataBulanan->uploads->map(function ($upload) {
                     return [
                         'id' => $upload->id,
@@ -564,8 +564,8 @@ public function show($id)
         'updated_at' => $data->updated_at,
 
         // Tambahkan created_by_name dan updated_by_name untuk data utama
-        'created_by_name' => $data->createdBy ? clean_string(get_decrypted_username($data->createdBy)) : 'Unknown User',
-        'updated_by_name' => $data->updatedBy ? clean_string(get_decrypted_username($data->updatedBy)) : 'Unknown User',
+        'created_by_name' => $data->createdBy ? clean_string(get_decrypted_name($data->createdBy)) : 'Unknown User',
+        'updated_by_name' => $data->updatedBy ? clean_string(get_decrypted_name($data->updatedBy)) : 'Unknown User',
 
         // Relationships
         'ir_dampak' => $data->irDampak ?? null,
@@ -769,7 +769,7 @@ public function store(Request $request)
 
         $createdByName = 'Unknown User';
         try {
-            $createdByName = get_decrypted_username($riskHeader->createdBy);
+            $createdByName = get_decrypted_name($riskHeader->createdBy);
         } catch (\Throwable $e) {
             \Log::warning("Error handling createdBy: {$e->getMessage()}");
         }
@@ -1318,7 +1318,7 @@ private function buildResponse($riskHeader)
 
     $createdByName = 'Unknown User';
     try {
-        $createdByName = get_decrypted_username($riskHeader->createdBy);
+        $createdByName = get_decrypted_name($riskHeader->createdBy);
     } catch (\Throwable $e) {
         \Log::warning("Error handling createdBy: {$e->getMessage()}");
     }
@@ -1695,9 +1695,9 @@ public function monitoring(Request $request)
             'updated_at' => $item->updated_at ? $item->updated_at->toISOString() : null,
 
             'created_by' => $item->created_by ?? null,
-            'created_by_name' => get_decrypted_username($item->createdBy),
+            'created_by_name' => get_decrypted_name($item->createdBy),
             'updated_by' => $item->updated_by ?? null,
-            'updated_by_name' => get_decrypted_username($item->updatedBy),
+            'updated_by_name' => get_decrypted_name($item->updatedBy),
 
             'ir_dampak' => $item->irDampak ?? null,
             'ir_kemungkinan' => $item->irKemungkinan ?? null,
@@ -1820,7 +1820,7 @@ public function getPendingApproval(Request $request)
         $responseData = $pendingData->map(function ($riskHeader) {
             $createdByName = 'Unknown User';
             try {
-                $createdByName = get_decrypted_username($riskHeader->createdBy);
+                $createdByName = get_decrypted_name($riskHeader->createdBy);
             } catch (\Throwable $e) {
                 \Log::warning("Error handling createdBy: {$e->getMessage()}");
             }
@@ -1939,7 +1939,7 @@ public function approveRiskHeader(Request $request, $id)
 
         $approvedByName = 'Unknown User';
         try {
-            $approvedByName = get_decrypted_username($riskHeader->approvedBy);
+            $approvedByName = get_decrypted_name($riskHeader->approvedBy);
         } catch (\Throwable $e) {
             \Log::warning("Error handling approvedBy: {$e->getMessage()}");
         }
@@ -2041,7 +2041,7 @@ public function rejectRiskHeader(Request $request, $id)
 
         $rejectedByName = 'Unknown User';
         try {
-            $rejectedByName = get_decrypted_username($riskHeader->approvedBy);
+            $rejectedByName = get_decrypted_name($riskHeader->approvedBy);
         } catch (\Throwable $e) {
             \Log::warning("Error handling approvedBy: {$e->getMessage()}");
         }
@@ -2119,13 +2119,13 @@ public function getRejectedData(Request $request)
             $approvedByName = 'Unknown User';
 
             try {
-                $createdByName = get_decrypted_username($riskHeader->createdBy);
+                $createdByName = get_decrypted_name($riskHeader->createdBy);
             } catch (\Throwable $e) {
                 \Log::warning("Error handling createdBy: {$e->getMessage()}");
             }
 
             try {
-                $approvedByName = get_decrypted_username($riskHeader->approvedBy);
+                $approvedByName = get_decrypted_name($riskHeader->approvedBy);
             } catch (\Throwable $e) {
                 \Log::warning("Error handling approvedBy: {$e->getMessage()}");
             }

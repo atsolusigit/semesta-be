@@ -56,10 +56,10 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         'C' => 20,  // JENIS RISIKO
         'D' => 25,  // PENYEBAB RISIKO
         'E' => 25,  // TARGET BULANAN
-        'F' => 15,  // REALISASI BULANAN
-        'G' => 15,  // TARGET TAHUNAN
-        'H' => 15,  // REALISASI BULANAN
-        'I' => 12,  // % BULANAN
+        'F' => 20,  // REALISASI BULANAN
+        'G' => 20,  // TARGET TAHUNAN
+        'H' => 20,  // REALISASI BULANAN
+        'I' => 20,  // % BULANAN
         'J' => 12,  // % TAHUNAN
         'K' => 12,  // BIAYA
         'L' => 25,  // EVALUASI PERLAKUAN RISIKO - KEMBALI KE POSISI ASLI
@@ -225,6 +225,72 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
+     * Format target bulanan - handles both qualitative and quantitative data
+     */
+    private function formatTargetBulan($monthly): string
+{
+    if (!$monthly) {
+        return 'Rp.0';
+    }
+
+    $targetKualitatif = trim($monthly->target_kualitatif ?? '');
+    $targetQuantitative = trim($monthly->target_quantitative ?? '');
+
+    // Jika target_kualitatif ada isi (bukan kosong/null) = data kualitatif
+    if (!empty($targetKualitatif)) {
+        // Format: "50%\r\nKualitatif 1" - PERSENTASE DULU
+        $result = $targetKualitatif;
+        // Tambahkan % jika belum ada dan numeric
+        if (is_numeric($targetKualitatif)) {
+            $result .= '%';
+        }
+
+        // Tampilkan deskripsi kualitatif dari target_quantitative (di bawah)
+        if (!empty($targetQuantitative)) {
+            $result .= "\r\n" . $targetQuantitative;
+        }
+
+        return $result;
+    }
+
+    // Jika kosong = data quantitative
+    return $this->formatCurrency($targetQuantitative);
+}
+
+    /**
+     * Format realisasi bulanan - handles both qualitative and quantitative data
+     */
+   private function formatRealizationBulan($monthly): string
+{
+    if (!$monthly) {
+        return 'Rp.0';
+    }
+
+    $realizationKualitatif = trim($monthly->realization_kualitatif ?? '');
+    $realizationQuantitative = trim($monthly->realization_quantitative ?? '');
+
+    // Jika realization_kualitatif ada isi (bukan kosong/null) = data kualitatif
+    if (!empty($realizationKualitatif)) {
+        // Format: "50%\r\nKualitatif 1" - PERSENTASE DULU
+        $result = $realizationKualitatif;
+        // Tambahkan % jika belum ada dan numeric
+        if (is_numeric($realizationKualitatif)) {
+            $result .= '%';
+        }
+
+        // Tampilkan deskripsi kualitatif dari realization_quantitative (di bawah)
+        if (!empty($realizationQuantitative)) {
+            $result .= "\r\n" . $realizationQuantitative;
+        }
+
+        return $result;
+    }
+
+    // Jika kosong = data quantitative
+    return $this->formatCurrency($realizationQuantitative);
+}
+
+    /**
      * Build document header rows
      */
     private function buildHeaderRows(): array
@@ -272,7 +338,7 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     }
 
     /**
- * Build data rows from headers - Hanya memindahkan Evaluasi Perlakuan Risiko ke akhir
+ * Build data rows from headers - Updated to use new format methods
  */
 private function buildDataRows(): array
 {
@@ -332,14 +398,18 @@ private function buildDataRows(): array
         }
         // --- end resolve ---
 
-        // Get values with null safety and proper conversion
-        $targetBulanan = $this->toNumeric($monthly->target_quantitative ?? 0);
-        $realisasiBulanan = $this->toNumeric($monthly->realization_quantitative ?? 0);
-        $targetTahunan = $this->toNumeric($header->target_quantitative_satu_tahun ?? 0);
+        // Get formatted values using the new methods
+        $targetBulanan = $this->formatTargetBulan($monthly);
+        $realisasiBulanan = $this->formatRealizationBulan($monthly);
+
+        // For percentage calculation, we need numeric values
+        $targetNumeric = $this->toNumeric($monthly->target_quantitative ?? 0);
+        $realisasiNumeric = $this->toNumeric($monthly->realization_quantitative ?? 0);
+        $targetTahunanNumeric = $this->toNumeric($header->target_quantitative_satu_tahun ?? 0);
 
         // Calculate percentages
-        $percentageBulanan = $this->calculatePercentage($realisasiBulanan, $targetBulanan);
-        $percentageTahunan = $this->calculatePercentage($realisasiBulanan, $targetTahunan);
+        $percentageBulanan = $this->calculatePercentage($realisasiNumeric, $targetNumeric);
+        $percentageTahunan = $this->calculatePercentage($realisasiNumeric, $targetTahunanNumeric);
 
         $dataRows[] = [
             $no,                                                              // 1. NO auto increment
@@ -347,10 +417,10 @@ private function buildDataRows(): array
             $header->jenis_risiko ?? '',                                     // 3. JENIS RISIKO
             $header->peristiwa_risiko ?? '',                                 // 4. PERISTIWA RISIKO
             $header->penyebab_risiko ?? '',                                  // 5. PENYEBAB RISIKO
-            $this->formatCurrency($monthly->target_quantitative ?? 0),       // 6. TARGET BULAN
-            $this->formatCurrency($monthly->realization_quantitative ?? 0),  // 7. REALISASI BULAN
+            $targetBulanan,                                                  // 6. TARGET BULAN (formatted)
+            $realisasiBulanan,                                               // 7. REALISASI BULAN (formatted)
             $this->formatCurrency($header->target_quantitative_satu_tahun ?? 0), // 8. TARGET 1 TAHUN
-            $this->formatCurrency($monthly->realization_quantitative ?? 0),  // 9. REALISASI BULAN (duplikasi)
+            $realisasiBulanan,                                               // 9. REALISASI BULAN (duplikasi)
             $percentageBulanan . '%',                                        // 10. BULAN %
             $percentageTahunan . '%',                                        // 11. TARGET TAHUN %
             $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),     // 12. BIAYA PERLAKUAN
@@ -662,7 +732,7 @@ private function buildDataRows(): array
 
         // Right alignment untuk currency column
         $currencyRange = "L" . self::DATA_START_ROW . ":L{$lastRow}";
-        $sheet->getStyle($currencyRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $sheet->getStyle($currencyRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
     }
 
     /**

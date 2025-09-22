@@ -55,6 +55,12 @@ class MstHeatmapController extends Controller
 
      public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+        $userRole = auth()->user()->role_id ?? null;
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
+        }
+
         $validator = Validator::make($request->all(), [
             'dampak' => 'required|exists:mst_heatmap_dampak,id',
             'kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
@@ -80,6 +86,12 @@ class MstHeatmapController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Check authorization: only role 1 and 2 can update
+        $userRole = auth()->user()->role_id ?? null;
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
+        }
+
         $heatmap = MstHeatmap::find($id);
         if (!$heatmap) {
             return json(404, false, 'Tidak Ditemukan', 'Data heatmap tidak ditemukan',null);
@@ -102,6 +114,12 @@ class MstHeatmapController extends Controller
 
     public function destroy($id)
     {
+        // Check authorization: only role 1 can delete
+        $userRole = auth()->user()->role_id ?? null;
+        if ($userRole !== 1) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menghapus data', null);
+        }
+
         $data = MstHeatmap::find($id);
 
         if (!$data) {

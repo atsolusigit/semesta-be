@@ -22,6 +22,12 @@ class HeatmapLabelController extends Controller
 
     public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+        $userRole = auth()->user()->role_id ?? null;
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
+        }
+
         $validator = Validator::make($request->all(), [
             'type' => 'required|in:dampak,kemungkinan',
             'label' => 'required|string',
@@ -49,6 +55,12 @@ class HeatmapLabelController extends Controller
 
     public function update(Request $request, $type, $id)
     {
+        // Check authorization: only role 1 and 2 can update
+        $userRole = auth()->user()->role_id ?? null;
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
+        }
+
         $validator = Validator::make($request->all(), [
             'skala' => 'required|integer|min:1|max:5',
             'label' => 'required|string'
@@ -87,6 +99,12 @@ class HeatmapLabelController extends Controller
 
     public function destroy($type, $id)
     {
+        // Check authorization: only role 1 can delete
+        $userRole = auth()->user()->role_id ?? null;
+        if ($userRole !== 1) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menghapus data', null);
+        }
+
         if ($type === 'dampak') {
             $data = MstHeatmapDampak::find($id);
             if (!$data) {

@@ -21,6 +21,12 @@ class HeatmapRiskRangeController extends Controller
 
     public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+        $userRole = auth()->user()->role_id ?? null;
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'start' => 'required|integer',
@@ -54,6 +60,12 @@ class HeatmapRiskRangeController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Check authorization: only role 1 and 2 can update
+        $userRole = auth()->user()->role_id ?? null;
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'start' => 'required|integer',
@@ -87,6 +99,12 @@ class HeatmapRiskRangeController extends Controller
 
     public function destroy($id)
     {
+        // Check authorization: only role 1 can delete
+        $userRole = auth()->user()->role_id ?? null;
+        if ($userRole !== 1) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menghapus data', null);
+        }
+
         try {
             $range = MstHeatmapRiskRange::findOrFail($id);
             $range->delete();

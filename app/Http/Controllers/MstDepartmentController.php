@@ -13,17 +13,18 @@ use Illuminate\Support\Arr;
 
 class MstDepartmentController extends Controller
 {
-public function index(Request $request)
+    public function index(Request $request)
 {
     $query = MstDepartment::select('id', 'name', 'abbreviation');
 
-    // Cek role user yang sedang login
     $user = auth()->user();
 
-    // Jika user memiliki role 2 atau 3, batasi hanya departemennya saja
-if ($user && in_array($user->role->id, [2, 3])) {
-    $query->where('id', $user->department_id);
-}
+    if ($user) {
+        // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
+        if (!in_array($user->role->id, [1, 2])) {
+            $query->where('id', $user->department_id);
+        }
+    }
 
     if ($request->filled('search')) {
         $search = $request->search;
@@ -42,24 +43,38 @@ if ($user && in_array($user->role->id, [2, 3])) {
     return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $departments);
 }
 
-    public function show($id)
-    {
-        $department = MstDepartment::select('id', 'name', 'abbreviation')->find($id);
+public function show($id)
+{
+    $user = auth()->user();
 
-        if (!$department) {
-            return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
+    if ($user) {
+        // Hanya role selain 1 & 2 yang dibatasi
+        if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
+            return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
         }
-
-        $safeData = collect($department)->map(function ($value) {
-            return is_string($value) ? mb_convert_encoding($value, 'UTF-8', 'UTF-8') : $value;
-        });
-
-        return json(200, 'success', 'Success', 'Data department berhasil ditemukan.', $safeData);
     }
+
+    $department = MstDepartment::select('id', 'name', 'abbreviation')->find($id);
+
+    if (!$department) {
+        return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
+    }
+
+    $safeData = collect($department)->map(function ($value) {
+        return is_string($value) ? mb_convert_encoding($value, 'UTF-8', 'UTF-8') : $value;
+    });
+
+    return json(200, 'success', 'Success', 'Data department berhasil ditemukan.', $safeData);
+}
+
 
     public function store(Request $request)
     {
         $user = JWTAuth::parseToken()->authenticate();
+
+            if (!in_array($user->role->id, [1, 2])) {
+        return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk menambahkan departemen.', null);
+    }
 
         // Menggunakan helper check_validation
         $validation = check_validation($request->all(), [
@@ -75,43 +90,71 @@ if ($user && in_array($user->role->id, [2, 3])) {
         $department = MstDepartment::create([
             'name' => $request->name,
             'abbreviation' => $request->abbreviation,
-            'created_by' => $user->id, // Simpan plain di database
+            'created_by' => $user->id,
         ]);
 
         $userIdToAssign = $request->assign_to_user_id ?? $user->id;
 
-        // Cek apakah user sudah di-assign ke department ini
         $alreadyAssigned = UserDepartment::where('user_id', $userIdToAssign)
             ->where('department_id', $department->id)
             ->exists();
 
-        // Jika belum di-assign, tambahkan relasi UserDepartment
         if (!$alreadyAssigned) {
             UserDepartment::insert([
                 'user_id' => $userIdToAssign,
                 'department_id' => $department->id,
-                'created_by' => $user->id, // Simpan plain di database
+                'created_by' => $user->id,
             ]);
         }
 
-        // Enkripsi created_by untuk response JSON
         $department->created_by = encrypt_decrypt_md5('enc', $department->created_by);
 
         return json(200, 'success', 'Success', 'Departemen berhasil ditambahkan dan user diassign.', $department);
     }
 
     public function update(Request $request, $id)
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+
+            if (!in_array($user->role->id, [1, 2])) {
+        return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk menambahkan departemen.', null);
+    }
+
+        $validation = check_validation($request->all(), [
+            'name' => 'required|string|max:100|unique:mst_department,name,' . $id,
+            'abbreviation' => 'nullable|string|max:10',
+        ]);
+
+        if ($validation[0] == 1) {
+            return $validation[1];
+        }
+
+        $department = MstDepartment::find($id);
+
+        if (!$department) {
+            return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
+        }
+
+        $department->update([
+            'name' => $request->name,
+            'abbreviation' => $request->abbreviation,
+            'updated_by' => $user->id,
+        ]);
+
+        $department->refresh();
+        $department = MstDepartment::find($id);
+        $department->created_by = encrypt_decrypt_md5('enc', $department->created_by);
+
+        return json(200, 'success', 'Success', 'Departemen berhasil diperbarui.', $department);
+    }
+
+ public function destroy($id)
 {
-    $user = JWTAuth::parseToken()->authenticate();
+    $user = auth()->user();
 
-    // Menggunakan helper check_validation
-    $validation = check_validation($request->all(), [
-        'name' => 'required|string|max:100|unique:mst_department,name,' . $id,
-        'abbreviation' => 'nullable|string|max:10',
-    ]);
-
-    if ($validation[0] == 1) {
-        return $validation[1];
+    // Cek hanya Super Admin (role_id = 1) yang bisa hapus
+    if (!$user || $user->role->id !== 1) {
+        return json(403, false, 'Akses ditolak', 'Anda tidak memiliki akses untuk menghapus departemen.', null);
     }
 
     $department = MstDepartment::find($id);
@@ -120,32 +163,9 @@ if ($user && in_array($user->role->id, [2, 3])) {
         return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
     }
 
-    $department->update([
-        'name' => $request->name,
-        'abbreviation' => $request->abbreviation,
-        'updated_by' => $user->id, // Simpan plain
-    ]);
+    $department->delete();
 
-    // Refresh department dari database setelah update
-    $department->refresh();
-
-    // Enkripsi created_by untuk response JSON (bukan disimpan)
-    $department = MstDepartment::find($id); // Ambil ulang dari database
-    $department->created_by = encrypt_decrypt_md5('enc', $department->created_by);
-
-    return json(200, 'success', 'Success', 'Departemen berhasil diperbarui.', $department);
+    return json(200, 'success', 'Success', 'Departemen berhasil dihapus.', null);
 }
 
-    public function destroy($id)
-    {
-        $department = MstDepartment::find($id);
-
-        if (!$department) {
-            return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
-        }
-
-        $department->delete();
-
-        return json(200, 'success', 'Success', 'Departemen berhasil dihapus.', null);
-    }
 }

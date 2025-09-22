@@ -35,7 +35,8 @@ class MstApprovalController extends Controller
         $userRole = $user->role->id ?? $user->role_id ?? 1;
         $userDepartmentId = $user->department_id ?? null;
 
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 1 dapat melihat semua data, role 2,3,4,5 hanya departemen mereka
+        if (in_array($userRole, [2, 3, 4, 5]) && $userDepartmentId) {
             $query->whereHas('document', function($q) use ($userDepartmentId) {
                 $q->where('department_id', $userDepartmentId);
             });
@@ -69,6 +70,15 @@ class MstApprovalController extends Controller
      */
     public function store(Request $request)
     {
+        // Role-based access control - hanya role 1 dan 2 yang bisa store
+        $user = auth()->user();
+        $userRole = $user->role->id ?? $user->role_id ?? 1;
+        $userDepartmentId = $user->department_id ?? null;
+
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk menambah data', null);
+        }
+
         $validator = Validator::make($request->all(), [
             'document_id' => 'required|integer|exists:tr_risk_header,id',
             'tahun' => 'required|integer|min:2020|max:2030',
@@ -93,15 +103,11 @@ class MstApprovalController extends Controller
             return json(409, false, 'Gagal', 'Sudah ada approval untuk dokumen, tahun, dan posisi yang sama', null);
         }
 
-        // Role-based access control
-        $user = auth()->user();
-        $userRole = $user->role->id ?? $user->role_id ?? 1;
-        $userDepartmentId = $user->department_id ?? null;
-
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 2 hanya bisa membuat approval untuk dokumen dalam departemen mereka
+        if ($userRole == 2 && $userDepartmentId) {
             $document = TrRiskHeader::find($request->document_id);
             if (!$document || $document->department_id !== $userDepartmentId) {
-                return json(404, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk membuat approval untuk dokumen ini', null);
+                return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk membuat approval untuk dokumen ini', null);
             }
         }
 
@@ -150,9 +156,10 @@ class MstApprovalController extends Controller
         $userRole = $user->role->id ?? $user->role_id ?? 1;
         $userDepartmentId = $user->department_id ?? null;
 
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 1 dapat melihat semua data, role 2,3,4,5 hanya departemen mereka
+        if (in_array($userRole, [2, 3, 4, 5]) && $userDepartmentId) {
             if (!$item->document || $item->document->department_id !== $userDepartmentId) {
-                return json(404, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk melihat data ini', null);
+                return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk melihat data ini', null);
             }
         }
 
@@ -164,20 +171,25 @@ class MstApprovalController extends Controller
      */
     public function update(Request $request, $id)
     {
+        // Role-based access control - hanya role 1 dan 2 yang bisa update
+        $user = auth()->user();
+        $userRole = $user->role->id ?? $user->role_id ?? 1;
+        $userDepartmentId = $user->department_id ?? null;
+
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk mengupdate data', null);
+        }
+
         $approval = MstApproval::with('document')->find($id);
 
         if (!$approval) {
             return json(404, false, 'Tidak Ditemukan', 'Data approval tidak ditemukan', null);
         }
 
-        // Role-based access control
-        $user = auth()->user();
-        $userRole = $user->role->id ?? $user->role_id ?? 1;
-        $userDepartmentId = $user->department_id ?? null;
-
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 2 hanya bisa update approval dalam departemen mereka
+        if ($userRole == 2 && $userDepartmentId) {
             if (!$approval->document || $approval->document->department_id !== $userDepartmentId) {
-                return json(404, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk mengupdate data ini', null);
+                return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk mengupdate data ini', null);
             }
         }
 
@@ -193,6 +205,14 @@ class MstApprovalController extends Controller
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Terdapat kesalahan input', $validator->errors());
+        }
+
+        // Role 2 hanya bisa update approval untuk dokumen dalam departemen mereka
+        if ($userRole == 2 && $userDepartmentId) {
+            $document = TrRiskHeader::find($request->document_id);
+            if (!$document || $document->department_id !== $userDepartmentId) {
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat mengupdate approval untuk dokumen dalam departemen Anda sendiri', null);
+            }
         }
 
         // Check duplicate
@@ -239,6 +259,14 @@ class MstApprovalController extends Controller
      */
     public function destroy($id)
     {
+        // Role-based access control - hanya role 1 yang bisa delete
+        $user = auth()->user();
+        $userRole = $user->role->id ?? $user->role_id ?? 1;
+
+        if ($userRole !== 1) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk menghapus data', null);
+        }
+
         $approval = MstApproval::find($id);
 
         if (!$approval) {

@@ -14,6 +14,8 @@ class KnowledgeBaseController extends Controller
 {
     public function index(Request $request)
 {
+    // Semua role dapat melihat data - tidak perlu pengecekan role
+
     // Eager load relasi creator & updater
     $query = Knowledgebase::with(['creator', 'updater']);
 
@@ -55,8 +57,11 @@ class KnowledgeBaseController extends Controller
         'data' => $data
     ]);
 }
-    public function show($id)
+
+public function show($id)
 {
+    // Semua role dapat melihat detail data - tidak perlu pengecekan role
+
     try {
         \Log::info('Starting show function for ID: ' . $id);
 
@@ -151,10 +156,10 @@ class KnowledgeBaseController extends Controller
     }
 }
 
-    public function store(Request $request)
+   public function store(Request $request)
 {
     $user = JWTAuth::parseToken()->authenticate();
-    if (!in_array($user->role_id, [1, 2, 6, 7])) {
+    if (!in_array($user->role_id, [1, 2])) {
         return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk membuat data', null);
     }
 
@@ -210,10 +215,10 @@ class KnowledgeBaseController extends Controller
     }
 }
 
-    public function update(Request $request, $id)
+public function update(Request $request, $id)
 {
     $user = JWTAuth::parseToken()->authenticate();
-    if (!in_array($user->role_id, [1, 2, 6, 7])) {
+    if (!in_array($user->role_id, [1, 2])) {
         return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk mengupdate data', null);
     }
 
@@ -298,37 +303,36 @@ class KnowledgeBaseController extends Controller
     }
 }
 
-    public function destroy($id)
-    {
-        $user = JWTAuth::parseToken()->authenticate();
-        if (!in_array($user->role_id, [1, 6])) {
-            return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk menghapus data', null);
-        }
-
-        $Base = Knowledgebase::find($id);
-        if (!$Base) {
-            return json(404, false, 'not_found', 'Data tidak ditemukan', null);
-        }
-
-        try {
-            // Hapus file gambar jika ada
-            if (!empty($Base->img_path) && File::exists(public_path('storage/' . $Base->img_path))) {
-                File::delete(public_path('storage/' . $Base->img_path));
-            }
-
-            // Hapus file dokumen jika ada
-            if (!empty($Base->doc_path) && File::exists(public_path('storage/' . $Base->doc_path))) {
-                File::delete(public_path('storage/' . $Base->doc_path));
-            }
-
-            $Base->delete();
-
-            return json(200, true, 'success', 'Data berhasil dihapus', null);
-        } catch (\Exception $e) {
-            return json(500, false, 'error', 'Gagal menghapus data: ' . $e->getMessage(), null);
-        }
+   public function destroy($id)
+{
+    $user = JWTAuth::parseToken()->authenticate();
+    if (!in_array($user->role_id, [1])) {
+        return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk menghapus data', null);
     }
 
+    $Base = Knowledgebase::find($id);
+    if (!$Base) {
+        return json(404, false, 'not_found', 'Data tidak ditemukan', null);
+    }
+
+    try {
+        // Hapus file gambar jika ada
+        if (!empty($Base->img_path) && File::exists(public_path('storage/' . $Base->img_path))) {
+            File::delete(public_path('storage/' . $Base->img_path));
+        }
+
+        // Hapus file dokumen jika ada
+        if (!empty($Base->doc_path) && File::exists(public_path('storage/' . $Base->doc_path))) {
+            File::delete(public_path('storage/' . $Base->doc_path));
+        }
+
+        $Base->delete();
+
+        return json(200, true, 'success', 'Data berhasil dihapus', null);
+    } catch (\Exception $e) {
+        return json(500, false, 'error', 'Gagal menghapus data: ' . $e->getMessage(), null);
+    }
+}
     public function trackReader($id)
     {
         try {

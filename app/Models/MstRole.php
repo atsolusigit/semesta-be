@@ -45,5 +45,16 @@ public function approvalFlows()
         return $this->hasMany(RoleApprovalFlow::class, 'can_approve_role_id');
     }
 
+// Relasi many-to-many dengan Permission melalui tabel pivot role_permissions
+    public function permissions()
+{
+    return $this->belongsToMany(
+        \App\Models\Permission::class,
+        'role_permissions',
+        'role_id',
+        'permission_id'
+    );
+}
+
 }
 

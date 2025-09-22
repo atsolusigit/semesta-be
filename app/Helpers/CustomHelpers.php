@@ -1207,3 +1207,28 @@ if (!function_exists('get_approval_status_simple')) {
     }
 }
 
+if (!function_exists('has_permission')) {
+    /**
+     * Cek apakah user punya permission tertentu
+     *
+     * @param \App\Models\User $user
+     * @param string $permissionName
+     * @return bool
+     */
+    function has_permission($user, $permissionName)
+    {
+        if (!$user) return false;
+
+        // Ambil semua role user
+        $roles = $user->roles; // pastikan model User punya relasi roles()
+        foreach ($roles as $role) {
+            // Ambil semua permissions role
+            foreach ($role->permissions as $perm) {
+                if (strtolower($perm->name) === strtolower($permissionName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}

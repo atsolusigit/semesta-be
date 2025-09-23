@@ -59,12 +59,14 @@ class MstJabatanController extends Controller
     {
         // Role-based access control - hanya role 1 dan 2 yang bisa store
         $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $userRole = $user->role->id ?? $user->role_id ?? 1;
         $userDepartmentId = $user->department_id ?? null;
-
-        if (!in_array($userRole, [1, 2])) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk menambah data', null);
-        }
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -146,12 +148,14 @@ class MstJabatanController extends Controller
     {
         // Role-based access control - hanya role 1 dan 2 yang bisa update
         $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $userRole = $user->role->id ?? $user->role_id ?? 1;
         $userDepartmentId = $user->department_id ?? null;
-
-        if (!in_array($userRole, [1, 2])) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk mengupdate data', null);
-        }
 
         $jabatan = MstJabatan::find($id);
 
@@ -221,10 +225,10 @@ class MstJabatanController extends Controller
     {
         // Role-based access control - hanya role 1 yang bisa delete
         $user = auth()->user();
-        $userRole = $user->role->id ?? $user->role_id ?? 1;
+        $roleCheck = check_role($user, 1);
 
-        if ($userRole !== 1) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk menghapus data', null);
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         $jabatan = MstJabatan::find($id);

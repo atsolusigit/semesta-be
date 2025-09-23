@@ -1232,3 +1232,42 @@ if (!function_exists('has_permission')) {
         return false;
     }
 }
+
+if (!function_exists('check_role')) {
+    /**
+     * Cek apakah user punya role tertentu,
+     * jika tidak langsung return JSON response standar.
+     *
+     * @param \App\Models\User|null $user
+     * @param array|int $allowedRoles
+     * @return bool|\Illuminate\Http\JsonResponse
+     */
+    function check_role($user, $allowedRoles)
+    {
+        if (!$user) {
+            return response()->json([
+                'status'  => false,
+                'code'    => 401,
+                'message' => 'Unauthorized',
+                'detail'  => 'User tidak terautentikasi',
+                'data'    => null
+            ], 401);
+        }
+
+        if (!is_array($allowedRoles)) {
+            $allowedRoles = [$allowedRoles];
+        }
+
+        if (!in_array($user->role_id, $allowedRoles)) {
+            return response()->json([
+                'status'  => false,
+                'code'    => 403,
+                'message' => 'Tidak Diizinkan',
+                'detail'  => 'Anda tidak memiliki akses',
+                'data'    => null
+            ], 403);
+        }
+
+        return true;
+    }
+}

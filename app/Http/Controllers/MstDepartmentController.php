@@ -14,67 +14,68 @@ use Illuminate\Support\Arr;
 class MstDepartmentController extends Controller
 {
     public function index(Request $request)
-{
-    $query = MstDepartment::select('id', 'name', 'abbreviation');
+    {
+        $query = MstDepartment::select('id', 'name', 'abbreviation');
 
-    $user = auth()->user();
+        $user = auth()->user();
 
-    if ($user) {
-        // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
-        if (!in_array($user->role->id, [1, 2])) {
-            $query->where('id', $user->department_id);
+        if ($user) {
+            // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
+            if (!in_array($user->role->id, [1, 2])) {
+                $query->where('id', $user->department_id);
+            }
         }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('abbreviation', 'like', "%{$search}%");
+            });
+        }
+
+        $departments = $query->orderBy('id')->get();
+
+        if ($departments->isEmpty()) {
+            return json(404, false, 'Not Found', 'Data departemen tidak ditemukan.', []);
+        }
+
+        return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $departments);
     }
 
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('abbreviation', 'like', "%{$search}%");
+    public function show($id)
+    {
+        $user = auth()->user();
+
+        if ($user) {
+            // Hanya role selain 1 & 2 yang dibatasi
+            if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
+                return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
+            }
+        }
+
+        $department = MstDepartment::select('id', 'name', 'abbreviation')->find($id);
+
+        if (!$department) {
+            return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
+        }
+
+        $safeData = collect($department)->map(function ($value) {
+            return is_string($value) ? mb_convert_encoding($value, 'UTF-8', 'UTF-8') : $value;
         });
+
+        return json(200, 'success', 'Success', 'Data department berhasil ditemukan.', $safeData);
     }
-
-    $departments = $query->orderBy('id')->get();
-
-    if ($departments->isEmpty()) {
-        return json(404, false, 'Not Found', 'Data departemen tidak ditemukan.', []);
-    }
-
-    return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $departments);
-}
-
-public function show($id)
-{
-    $user = auth()->user();
-
-    if ($user) {
-        // Hanya role selain 1 & 2 yang dibatasi
-        if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
-            return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
-        }
-    }
-
-    $department = MstDepartment::select('id', 'name', 'abbreviation')->find($id);
-
-    if (!$department) {
-        return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
-    }
-
-    $safeData = collect($department)->map(function ($value) {
-        return is_string($value) ? mb_convert_encoding($value, 'UTF-8', 'UTF-8') : $value;
-    });
-
-    return json(200, 'success', 'Success', 'Data department berhasil ditemukan.', $safeData);
-}
-
 
     public function store(Request $request)
     {
-        $user = JWTAuth::parseToken()->authenticate();
+        // Check authorization: only role 1 and 2 can store
+        $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
 
-            if (!in_array($user->role->id, [1, 2])) {
-        return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk menambahkan departemen.', null);
-    }
+        $user = auth()->user();
 
         // Menggunakan helper check_validation
         $validation = check_validation($request->all(), [
@@ -114,11 +115,13 @@ public function show($id)
 
     public function update(Request $request, $id)
     {
-        $user = JWTAuth::parseToken()->authenticate();
+        // Check authorization: only role 1 and 2 can update
+        $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
 
-            if (!in_array($user->role->id, [1, 2])) {
-        return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk menambahkan departemen.', null);
-    }
+        $user = auth()->user();
 
         $validation = check_validation($request->all(), [
             'name' => 'required|string|max:100|unique:mst_department,name,' . $id,
@@ -148,24 +151,22 @@ public function show($id)
         return json(200, 'success', 'Success', 'Departemen berhasil diperbarui.', $department);
     }
 
- public function destroy($id)
-{
-    $user = auth()->user();
+    public function destroy($id)
+    {
+        // Check authorization: only role 1 can delete
+        $result = check_role(auth()->user(), [1]);
+        if ($result !== true) {
+            return $result;
+        }
 
-    // Cek hanya Super Admin (role_id = 1) yang bisa hapus
-    if (!$user || $user->role->id !== 1) {
-        return json(403, false, 'Akses ditolak', 'Anda tidak memiliki akses untuk menghapus departemen.', null);
+        $department = MstDepartment::find($id);
+
+        if (!$department) {
+            return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
+        }
+
+        $department->delete();
+
+        return json(200, 'success', 'Success', 'Departemen berhasil dihapus.', null);
     }
-
-    $department = MstDepartment::find($id);
-
-    if (!$department) {
-        return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
-    }
-
-    $department->delete();
-
-    return json(200, 'success', 'Success', 'Departemen berhasil dihapus.', null);
-}
-
 }

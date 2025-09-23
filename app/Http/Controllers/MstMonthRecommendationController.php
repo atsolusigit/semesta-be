@@ -12,10 +12,10 @@ class MstMonthRecommendationController extends Controller
     {
         // Role-based access control - hanya role 1 dan 2 yang bisa melihat data
         $user = auth()->user();
-        $userRole = $user->role->id ?? $user->role_id ?? 1;
+        $roleCheck = check_role($user, [1, 2]);
 
-        if (!in_array($userRole, [1, 2])) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk melihat data', null);
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         $query = MstMonthRecommendation::with([
@@ -51,17 +51,17 @@ class MstMonthRecommendationController extends Controller
 
      public function store(Request $request)
     {
-        $role = Auth::user()->role_id;
-        if (!in_array($role, [1, 2])) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        $user = Auth::user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         $request->validate([
             'name' => 'required|string|max:255',
             'required' => 'nullable|string|in:Rekomendasi,Tidak Rekomendasi'
         ]);
-
-        $user = Auth::user();
 
         // Konversi string ke boolean
         $requiredValue = ($request->required === 'Rekomendasi') ? 1 : 0;
@@ -78,9 +78,11 @@ class MstMonthRecommendationController extends Controller
 
     public function update(Request $request, $id)
     {
-        $role = Auth::user()->role_id;
-        if (!in_array($role, [1, 2])) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        $user = Auth::user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         $monthRecommendation = MstMonthRecommendation::find($id);
@@ -92,8 +94,6 @@ class MstMonthRecommendationController extends Controller
             'name' => 'required|string|max:255',
             'required' => 'nullable|string|in:Rekomendasi,Tidak Rekomendasi'
         ]);
-
-        $user = Auth::user();
 
         // Konversi string ke boolean
         $requiredValue = ($request->required === 'Rekomendasi') ? 1 : 0;
@@ -109,9 +109,11 @@ class MstMonthRecommendationController extends Controller
 
     public function destroy($id)
     {
-         $role = Auth::user()->role_id;
-        if ($role != 1) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        $user = Auth::user();
+        $roleCheck = check_role($user, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         $monthRecommendation = MstMonthRecommendation::find($id);

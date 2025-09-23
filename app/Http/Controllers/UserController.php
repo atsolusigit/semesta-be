@@ -185,15 +185,14 @@ public function show(Request $request, $id)
     return json(200, 'success', 'Success', 'Berhasil menampilkan detail user', [$data]);
 }
 
-   public function store(Request $request)
+  public function store(Request $request)
 {
     // Cek apakah user yang sedang login memiliki role ID 1 atau 2
-    $currentUserRoleId = auth()->user()->role_id;
-    if (!in_array($currentUserRoleId, [1, 2])) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Anda tidak memiliki izin untuk membuat user baru.'
-        ], 403);
+    $user = auth()->user();
+    $roleCheck = check_role($user, [1, 2]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     DB::beginTransaction();
@@ -267,9 +266,16 @@ public function show(Request $request, $id)
         return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
     }
 
-    // Mendapatkan role ID dari user yang sedang login
-    $currentUserRoleId = auth()->user()->role_id;
-    $currentUserDepartmentId = auth()->user()->department_id;
+    // Check role authorization - hanya role 1 dan 2 yang bisa update
+    $currentUser = auth()->user();
+    $roleCheck = check_role($currentUser, [1, 2]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
+    $currentUserRoleId = $currentUser->role_id;
+    $currentUserDepartmentId = $currentUser->department_id;
 
     // Validasi akses berdasarkan role
     if ($currentUserRoleId == 2) {
@@ -359,9 +365,10 @@ public function show(Request $request, $id)
     $authUser = auth()->user();
 
     // Cek apakah user yang login memiliki role_id 1 (super admin)
-    // Jika bukan, return response forbidden
-    if (!$authUser || (int) $authUser->role_id !== 1) {
-        return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menghapus user.', []);
+    $roleCheck = check_role($authUser, 1);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     try {
@@ -397,8 +404,9 @@ public function show(Request $request, $id)
 
     // Cek apakah user yang login memiliki role_id 1 atau 2
     // Jika bukan, return response unauthorized
-    if (!$authUser || !in_array((int) $authUser->role_id, [1, 2])) {
-        return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menyetujui user.', []);
+    $roleCheck = check_role($authUser, [1, 2]);
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     $user = User::find($id);
@@ -430,8 +438,10 @@ public function rejectUser($id)
 
     // Cek apakah user yang login memiliki role_id 1 atau 2
     // Jika bukan, return response unauthorized
-    if (!$authUser || !in_array((int) $authUser->role_id, [1, 2])) {
-        return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menolak user.', []);
+    $roleCheck = check_role($authUser, [1, 2]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     $user = User::find($id);
@@ -458,8 +468,10 @@ public function rejectUser($id)
 
     // Cek apakah user yang login memiliki role_id 1 atau 2
     // Jika bukan, return response unauthorized
-    if (!$authUser || !in_array((int) $authUser->role_id, [1, 2])) {
-        return json(403, 'error', 'Forbidden', 'Anda tidak memiliki akses untuk melihat data ini', []);
+    $roleCheck = check_role($authUser, [1, 2]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     // Ambil kata kunci pencarian (search) dari request jika ada

@@ -70,14 +70,15 @@ class MstApprovalController extends Controller
      */
     public function store(Request $request)
     {
-        // Role-based access control - hanya role 1 dan 2 yang bisa store
+        // Check authorization: only role 1 and 2 can store
+        $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
+
         $user = auth()->user();
         $userRole = $user->role->id ?? $user->role_id ?? 1;
         $userDepartmentId = $user->department_id ?? null;
-
-        if (!in_array($userRole, [1, 2])) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk menambah data', null);
-        }
 
         $validator = Validator::make($request->all(), [
             'document_id' => 'required|integer|exists:tr_risk_header,id',
@@ -171,14 +172,15 @@ class MstApprovalController extends Controller
      */
     public function update(Request $request, $id)
     {
-        // Role-based access control - hanya role 1 dan 2 yang bisa update
+        // Check authorization: only role 1 and 2 can update
+        $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
+
         $user = auth()->user();
         $userRole = $user->role->id ?? $user->role_id ?? 1;
         $userDepartmentId = $user->department_id ?? null;
-
-        if (!in_array($userRole, [1, 2])) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk mengupdate data', null);
-        }
 
         $approval = MstApproval::with('document')->find($id);
 
@@ -259,12 +261,10 @@ class MstApprovalController extends Controller
      */
     public function destroy($id)
     {
-        // Role-based access control - hanya role 1 yang bisa delete
-        $user = auth()->user();
-        $userRole = $user->role->id ?? $user->role_id ?? 1;
-
-        if ($userRole !== 1) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk menghapus data', null);
+        // Check authorization: only role 1 can delete
+        $result = check_role(auth()->user(), [1]);
+        if ($result !== true) {
+            return $result;
         }
 
         $approval = MstApproval::find($id);

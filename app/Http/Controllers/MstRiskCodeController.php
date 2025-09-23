@@ -31,9 +31,11 @@ class MstRiskCodeController extends Controller
     public function store(Request $request)
     {
         // Check authorization: only role 1 and 2 can store
-        $userRole = auth()->user()->role_id ?? null;
-        if (!in_array($userRole, [1, 2])) {
-            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         $validator = Validator::make($request->all(), [
@@ -68,9 +70,11 @@ class MstRiskCodeController extends Controller
     public function update(Request $request, $id)
     {
         // Check authorization: only role 1 and 2 can update
-        $userRole = auth()->user()->role_id ?? null;
-        if (!in_array($userRole, [1, 2])) {
-            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         $data = MstRiskCode::find($id);
@@ -99,9 +103,11 @@ class MstRiskCodeController extends Controller
     public function destroy($id)
     {
         // Check authorization: only role 1 can delete
-        $userRole = auth()->user()->role_id ?? null;
-        if ($userRole !== 1) {
-            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menghapus data', null);
+        $user = auth()->user();
+        $roleCheck = check_role($user, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         $data = MstRiskCode::find($id);

@@ -61,12 +61,11 @@ class RoleController extends Controller
 
    public function store(Request $request)
 {
+    $user = auth()->user();
+    $roleCheck = check_role($user, 1);
 
-      if (auth()->user()->role_id != 1) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Hanya Super Admin yang boleh membuat role'
-        ], 403);
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     $validated = $request->validate([
@@ -116,11 +115,11 @@ class RoleController extends Controller
 
 public function update(Request $request, $id)
 {
-          if (auth()->user()->role_id != 1) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Hanya Super Admin yang boleh mengupdate role'
-        ], 403);
+    $user = auth()->user();
+    $roleCheck = check_role($user, 1);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     $validated = $request->validate([
@@ -193,12 +192,12 @@ public function update(Request $request, $id)
 }
     public function destroy($id)
     {
-         if (auth()->user()->role_id != 1) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Hanya Super Admin yang boleh menghapus role'
-        ], 403);
-    }
+        $user = auth()->user();
+        $roleCheck = check_role($user, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
 
     if ($id == 1) {
         return response()->json([

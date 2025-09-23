@@ -666,17 +666,12 @@ public function store(Request $request)
     // VALIDASI ROLE: HANYA ROLE 1, 2, 3 YANG DIIZINKAN
     // ============================================
 
-    $currentUser = auth()->user();
-
-    if (!in_array($currentUser->role_id, [1, 2, 3])) {
-        return response()->json([
-            'code' => 403,
-            'status' => false,
-            'title' => 'AKSES DITOLAK',
-            'message' => 'Anda tidak memiliki izin untuk membuat data risk header.',
-            'data' => null
-        ], 403);
+    $result = check_role(auth()->user(), [1, 2, 3]);
+    if ($result !== true) {
+        return $result;
     }
+
+    $currentUser = auth()->user();
 
     // ============================================
     // VALIDASI WAJIB: HANYA BOLEH 14 FIELD DASAR
@@ -923,14 +918,9 @@ public function update(Request $request, $id)
     $currentUser = auth()->user();
 
     // Validasi role: hanya role 1, 2, 3 yang diizinkan
-    if (!in_array($currentUser->role_id, [1, 2, 3])) {
-        return response()->json([
-            'code' => 403,
-            'status' => false,
-            'title' => 'AKSES DITOLAK',
-            'message' => 'Anda tidak memiliki izin untuk mengubah data risk header.',
-            'data' => null
-        ], 403);
+    $roleCheck = check_role($currentUser, [1, 2, 3]);
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     $riskHeader = TrRiskHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
@@ -1535,14 +1525,10 @@ public function submit(Request $request, $id)
     $currentUser = auth()->user();
 
     // Validasi role: hanya role 1, 2, 3 yang diizinkan
-    if (!in_array($currentUser->role_id, [1, 2, 3])) {
-        return response()->json([
-            'code' => 403,
-            'status' => false,
-            'title' => 'AKSES DITOLAK',
-            'message' => 'Anda tidak memiliki izin untuk submit data risk header.',
-            'data' => null
-        ], 403);
+    $roleCheck = check_role($currentUser, [1, 2, 3]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
 
     $riskHeader = TrRiskHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
@@ -2477,8 +2463,10 @@ public function destroy($id)
         $currentUser = auth()->user();
 
         // VALIDASI HAK AKSES DELETE - Hanya role 1 yang bisa hapus
-        if ($currentUser->role_id !== 1) {
-            return json(403, false, 'Akses Ditolak', 'Hanya Superadmin yang dapat menghapus data risk header.', null);
+        $roleCheck = check_role($currentUser, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         // VALIDASI BUSINESS LOGIC

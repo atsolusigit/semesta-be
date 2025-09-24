@@ -2,94 +2,121 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MstOption;
+use App\Models\MstRiskCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
-class MstOptionController extends Controller
+class MstRiskCodeController extends Controller
 {
-    public function index(Request $request)
-    {
-        $query = MstOption::query()->orderBy('id', 'asc');
+    // Ambil semua data jenis risiko
+   public function index(Request $request)
+{
+    $query = MstRiskCode::query()->orderBy('id', 'asc');
 
-        // Search filter
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('position', 'like', "%{$search}%")
-                  ->orWhere('type', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter berdasarkan type
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
-        }
-
-        $data = $query->get();
-
-        return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $data);
+    // Search filter (code dan name)
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('code', 'like', "%{$search}%")
+              ->orWhere('name', 'like', "%{$search}%");
+        });
     }
 
+    $data = $query->get();
+
+    return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $data);
+}
+
+    // Tambah data jenis risiko
     public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'position' => 'required|in:Depan,Belakang',
-            'type' => 'required|in:kuantitatif,kualitatif',
+            'code' => 'required|string|unique:mst_risk_code,code',
+            'name' => 'required|string',
         ]);
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
-        $data = MstOption::create($request->only('name', 'position', 'type'));
+        $data = MstRiskCode::create([
+            'code' => $request->code,
+            'name' => $request->name,
+        ]);
 
-        return json(200, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
+        return json(200, true, 'Berhasil Ditambahkan', 'Jenis risiko berhasil ditambahkan.', $data);
     }
 
+    // Detail satu jenis risiko
     public function show($id)
     {
-        $data = MstOption::find($id);
+        $data = MstRiskCode::find($id);
         if (!$data) {
-            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
+            return json(404, false, 'Tidak Ditemukan', 'Data jenis risiko tidak ditemukan.', null);
         }
 
-        return json(200, true, 'Detail Ditemukan', 'Detail data berhasil diambil.', $data);
+        return json(200, true, 'Detail Ditemukan', 'Detail jenis risiko berhasil diambil.', $data);
     }
 
+    // Update jenis risiko
     public function update(Request $request, $id)
     {
-        $data = MstOption::find($id);
+        // Check authorization: only role 1 and 2 can update
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
+        $data = MstRiskCode::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'position' => 'required|in:Depan,Belakang',
-            'type' => 'required|in:kuantitatif,kualitatif',
+            'code' => 'required|string|unique:mst_risk_code,code,' . $id,
+            'name' => 'required|string',
         ]);
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
-        $data->update($request->only('name', 'position', 'type'));
+        $data->update([
+            'code' => $request->code,
+            'name' => $request->name,
+        ]);
 
-        return json(200, true, 'Berhasil Diperbarui', 'Data berhasil diperbarui.', $data);
+        return json(200, true, 'Berhasil Diperbarui', 'Jenis risiko berhasil diperbarui.', $data);
     }
 
+    // Hapus jenis risiko
     public function destroy($id)
     {
-        $data = MstOption::find($id);
+        // Check authorization: only role 1 can delete
+        $user = auth()->user();
+        $roleCheck = check_role($user, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
+        $data = MstRiskCode::find($id);
         if (!$data) {
-            return json(404, true, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $data->delete();
 
-        return json(200, true, 'Berhasil Dihapus', 'Data berhasil dihapus.', null);
+        return json(200, true, 'Berhasil Dihapus', 'Jenis risiko berhasil dihapus.', null);
     }
 }

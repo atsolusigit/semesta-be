@@ -28,7 +28,8 @@ class MstJabatanController extends Controller
         $userRole = $user->role->id ?? $user->role_id ?? 1;
         $userDepartmentId = $user->department_id ?? null;
 
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 1 dapat melihat semua data, role 2,3,4,5 hanya departemen mereka
+        if (in_array($userRole, [2, 3, 4, 5]) && $userDepartmentId) {
             $query->where('department_id', $userDepartmentId);
         }
 
@@ -56,6 +57,17 @@ class MstJabatanController extends Controller
      */
     public function store(Request $request)
     {
+        // Role-based access control - hanya role 1 dan 2 yang bisa store
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
+        $userRole = $user->role->id ?? $user->role_id ?? 1;
+        $userDepartmentId = $user->department_id ?? null;
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'nipp' => 'required|string|max:50|unique:mst_jabatan,nipp',
@@ -66,14 +78,10 @@ class MstJabatanController extends Controller
             return json(400, false, 'Validasi Gagal', 'Terdapat kesalahan input', $validator->errors());
         }
 
-        // Role-based access control
-        $user = auth()->user();
-        $userRole = $user->role->id ?? $user->role_id ?? 1;
-        $userDepartmentId = $user->department_id ?? null;
-
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 2 hanya bisa membuat jabatan untuk departemen mereka sendiri
+        if ($userRole == 2 && $userDepartmentId) {
             if ($request->department_id !== $userDepartmentId) {
-                return json(404, false, 'Akses Ditolak', 'Anda hanya dapat membuat jabatan untuk departemen Anda sendiri', null);
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat membuat jabatan untuk departemen Anda sendiri', null);
             }
         }
 
@@ -123,9 +131,10 @@ class MstJabatanController extends Controller
         $userRole = $user->role->id ?? $user->role_id ?? 1;
         $userDepartmentId = $user->department_id ?? null;
 
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 1 dapat melihat semua data, role 2,3,4,5 hanya departemen mereka
+        if (in_array($userRole, [2, 3, 4, 5]) && $userDepartmentId) {
             if ($item->department_id !== $userDepartmentId) {
-                return json(404, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk melihat data ini', null);
+                return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk melihat data ini', null);
             }
         }
 
@@ -137,20 +146,27 @@ class MstJabatanController extends Controller
      */
     public function update(Request $request, $id)
     {
+        // Role-based access control - hanya role 1 dan 2 yang bisa update
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
+        $userRole = $user->role->id ?? $user->role_id ?? 1;
+        $userDepartmentId = $user->department_id ?? null;
+
         $jabatan = MstJabatan::find($id);
 
         if (!$jabatan) {
             return json(404, false, 'Tidak Ditemukan', 'Data jabatan tidak ditemukan', null);
         }
 
-        // Role-based access control
-        $user = auth()->user();
-        $userRole = $user->role->id ?? $user->role_id ?? 1;
-        $userDepartmentId = $user->department_id ?? null;
-
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 2 hanya bisa update jabatan dalam departemen mereka
+        if ($userRole == 2 && $userDepartmentId) {
             if ($jabatan->department_id !== $userDepartmentId) {
-                return json(404, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk mengupdate data ini', null);
+                return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki akses untuk mengupdate data ini', null);
             }
         }
 
@@ -164,9 +180,10 @@ class MstJabatanController extends Controller
             return json(400, false, 'Validasi Gagal', 'Terdapat kesalahan input', $validator->errors());
         }
 
-        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+        // Role 2 hanya bisa mengupdate ke departemen mereka sendiri
+        if ($userRole == 2 && $userDepartmentId) {
             if ($request->department_id !== $userDepartmentId) {
-                return json(404, false, 'Akses Ditolak', 'Anda hanya dapat mengupdate jabatan dalam departemen Anda sendiri', null);
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat mengupdate jabatan dalam departemen Anda sendiri', null);
             }
         }
 
@@ -206,6 +223,14 @@ class MstJabatanController extends Controller
      */
     public function destroy($id)
     {
+        // Role-based access control - hanya role 1 yang bisa delete
+        $user = auth()->user();
+        $roleCheck = check_role($user, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $jabatan = MstJabatan::find($id);
 
         if (!$jabatan) {

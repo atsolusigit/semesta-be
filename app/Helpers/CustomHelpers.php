@@ -1207,3 +1207,67 @@ if (!function_exists('get_approval_status_simple')) {
     }
 }
 
+if (!function_exists('has_permission')) {
+    /**
+     * Cek apakah user punya permission tertentu
+     *
+     * @param \App\Models\User $user
+     * @param string $permissionName
+     * @return bool
+     */
+    function has_permission($user, $permissionName)
+    {
+        if (!$user) return false;
+
+        // Ambil semua role user
+        $roles = $user->roles; // pastikan model User punya relasi roles()
+        foreach ($roles as $role) {
+            // Ambil semua permissions role
+            foreach ($role->permissions as $perm) {
+                if (strtolower($perm->name) === strtolower($permissionName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('check_role')) {
+    /**
+     * Cek apakah user punya role tertentu,
+     * jika tidak langsung return JSON response standar.
+     *
+     * @param \App\Models\User|null $user
+     * @param array|int $allowedRoles
+     * @return bool|\Illuminate\Http\JsonResponse
+     */
+    function check_role($user, $allowedRoles)
+    {
+        if (!$user) {
+            return response()->json([
+                'status'  => false,
+                'code'    => 401,
+                'message' => 'Unauthorized',
+                'detail'  => 'User tidak terautentikasi',
+                'data'    => null
+            ], 401);
+        }
+
+        if (!is_array($allowedRoles)) {
+            $allowedRoles = [$allowedRoles];
+        }
+
+        if (!in_array($user->role_id, $allowedRoles)) {
+            return response()->json([
+                'status'  => false,
+                'code'    => 403,
+                'message' => 'Tidak Diizinkan',
+                'detail'  => 'Anda tidak memiliki akses',
+                'data'    => null
+            ], 403);
+        }
+
+        return true;
+    }
+}

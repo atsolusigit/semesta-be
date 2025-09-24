@@ -4,21 +4,25 @@ namespace App\Http\Controllers;
 
 use App\Models\TrRiskMonthly;
 use App\Models\TrRiskHeader;
+use App\Models\MstMonthRecommendation;
 use App\Models\MstHeatmap;
 use App\Http\Controllers\UploadController;
 use App\Models\TrRiskMonthlyUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class TrRiskMonthlyController extends Controller
 {
 
-  public function index()
+ public function index()
 {
-    $data = TrRiskMonthly::with([
+    $user = auth()->user();
+
+    $query = TrRiskMonthly::with([
         'header.optionTargetSatuTahun',
         'rrLevelDampak',
         'rrLevelKemungkinan',
@@ -30,10 +34,20 @@ class TrRiskMonthlyController extends Controller
         'entries.rrLevelKemungkinan',
         'createdBy',
         'updatedBy',
-    ])
-    ->orderBy('header_id')
-    ->orderBy('month')
-    ->get();
+    ]);
+
+    // Filter berdasarkan role
+    if ($user->role_id == 2 || $user->role_id == 3) {
+        // Role 2 dan 3: Hanya bisa melihat data dari department mereka sendiri
+        $query->whereHas('header', function($q) use ($user) {
+            $q->where('department_id', $user->department_id);
+        });
+    }
+    // Role 1, 4, 5: Bisa melihat semua data tanpa filter
+
+    $data = $query->orderBy('header_id')
+        ->orderBy('month')
+        ->get();
 
     $cleaned = $data->map(function ($item) {
         $arr = collect($item)->toArray();
@@ -124,6 +138,15 @@ class TrRiskMonthlyController extends Controller
             ];
         });
 
+        // Tambahkan bulan dan note untuk rekomendasi
+        $monthNames = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        ];
+        $arr['month_name'] = ($monthNames[$item->month] ?? 'Unknown') . ' ' . ($item->year ?? ($item->header->year ?? ''));
+        $arr['rekomendasi_note'] = $arr['rekomendasi'] ?? null;
+
         $arr['created_by_name'] = $item->createdBy ? clean_string(get_decrypted_username($item->createdBy)) : 'Unknown User';
         $arr['updated_by_name'] = $item->updatedBy ? clean_string(get_decrypted_username($item->updatedBy)) : 'Unknown User';
 
@@ -136,7 +159,9 @@ class TrRiskMonthlyController extends Controller
 
 public function show($id)
 {
-    $data = TrRiskMonthly::with([
+    $user = auth()->user();
+
+    $query = TrRiskMonthly::with([
         'header.optionTargetSatuTahun',
         'rrLevelDampak',
         'rrLevelKemungkinan',
@@ -148,7 +173,18 @@ public function show($id)
         'entries.rrLevelKemungkinan',
         'createdBy',
         'updatedBy',
-    ])->find($id);
+    ]);
+
+    // Filter berdasarkan role
+    if ($user->role_id == 2 || $user->role_id == 3) {
+        // Role 2 dan 3: Hanya bisa melihat data dari department mereka sendiri
+        $query->whereHas('header', function($q) use ($user) {
+            $q->where('department_id', $user->department_id);
+        });
+    }
+    // Role 1, 4, 5: Bisa melihat semua data tanpa filter
+
+    $data = $query->find($id);
 
     if (!$data) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
@@ -209,6 +245,9 @@ public function show($id)
     ];
     $arr['month_name'] = ($monthNames[$data->month] ?? 'Unknown') . ' ' . ($data->year ?? ($data->header->year ?? ''));
 
+    // Tambahkan rekomendasi note
+    $arr['rekomendasi_note'] = $arr['rekomendasi'] ?? null;
+
     $arr = clean_recursive($arr);
 
     return json(200, true, 'Data Ditemukan', 'Detail data risk monthly berhasil diambil.', $arr);
@@ -216,9 +255,21 @@ public function show($id)
 
 public function getByHeader($headerId)
 {
-    $header = TrRiskHeader::with('optionTargetSatuTahun')->find($headerId);
+    $user = auth()->user();
+
+    // Cek akses ke header berdasarkan role
+    $headerQuery = TrRiskHeader::with('optionTargetSatuTahun');
+
+    if ($user->role_id == 2 || $user->role_id == 3) {
+        // Role 2 dan 3: Hanya bisa akses header dari department mereka sendiri
+        $headerQuery->where('department_id', $user->department_id);
+    }
+    // Role 1, 4, 5: Bisa akses semua header
+
+    $header = $headerQuery->find($headerId);
+
     if (!$header) {
-        return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan atau Anda tidak memiliki akses.', null);
     }
 
     $data = TrRiskMonthly::with([
@@ -324,6 +375,15 @@ public function getByHeader($headerId)
             ];
         });
 
+        // Tambahkan bulan dan note untuk monthly data
+        $monthNames = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        ];
+        $arr['month_name'] = ($monthNames[$item->month] ?? 'Unknown') . ' ' . ($item->year ?? ($item->header->year ?? ''));
+        $arr['rekomendasi_note'] = $arr['rekomendasi'] ?? null;
+
         $arr['created_by_name'] = $item->createdBy ? clean_string(get_decrypted_username($item->createdBy)) : 'Unknown User';
         $arr['updated_by_name'] = $item->updatedBy ? clean_string(get_decrypted_username($item->updatedBy)) : 'Unknown User';
 
@@ -341,6 +401,19 @@ public function getByHeader($headerId)
     }
     $headerArray['target_satu_tahun_type'] = $header->optionTargetSatuTahun->type ?? '';
 
+    // Tambahkan rekomendasi bulanan ke dalam header
+    $monthlyRekomendasi = [];
+    foreach ($cleaned as $monthlyData) {
+        if (!empty($monthlyData['rekomendasi_note'])) {
+            $monthlyRekomendasi[] = [
+                'month' => $monthlyData['month'],
+                'month_name' => $monthlyData['month_name'],
+                'rekomendasi_note' => $monthlyData['rekomendasi_note']
+            ];
+        }
+    }
+    $headerArray['monthly_rekomendasi'] = $monthlyRekomendasi;
+
     return json(200, true, 'Data Ditemukan', 'Data monthly untuk header berhasil diambil.', [
         'header' => $headerArray,
         'monthly_data' => $cleaned,
@@ -349,6 +422,14 @@ public function getByHeader($headerId)
 
     public function updateResidualAndFinalize(Request $request, $id)
 {
+    // Check user role authorization
+    $user = auth()->user();
+    $roleCheck = check_role($user, [1, 2, 3]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
     $data = TrRiskMonthly::with('header.createdBy', 'uploads')->find($id);
     if (!$data) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
@@ -369,6 +450,17 @@ public function getByHeader($headerId)
             return json(400, false, 'Finalisasi Ditolak', 'Bulan sebelumnya belum difinalisasi.', [
                 'id' => $id,
                 'unfinalized_months' => $unfinalized
+            ]);
+        }
+    }
+
+        $monthRecommendation = MstMonthRecommendation::find($data->month);
+
+        if ($monthRecommendation && $monthRecommendation->required) {
+        if (empty($data->note_recommendation) && !$data->is_submitted_recommendation) {
+            return json(400, false, 'Finalisasi Ditolak', 'Rekomendasi untuk bulan ini belum diisi atau belum disubmit.', [
+                'id' => $id,
+                'month' => $monthRecommendation->name,
             ]);
         }
     }
@@ -590,9 +682,16 @@ public function getByHeader($headerId)
     }
 }
 
-
-   public function updateResidual(Request $request, $id)
+  public function updateResidual(Request $request, $id)
 {
+    // Check user role authorization
+     $user = auth()->user();
+    $roleCheck = check_role($user, [1, 2, 3]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
     $data = TrRiskMonthly::with('header.createdBy', 'uploads')->find($id);
     if (!$data) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
@@ -615,6 +714,27 @@ public function getByHeader($headerId)
             ]);
         }
     }
+
+    // ======= NEW: cek mst_month_recommendation apakah bulan ini butuh rekomendasi =======
+    $mst = \App\Models\MstMonthRecommendation::find($data->month);
+
+    $requiresRecommendation = false;
+    if ($mst && $mst->required) {
+        $requiresRecommendation = true;
+    }
+
+    // Jika membutuhkan rekomendasi, pastikan data tr_risk_monthly sudah disubmit rekomendasinya
+    if ($requiresRecommendation) {
+        if (empty($data->is_submitted_recommendation) || !$data->is_submitted_recommendation) {
+            $monthName = $mst->name ?? $data->month;
+            return json(400, false, 'Terkunci', "Bulan {$monthName} membutuhkan rekomendasi yang belum disubmit. Silakan submit rekomendasi terlebih dahulu sebelum mengisi residual.", [
+                'id' => $id,
+                'month' => $data->month,
+                'monthly_is_submitted_recommendation' => (bool)$data->is_submitted_recommendation
+            ]);
+        }
+    }
+    // ======= END NEW CHECK =======
 
     $autoGeneratedDates = generate_risk_monthly_dates($data->header->year, $data->month);
 
@@ -704,7 +824,6 @@ public function getByHeader($headerId)
         }
 
         $data->load(['realizationOption:id,name,position', 'targetOption:id,name,position', 'uploads']);
-
         $data->makeHidden(['realization_option_position', 'target_option_position']);
 
         $createdByName = get_decrypted_username($data->header->createdBy ?? null);
@@ -724,7 +843,7 @@ public function getByHeader($headerId)
             'start_date' => clean_string($data->start_date),
             'expired_date' => clean_string($data->expired_date),
             'realization_quantitative' => $formattedRealizationQuantitative,
-            'realization_kualitatif' => clean_string($data->realization_kualitatif), // Sudah tersimpan dengan %
+            'realization_kualitatif' => clean_string($data->realization_kualitatif),
             'realization_note' => clean_string($data->realization_note),
             'target_quantitative' => $data->target_quantitative ? number_format((float)$data->target_quantitative, 0, ',', '.') : '0',
             'target_notes' => clean_string($data->target_notes),
@@ -767,80 +886,88 @@ public function getByHeader($headerId)
     }
 }
 
-  public function updateQuantitative(Request $request, $id)
-{
-    $monthly = TrRiskMonthly::with('header.createdBy', 'header.uploads')->find($id);
-    if (!$monthly) {
-        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
-    }
+//   public function updateQuantitative(Request $request, $id)
+// {
+//     $monthly = TrRiskMonthly::with('header.createdBy', 'header.uploads')->find($id);
+//     if (!$monthly) {
+//         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
+//     }
 
-    if ($monthly->is_finalize || $monthly->entries()->where('is_finalize', true)->exists()) {
-        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
-    }
+//     if ($monthly->is_finalize || $monthly->entries()->where('is_finalize', true)->exists()) {
+//         return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
+//     }
 
-    $validationRules = [
-        'target_quantitative' => 'required|string',
-        'target_notes' => 'nullable|string',
-    ];
+//     $validationRules = [
+//         'target_quantitative' => 'required|string',
+//         'target_notes' => 'nullable|string',
+//     ];
 
-    $validation = check_validation($request->all(), $validationRules);
-    if ($validation[0] == 1) {
-        $errors = $validation[1]->getData(true)['data'] ?? [];
-        return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
-    }
+//     $validation = check_validation($request->all(), $validationRules);
+//     if ($validation[0] == 1) {
+//         $errors = $validation[1]->getData(true)['data'] ?? [];
+//         return json(400, false, 'Data Kosong', 'Data tidak boleh kosong', $errors);
+//     }
 
-    DB::beginTransaction();
-    try {
-        $monthly->update([
-            'target_quantitative' => $request->target_quantitative,
-            'target_notes' => $request->target_notes,
-            'updated_by' => auth()->id(),
-        ]);
+//     DB::beginTransaction();
+//     try {
+//         $monthly->update([
+//             'target_quantitative' => $request->target_quantitative,
+//             'target_notes' => $request->target_notes,
+//             'updated_by' => auth()->id(),
+//         ]);
 
-        DB::commit();
+//         DB::commit();
 
-        // Refresh data
-        $monthly->load('header.createdBy', 'header.uploads');
+//         // Refresh data
+//         $monthly->load('header.createdBy', 'header.uploads');
 
-        // Bersihkan string pada response
-        $cleanedData = [
-            'id' => $monthly->id,
-            'header_id' => $monthly->header_id,
-            'month' => $monthly->month,
-            'risk_code' => $monthly->header_id,
-            'target_quantitative' => clean_string($monthly->target_quantitative),
-            'target_notes' => clean_string($monthly->target_notes),
-            'status_risiko' => clean_string($monthly->status_risiko),
-            'is_finalize' => $monthly->is_finalize,
-            'created_at' => clean_string($monthly->created_at),
-            'updated_at' => clean_string($monthly->updated_at),
-            'header' => [
-                'id' => $monthly->header->id,
-                'year' => $monthly->header->year,
-                'created_by' => $monthly->header->created_by,
-                'created_at' => clean_string($monthly->header->created_at),
-                'updated_at' => clean_string($monthly->header->updated_at),
-                'created_by_name' => get_decrypted_username($monthly->header->createdBy ?? null),
-            ],
-            'uploaded_files' => $monthly->header->uploads
-                ->filter(fn($file) => $file->risk_monthly_id == $monthly->id)
-                ->map(fn($file) => [
-                    'id' => $file->id,
-                    'filepath' => clean_string($file->filepath),
-                    'domain' => clean_string($file->domain),
-                ])->values()->toArray(),
-        ];
+//         // Bersihkan string pada response
+//         $cleanedData = [
+//             'id' => $monthly->id,
+//             'header_id' => $monthly->header_id,
+//             'month' => $monthly->month,
+//             'risk_code' => $monthly->header_id,
+//             'target_quantitative' => clean_string($monthly->target_quantitative),
+//             'target_notes' => clean_string($monthly->target_notes),
+//             'status_risiko' => clean_string($monthly->status_risiko),
+//             'is_finalize' => $monthly->is_finalize,
+//             'created_at' => clean_string($monthly->created_at),
+//             'updated_at' => clean_string($monthly->updated_at),
+//             'header' => [
+//                 'id' => $monthly->header->id,
+//                 'year' => $monthly->header->year,
+//                 'created_by' => $monthly->header->created_by,
+//                 'created_at' => clean_string($monthly->header->created_at),
+//                 'updated_at' => clean_string($monthly->header->updated_at),
+//                 'created_by_name' => get_decrypted_username($monthly->header->createdBy ?? null),
+//             ],
+//             'uploaded_files' => $monthly->header->uploads
+//                 ->filter(fn($file) => $file->risk_monthly_id == $monthly->id)
+//                 ->map(fn($file) => [
+//                     'id' => $file->id,
+//                     'filepath' => clean_string($file->filepath),
+//                     'domain' => clean_string($file->domain),
+//                 ])->values()->toArray(),
+//         ];
 
-        return json(200, true, 'Berhasil Diupdate', 'Data target kuantitatif berhasil diupdate.', $cleanedData);
+//         return json(200, true, 'Berhasil Diupdate', 'Data target kuantitatif berhasil diupdate.', $cleanedData);
 
-    } catch (\Throwable $e) {
-        DB::rollBack();
-        return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan pada sistem.', ['error' => $e->getMessage()]);
-    }
-}
+//     } catch (\Throwable $e) {
+//         DB::rollBack();
+//         return json(500, false, 'Gagal Diupdate', 'Terjadi kesalahan pada sistem.', ['error' => $e->getMessage()]);
+//     }
+// }
 
 public function bulkUpdateQuantitative(Request $request, $headerId)
 {
+    // Check user role authorization
+    $user = auth()->user();
+    $roleCheck = check_role($user, [1, 2, 3]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
     $header = TrRiskHeader::find($headerId);
     if (!$header) {
         return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', ['header_id' => $headerId]);
@@ -1143,79 +1270,79 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
         $message = "Berhasil memproses {$result['total_processed']} data. ";
         $message .= "Updated: {$result['updated_count']}, Created: {$result['created_count']}.";
 
-        return json(200, true, 'Berhasil Bulk Update', $message, $result, $warnings);
+        return json(200, true, 'Berhasil Menyimpan 12 Bulan', $message, $result, $warnings);
 
     } catch (\Throwable $e) {
         DB::rollBack();
-        return json(500, false, 'Gagal Bulk Update', 'Terjadi kesalahan sistem.', [
+        return json(500, false, 'Gagal Menyimpan 12 Bulan', 'Terjadi kesalahan sistem.', [
             'header_id' => $headerId,
             'error' => $e->getMessage()
         ]);
     }
 }
 
-    public function finalizeAll(Request $request, $headerId)
-    {
-        $header = TrRiskHeader::find($headerId);
-        if (!$header) {
-            return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
-        }
+    // public function finalizeAll(Request $request, $headerId)
+    // {
+    //     $header = TrRiskHeader::find($headerId);
+    //     if (!$header) {
+    //         return json(404, false, 'Header Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+    //     }
 
-        $monthlyData = TrRiskMonthly::where('header_id', $headerId)
-            ->where('is_finalize', false)
-            ->orderBy('month')
-            ->get();
+    //     $monthlyData = TrRiskMonthly::where('header_id', $headerId)
+    //         ->where('is_finalize', false)
+    //         ->orderBy('month')
+    //         ->get();
 
-        if ($monthlyData->isEmpty()) {
-            return json(400, false, 'Tidak Ada Data', 'Tidak ada data yang dapat difinalisasi.', null);
-        }
+    //     if ($monthlyData->isEmpty()) {
+    //         return json(400, false, 'Tidak Ada Data', 'Tidak ada data yang dapat difinalisasi.', null);
+    //     }
 
-        $validationErrors = [];
-        $decemberOpenRisks = [];
+    //     $validationErrors = [];
+    //     $decemberOpenRisks = [];
 
-        foreach ($monthlyData as $monthly) {
-            $validationResult = validate_monthly_data_for_finalization($monthly);
-            if (!$validationResult['valid']) {
-                $validationErrors[] = "Bulan {$monthly->month}: " . $validationResult['message'];
-            }
+    //     foreach ($monthlyData as $monthly) {
+    //         $validationResult = validate_monthly_data_for_finalization($monthly);
+    //         if (!$validationResult['valid']) {
+    //             $validationErrors[] = "Bulan {$monthly->month}: " . $validationResult['message'];
+    //         }
 
-            if ($monthly->month == 12 && $monthly->status_risiko == 'open') {
-                $decemberOpenRisks[] = "Risiko bulan Desember masih open dan akan menjadi tindak lanjut tahun " . ($header->year + 1);
-            }
-        }
+    //         if ($monthly->month == 12 && $monthly->status_risiko == 'open') {
+    //             $decemberOpenRisks[] = "Risiko bulan Desember masih open dan akan menjadi tindak lanjut tahun " . ($header->year + 1);
+    //         }
+    //     }
 
-        if (!empty($validationErrors)) {
-            return json(400, false, 'Data Tidak Lengkap', 'Beberapa data belum lengkap.', $validationErrors);
-        }
+    //     if (!empty($validationErrors)) {
+    //         return json(400, false, 'Data Tidak Lengkap', 'Beberapa data belum lengkap.', $validationErrors);
+    //     }
 
-        DB::beginTransaction();
-        try {
-            $finalizedCount = 0;
-            foreach ($monthlyData as $monthly) {
-                $monthly->is_finalize = true;
-                $monthly->finalized_at = Carbon::now();
-                $monthly->finalized_by = auth()->id() ?? null;
-                $monthly->save();
-                $finalizedCount++;
-            }
+    //     DB::beginTransaction();
+    //     try {
+    //         $finalizedCount = 0;
+    //         foreach ($monthlyData as $monthly) {
+    //             $monthly->is_finalize = true;
+    //             $monthly->finalized_at = Carbon::now();
+    //             $monthly->finalized_by = auth()->id() ?? null;
+    //             $monthly->save();
+    //             $finalizedCount++;
+    //         }
 
-            // Handle file uploads
-            if ($request->has('uploaded_files')) {
-                $firstMonthly = $monthlyData->first();
-                process_risk_monthly_file_uploads($request->uploaded_files, $firstMonthly);
-            }
+    //         // Handle file uploads
+    //         if ($request->has('uploaded_files')) {
+    //             $firstMonthly = $monthlyData->first();
+    //             process_risk_monthly_file_uploads($request->uploaded_files, $firstMonthly);
+    //         }
 
-            DB::commit();
+    //         DB::commit();
 
-            $warnings = array_merge($decemberOpenRisks);
+    //         $warnings = array_merge($decemberOpenRisks);
 
-            return json(200, true, 'Berhasil Difinalisasi', "$finalizedCount data risk monthly berhasil difinalisasi.", null, $warnings);
+    //         return json(200, true, 'Berhasil Difinalisasi', "$finalizedCount data risk monthly berhasil difinalisasi.", null, $warnings);
 
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return json(500, false, 'Gagal Difinalisasi', 'Terjadi kesalahan sistem.', $e->getMessage());
-        }
-    }
+    //     } catch (\Throwable $e) {
+    //         DB::rollBack();
+    //         return json(500, false, 'Gagal Difinalisasi', 'Terjadi kesalahan sistem.', $e->getMessage());
+    //     }
+    // }
 
    public function uploadDocument(Request $request, $monthlyId)
 {
@@ -1341,21 +1468,151 @@ if ($isMultiple) {
     }
 
     public function destroy($id)
-    {
-        $data = TrRiskMonthly::find($id);
-        if (!$data) {
-            return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
-        }
+{
+    // Check if user has role id 1
+      $user = auth()->user();
+    $roleCheck = check_role($user, 1);
 
-        if ($data->is_finalize) {
-            return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa dihapus.', null);
-        }
-
-        try {
-            $data->delete();
-            return json(200, true, 'Berhasil Dihapus', 'Data risk monthly berhasil dihapus.', null);
-        } catch (\Throwable $e) {
-            return json(500, false, 'Gagal Dihapus', 'Terjadi kesalahan sistem.', $e->getMessage());
-        }
+    if ($roleCheck !== true) {
+        return $roleCheck;
     }
+
+    $data = TrRiskMonthly::find($id);
+    if (!$data) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', null);
+    }
+
+    if ($data->is_finalize) {
+        return json(400, false, 'Data Sudah Difinalisasi', 'Data sudah difinalisasi dan tidak bisa dihapus.', null);
+    }
+
+    try {
+        $data->delete();
+        return json(200, true, 'Berhasil Dihapus', 'Data risk monthly berhasil dihapus.', null);
+    } catch (\Throwable $e) {
+        return json(500, false, 'Gagal Dihapus', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+public function getRecommendationMonths(Request $request)
+{
+    $user = Auth::user();
+
+    // Role check
+     $roleCheck = check_role($user, [1,2,3,4,5]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
+    $monthlyQuery = TrRiskMonthly::select(
+        'tr_risk_monthly.id',
+        'tr_risk_monthly.month', // foreign key ke mst_month_recommendation.id
+        'tr_risk_monthly.note_recommendation',
+        'tr_risk_monthly.is_submitted_recommendation',
+        'tr_risk_monthly.recommendation_submitted_by',
+        'tr_risk_monthly.recommendation_submitted_at',
+        'm.name as month_name',
+        'm.required'
+    )
+    ->join('mst_month_recommendation as m', 'tr_risk_monthly.month', '=', 'm.id')
+    ->where(function($q) {
+        $q->where('m.required', 1) // hanya bulan yang required
+          ->orWhereNotNull('tr_risk_monthly.note_recommendation') // atau ada rekomendasi
+          ->orWhere('tr_risk_monthly.is_submitted_recommendation', true); // atau sudah submit
+    });
+
+    // Kalau role 2 atau 3 → filter department (hapus bagian ini kalau kolomnya tidak ada)
+    if (in_array($user->role_id, [2,3])) {
+        $monthlyQuery->where('tr_risk_monthly.department_id', $user->department_id);
+    }
+
+    $data = $monthlyQuery->orderBy('m.id', 'asc')->orderBy('tr_risk_monthly.id', 'desc')->get()->map(function ($item) {
+        return [
+            'monthly_id'          => $item->id,
+            'month'               => $item->month_name,
+            'required'            => (bool) $item->required,
+            'note_recommendation' => $item->note_recommendation,
+            'is_submitted'        => (bool) $item->is_submitted_recommendation,
+            'submitted_by'        => $item->recommendation_submitted_by,
+            'submitted_at'        => $item->recommendation_submitted_at,
+        ];
+    });
+
+    return json(200, true, 'Data Ditemukan', 'Daftar bulan rekomendasi berhasil diambil.', $data);
+}
+
+public function saveNoteRecommendation(Request $request, $id)
+{
+    $user = Auth::user();
+
+    // Hanya role 1,2,4,5 yang boleh save (role 3 hanya GET)
+    $roleCheck = check_role($user, [1,2,4,5]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
+    $request->validate([
+        'note_recommendation' => 'required|string',
+    ]);
+
+    $monthly = TrRiskMonthly::find($id);
+    if (!$monthly) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data bulan tidak ditemukan.');
+    }
+
+    // Role 2 dibatasi department (role 1,4,5 bebas)
+    if (!in_array($user->role_id, [1,4,5]) && $monthly->department_id != $user->department_id) {
+        return json(403, false, 'Forbidden', 'Tidak punya akses untuk mengubah data departemen lain.');
+    }
+
+    if ($monthly->is_submitted_recommendation) {
+        return json(400, false, 'Tidak Bisa Diubah', 'Rekomendasi bulan ini sudah disubmit dan tidak bisa diubah.');
+    }
+
+    $monthly->note_recommendation = $request->note_recommendation;
+    $monthly->updated_by = $user->id; // opsional jika kolom ada
+    $monthly->save();
+
+    return json(200, true, 'Berhasil', 'Catatan rekomendasi berhasil disimpan.', $monthly);
+}
+
+public function submitRecommendation(Request $request, $id)
+{
+    $user = Auth::user();
+
+    // Hanya role 1,2,4,5 yang boleh submit (role 3 tidak boleh)
+    $roleCheck = check_role($user, [1,2,4,5]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
+    $monthly = TrRiskMonthly::find($id);
+    if (!$monthly) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data bulan tidak ditemukan.');
+    }
+
+    // Role 2 dibatasi department (role 1,4,5 bebas)
+    if (!in_array($user->role_id, [1,4,5]) && $monthly->department_id != $user->department_id) {
+        return json(403, false, 'Forbidden', 'Tidak punya akses untuk submit data departemen lain.');
+    }
+
+    if (empty($monthly->note_recommendation)) {
+        return json(400, false, 'Gagal', 'Note rekomendasi harus diisi sebelum submit.');
+    }
+
+    if ($monthly->is_submitted_recommendation) {
+        return json(400, false, 'Sudah Disubmit', 'Rekomendasi bulan ini sudah disubmit sebelumnya.');
+    }
+
+    $monthly->is_submitted_recommendation = true;
+    $monthly->recommendation_submitted_by = $user->id;
+    $monthly->recommendation_submitted_at = now();
+    $monthly->save();
+
+    return json(200, true, 'Berhasil', 'Rekomendasi berhasil disubmit.', $monthly);
+}
+
 }

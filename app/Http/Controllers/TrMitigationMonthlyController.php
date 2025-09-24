@@ -19,6 +19,14 @@ class TrMitigationMonthlyController extends Controller
 
     public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $validator = Validator::make($request->all(), [
             'header_id' => 'required|exists:tr_risk_header,id',
             'risk_monthly_id' => 'required|exists:tr_risk_monthly,id',
@@ -43,6 +51,14 @@ class TrMitigationMonthlyController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Check authorization: only role 1 and 2 can update
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $data = TrMitigationMonthly::find($id);
 
         if (!$data) {
@@ -84,6 +100,14 @@ class TrMitigationMonthlyController extends Controller
 
     public function destroy($id)
     {
+        // Check authorization: only role 1 can delete
+        $user = auth()->user();
+        $roleCheck = check_role($user, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $data = TrMitigationMonthly::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);

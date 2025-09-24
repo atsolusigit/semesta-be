@@ -26,9 +26,18 @@ class MstRiskCodeController extends Controller
 
     return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $data);
 }
+
     // Tambah data jenis risiko
     public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|unique:mst_risk_code,code',
             'name' => 'required|string',
@@ -60,6 +69,14 @@ class MstRiskCodeController extends Controller
     // Update jenis risiko
     public function update(Request $request, $id)
     {
+        // Check authorization: only role 1 and 2 can update
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $data = MstRiskCode::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
@@ -85,6 +102,14 @@ class MstRiskCodeController extends Controller
     // Hapus jenis risiko
     public function destroy($id)
     {
+        // Check authorization: only role 1 can delete
+        $user = auth()->user();
+        $roleCheck = check_role($user, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $data = MstRiskCode::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);

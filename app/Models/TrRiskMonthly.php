@@ -51,6 +51,11 @@ class TrRiskMonthly extends Model
         'updated_at',
         'finalized_by',
         'entries',
+
+        'note_recommendation',
+        'is_submitted_recommendation',
+        'recommendation_submitted_by',
+        'recommendation_submitted_at',
     ];
 
     protected $casts = [
@@ -190,4 +195,10 @@ class TrRiskMonthly extends Model
 
         return $months[$this->month] ?? '';
     }
+
+    public function monthRecommendation()
+    {
+        return $this->belongsTo(MstMonthRecommendation::class, 'month', 'id');
+    }
+
 }

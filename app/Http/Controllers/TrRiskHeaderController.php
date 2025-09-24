@@ -36,7 +36,10 @@ public function index(Request $request)
         'optionTargetSatuTahun:id,name,position,type',
         'uploads',
         'monthlyData' => function ($query) {
-            $query->orderBy('month', 'asc')->with('uploads');
+            $query->orderBy('month', 'asc')
+                  ->with(['uploads'])
+                  ->join('mst_month_recommendation as mr', 'tr_risk_monthly.month', '=', 'mr.id')
+                  ->select('tr_risk_monthly.*', 'mr.name as month_recommendation_name');
         },
         'headerEntry.monthlyEntryData.uploads',
         'headerEntry.irDampak:id,label',
@@ -50,10 +53,10 @@ public function index(Request $request)
     ])
     // Filter hanya data yang sudah di-approve
     // ->where('status', 'approved')
-    // ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
-    //     // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
-    //     $query->where('department_id', $user->department_id);
-    // })
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+        // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+        $query->where('department_id', $user->department_id);
+    })
     ->when($request->peristiwa, function ($query) use ($request) {
         $query->where('peristiwa_risiko', 'like', '%' . $request->peristiwa . '%');
     })
@@ -70,13 +73,21 @@ public function index(Request $request)
     // Pagination, ambil data per halaman
     $data = $query->paginate($perPage);
 
+    // Nama bulan dalam bahasa Indonesia
+    $monthNames = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+    ];
+
     // Mapping data pada halaman saat ini
-    $orderedData = collect($data->items())->map(function ($item) {
+    $orderedData = collect($data->items())->map(function ($item) use ($monthNames) {
         $inherentColor = get_color_by_position($item->inherent_risk_posisi_risiko);
         $residualTargetColor = get_color_by_position($item->residual_target_posisi_risiko);
 
         $monthlyDataMap = [];
         $monthly = [];
+        $rekomendasi = []; // Array untuk rekomendasi di header
 
         for ($i = 1; $i <= 12; $i++) {
             $dataBulanan = $item->monthlyData->firstWhere('month', $i);
@@ -91,11 +102,14 @@ public function index(Request $request)
 
                 $monthly[] = [
                     'bulan' => $i,
+                    'month_name' => $monthNames[$i] ?? 'Unknown',
+                    'month_full_name' => ($monthNames[$i] ?? 'Unknown') . ' ' . $item->year,
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
                     'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                     'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                     'realization_percentage' => $percentage . '%',
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
+                    'note_recommendation' => $dataBulanan->note_recommendation ?? null,
                     'uploads' => $dataBulanan->uploads->map(function ($upload) {
                         return [
                             'id' => $upload->id,
@@ -104,15 +118,27 @@ public function index(Request $request)
                         ];
                     }),
                 ];
+
+                // Tambahkan ke array rekomendasi jika ada
+                if (!empty($dataBulanan->note_recommendation)) {
+                    $rekomendasi[] = [
+                        'month_id' => $i,
+                        'month_name' => $monthNames[$i] ?? 'Unknown',
+                        'note_recommendation' => $dataBulanan->note_recommendation
+                    ];
+                }
             } else {
                 $monthlyDataMap[$i] = null;
                 $monthly[] = [
                     'bulan' => $i,
+                    'month_name' => $monthNames[$i] ?? 'Unknown',
+                    'month_full_name' => ($monthNames[$i] ?? 'Unknown') . ' ' . $item->year,
                     'residual_risk_level' => null,
                     'residual_risk_posisi_risiko' => null,
                     'residual_risk_posisi_risiko_color' => null,
                     'realization_percentage' => '0%',
                     'is_finalized' => false,
+                    'note_recommendation' => null,
                     'uploads' => [],
                 ];
             }
@@ -126,7 +152,7 @@ public function index(Request $request)
             ];
         });
 
-        $entryData = $item->headerEntry->map(function ($entry) {
+        $entryData = $item->headerEntry->map(function ($entry) use ($monthNames, $item) {
             $monthlyEntries = collect();
             for ($i = 1; $i <= 12; $i++) {
                 $monthlyEntry = $entry->monthlyEntryData->firstWhere('month', $i);
@@ -138,11 +164,14 @@ public function index(Request $request)
 
                     $monthlyEntries[] = [
                         'bulan' => $i,
+                        'month_name' => $monthNames[$i] ?? 'Unknown',
+                        'month_full_name' => ($monthNames[$i] ?? 'Unknown') . ' ' . $item->year,
                         'residual_risk_level' => $monthlyEntry->residual_risk_level_risiko,
                         'residual_risk_posisi_risiko' => $monthlyEntry->residual_risk_posisi_risiko,
                         'residual_risk_posisi_risiko_color' => get_color_by_position($monthlyEntry->residual_risk_posisi_risiko),
                         'realization_percentage' => $percentage . '%',
                         'is_finalized' => (bool) $monthlyEntry->is_finalize,
+                        'note_recommendation' => $monthlyEntry->monthRecommendation->note ?? null,
                         'monthly_entry_data' => $monthlyEntry,
                         'uploads' => $monthlyEntry->uploads->map(function ($upload) {
                             return [
@@ -155,11 +184,14 @@ public function index(Request $request)
                 } else {
                     $monthlyEntries[] = [
                         'bulan' => $i,
+                        'month_name' => $monthNames[$i] ?? 'Unknown',
+                        'month_full_name' => ($monthNames[$i] ?? 'Unknown') . ' ' . $item->year,
                         'residual_risk_level' => null,
                         'residual_risk_posisi_risiko' => null,
                         'residual_risk_posisi_risiko_color' => null,
                         'realization_percentage' => '0%',
                         'is_finalized' => false,
+                        'note_recommendation' => null,
                         'monthly_entry_data' => null,
                         'uploads' => [],
                     ];
@@ -278,7 +310,10 @@ public function index(Request $request)
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             // 'department' => $item->department ?? null,
 
-            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) {
+            // Array rekomendasi di level header
+            'rekomendasi' => $rekomendasi,
+
+            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) use ($monthNames, $item) {
                 // Safe numeric conversion untuk perhitungan
                 $target = is_numeric($dataBulanan->target_quantitative) ? (float)$dataBulanan->target_quantitative : 0;
                 $realization = is_numeric($dataBulanan->realization_quantitative) ? (float)$dataBulanan->realization_quantitative : 0;
@@ -288,6 +323,8 @@ public function index(Request $request)
                     'id' => $dataBulanan->id,
                     'header_id' => $dataBulanan->header_id,
                     'month' => $dataBulanan->month,
+                    'month_name' => $monthNames[$dataBulanan->month] ?? 'Unknown',
+                    'month_full_name' => ($monthNames[$dataBulanan->month] ?? 'Unknown') . ' ' . $item->year,
                     'risk_code' => $dataBulanan->risk_code,
                     'status_risiko' => $dataBulanan->status_risiko,
                     'process_code' => $dataBulanan->process_code,
@@ -309,6 +346,7 @@ public function index(Request $request)
                     'is_finalize' => (bool) $dataBulanan->is_finalize,
                     'finalized_at' => $dataBulanan->finalized_at,
                     'finalized_by' => $dataBulanan->finalized_by,
+                    'note_recommendation' => $dataBulanan->monthRecommendation->note ?? null,
                     'created_at' => $dataBulanan->created_at ? $dataBulanan->created_at->toISOString() : null,
                     'updated_at' => $dataBulanan->updated_at ? $dataBulanan->updated_at->toISOString() : null,
                     'uploads' => $dataBulanan->uploads->map(function ($upload) {
@@ -342,7 +380,9 @@ public function index(Request $request)
 
 public function show($id)
 {
-    $data = TrRiskHeader::with([
+    $user = auth()->user();
+
+    $query = TrRiskHeader::with([
         'irDampak:id,label',
         'irKemungkinan:id,label',
         'rrDampak:id,label',
@@ -356,17 +396,30 @@ public function show($id)
         }
     ])
     // Hapus filter status agar bisa menampilkan semua status
-    ->find($id);
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+        // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+        $query->where('department_id', $user->department_id);
+    });
+
+    $data = $query->find($id);
 
     if (!$data) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk header tidak ditemukan.', null);
     }
+
+    // Nama bulan dalam bahasa Indonesia
+    $monthNames = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+    ];
 
     $inherentColor = get_color_by_position($data->inherent_risk_posisi_risiko);
     $residualTargetColor = get_color_by_position($data->residual_target_posisi_risiko);
 
     $monthly = [];
     $monthlyData = [];
+    $rekomendasi = []; // Array untuk rekomendasi di header
 
     for ($i = 1; $i <= 12; $i++) {
         $dataBulanan = $data->monthlyData->firstWhere('month', $i);
@@ -382,12 +435,15 @@ public function show($id)
 
             $monthly[] = [
                 'bulan' => $i,
+                'month_name' => $monthNames[$i] ?? 'Unknown',
+                'month_full_name' => ($monthNames[$i] ?? 'Unknown') . ' ' . $data->year,
                 'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
                 'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                 'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
                 'realization_percentage' => $percentage . '%',
                 'is_finalized' => (bool) $dataBulanan->is_finalize,
                 'is_edit' => $isEditMonthly,
+                'note_recommendation' => $dataBulanan->note_recommendation ?? null,
                 'monthly_data' => $dataBulanan,
             ];
 
@@ -395,6 +451,8 @@ public function show($id)
                 'id' => $dataBulanan->id,
                 'header_id' => $dataBulanan->header_id,
                 'month' => $dataBulanan->month,
+                'month_name' => $monthNames[$dataBulanan->month] ?? 'Unknown',
+                'month_full_name' => ($monthNames[$dataBulanan->month] ?? 'Unknown') . ' ' . $data->year,
                 'risk_code' => $dataBulanan->risk_code,
                 'status_risiko' => $dataBulanan->status_risiko,
                 'process_code' => $dataBulanan->process_code,
@@ -413,6 +471,7 @@ public function show($id)
                 'is_edit' => $isEditMonthly,
                 'finalized_at' => $dataBulanan->finalized_at,
                 'finalized_by' => $dataBulanan->finalized_by,
+                'note_recommendation' => $dataBulanan->note_recommendation ?? null,
                 'created_at' => $dataBulanan->created_at,
                 'updated_at' => $dataBulanan->updated_at,
                 // Tambahkan created_by_name dan updated_by_name menggunakan helper yang sudah ada
@@ -429,15 +488,27 @@ public function show($id)
 
             $monthlyData[] = $monthlyItem;
 
+            // Tambahkan ke array rekomendasi jika ada
+            if (!empty($dataBulanan->note_recommendation)) {
+                $rekomendasi[] = [
+                    'month_id' => $i,
+                    'month_name' => $monthNames[$i] ?? 'Unknown',
+                    'note_recommendation' => $dataBulanan->note_recommendation
+                ];
+            }
+
         } else {
             $monthly[] = [
                 'bulan' => $i,
+                'month_name' => $monthNames[$i] ?? 'Unknown',
+                'month_full_name' => ($monthNames[$i] ?? 'Unknown') . ' ' . $data->year,
                 'residual_risk_level' => null,
                 'residual_risk_posisi_risiko' => null,
                 'residual_risk_posisi_risiko_color' => null,
                 'realization_percentage' => '0%',
                 'is_finalized' => false,
                 'is_edit' => true, // Data kosong masih bisa diedit
+                'note_recommendation' => null,
                 'monthly_data' => null,
             ];
 
@@ -445,6 +516,8 @@ public function show($id)
                 'id' => null,
                 'header_id' => $data->id,
                 'month' => $i,
+                'month_name' => $monthNames[$i] ?? 'Unknown',
+                'month_full_name' => ($monthNames[$i] ?? 'Unknown') . ' ' . $data->year,
                 'risk_code' => null,
                 'status_risiko' => 'open',
                 'process_code' => $data->process_code,
@@ -463,6 +536,7 @@ public function show($id)
                 'is_edit' => true, // Data kosong masih bisa diedit
                 'finalized_at' => null,
                 'finalized_by' => null,
+                'note_recommendation' => null,
                 'created_at' => null,
                 'updated_at' => null,
                 'created_by_name' => 'Unknown User',
@@ -567,6 +641,9 @@ public function show($id)
         'created_by_name' => $data->createdBy ? clean_string(get_decrypted_name($data->createdBy)) : 'Unknown User',
         'updated_by_name' => $data->updatedBy ? clean_string(get_decrypted_name($data->updatedBy)) : 'Unknown User',
 
+        // Array rekomendasi di level header
+        'rekomendasi' => $rekomendasi,
+
         // Relationships
         'ir_dampak' => $data->irDampak ?? null,
         'ir_kemungkinan' => $data->irKemungkinan ?? null,
@@ -585,6 +662,17 @@ public function show($id)
 
 public function store(Request $request)
 {
+    // ============================================
+    // VALIDASI ROLE: HANYA ROLE 1, 2, 3 YANG DIIZINKAN
+    // ============================================
+
+    $result = check_role(auth()->user(), [1, 2, 3]);
+    if ($result !== true) {
+        return $result;
+    }
+
+    $currentUser = auth()->user();
+
     // ============================================
     // VALIDASI WAJIB: HANYA BOLEH 14 FIELD DASAR
     // ============================================
@@ -689,13 +777,11 @@ public function store(Request $request)
         // SET DEPARTMENT SESUAI ROLE
         // ============================================
 
-        $currentUser = auth()->user();
-
         // Superadmin (role 1) boleh pilih departemen dari request
         if ($currentUser->role_id == 1) {
             $data['department_id'] = $request->input('department_id');
         } else {
-            // Role lain (2, 3, dst) selalu pakai department_id user
+            // Role lain (2, 3) selalu pakai department_id user
             $data['department_id'] = $currentUser->department_id;
         }
 
@@ -792,7 +878,7 @@ public function store(Request $request)
             'residual_target_posisi_risiko' => $riskHeader->residual_target_posisi_risiko,
             'residual_target_level_risiko' => clean_string($riskHeader->residual_target_level_risiko),
             'process_code' => $riskHeader->process_code ?? null,
-            'status' => $riskHeader->status,
+            // 'status' => $riskHeader->status,
             'is_complete' => $riskHeader->is_complete ?? false,
             'year' => $riskHeader->year,
             'updated_at' => $riskHeader->updated_at,
@@ -829,7 +915,18 @@ public function store(Request $request)
 
 public function update(Request $request, $id)
 {
-    $riskHeader = TrRiskHeader::find($id);
+    $currentUser = auth()->user();
+
+    // Validasi role: hanya role 1, 2, 3 yang diizinkan
+    $roleCheck = check_role($currentUser, [1, 2, 3]);
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
+    $riskHeader = TrRiskHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
+        // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+        $query->where('department_id', $currentUser->department_id);
+    })->find($id);
 
     if (!$riskHeader) {
         return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
@@ -1070,6 +1167,19 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
         return json(400, false, 'Validasi Gagal', 'Validasi 14 field dasar gagal.', $validator->errors());
     }
 
+    // ============================================
+    // VALIDASI DEPARTMENT BERDASARKAN ROLE
+    // ============================================
+
+    $currentUser = auth()->user();
+
+    // Role 2 & 3 tidak boleh mengubah department_id, harus sesuai department mereka
+    if (in_array($currentUser->role_id, [2, 3])) {
+        if ($request->has('department_id') && $request->input('department_id') != $currentUser->department_id) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak dapat mengubah department_id ke department lain.', null);
+        }
+    }
+
     try {
         DB::beginTransaction();
 
@@ -1083,6 +1193,20 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
 
         $updateData['created_by'] = auth()->id();
         $updateData['created_by_role'] = auth()->user()->role_id;
+
+        // ============================================
+        // SET DEPARTMENT SESUAI ROLE
+        // ============================================
+
+        // Superadmin (role 1) boleh ubah departemen dari request
+        if ($currentUser->role_id == 1) {
+            if ($request->has('department_id')) {
+                $updateData['department_id'] = $request->input('department_id');
+            }
+        } else {
+            // Role lain (2, 3) selalu pakai department_id user
+            $updateData['department_id'] = $currentUser->department_id;
+        }
 
         // PAKSA kosongkan 4 field tambahan
         $updateData['internal_control'] = null;
@@ -1226,6 +1350,19 @@ private function handleDraftUpdate(Request $request, $riskHeader)
         return json(400, false, 'Validasi Gagal', 'Validasi 14 field dasar gagal.', $validator->errors());
     }
 
+    // ============================================
+    // VALIDASI DEPARTMENT BERDASARKAN ROLE
+    // ============================================
+
+    $currentUser = auth()->user();
+
+    // Role 2 & 3 tidak boleh mengubah department_id, harus sesuai department mereka
+    if (in_array($currentUser->role_id, [2, 3])) {
+        if ($request->has('department_id') && $request->input('department_id') != $currentUser->department_id) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak dapat mengubah department_id ke department lain.', null);
+        }
+    }
+
     try {
         DB::beginTransaction();
 
@@ -1240,6 +1377,20 @@ private function handleDraftUpdate(Request $request, $riskHeader)
         // Update creator info
         $updateData['created_by'] = auth()->id();
         $updateData['created_by_role'] = auth()->user()->role_id;
+
+        // ============================================
+        // SET DEPARTMENT SESUAI ROLE
+        // ============================================
+
+        // Superadmin (role 1) boleh ubah departemen dari request
+        if ($currentUser->role_id == 1) {
+            if ($request->has('department_id')) {
+                $updateData['department_id'] = $request->input('department_id');
+            }
+        } else {
+            // Role lain (2, 3) selalu pakai department_id user
+            $updateData['department_id'] = $currentUser->department_id;
+        }
 
         // PAKSA kosongkan 4 field tambahan untuk memastikan
         $updateData['internal_control'] = null;
@@ -1371,7 +1522,19 @@ private function buildResponse($riskHeader)
 
 public function submit(Request $request, $id)
 {
-    $riskHeader = TrRiskHeader::find($id);
+    $currentUser = auth()->user();
+
+    // Validasi role: hanya role 1, 2, 3 yang diizinkan
+    $roleCheck = check_role($currentUser, [1, 2, 3]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
+    $riskHeader = TrRiskHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
+        // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+        $query->where('department_id', $currentUser->department_id);
+    })->find($id);
 
     if (!$riskHeader) {
         return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
@@ -1414,7 +1577,6 @@ public function submit(Request $request, $id)
         ]);
 
         // Buat approval entry untuk proses persetujuan
-        $currentUser = auth()->user();
         $jabatanId = null;
 
         if ($currentUser->jabatan_id) {
@@ -1767,7 +1929,6 @@ public function monitoring(Request $request)
 public function getPendingApproval(Request $request)
 {
     try {
-        // IMMEDIATE BLOCK untuk role 2 dan 3
         $user = auth()->user();
 
         \Log::info('User info for pending approval', [
@@ -1776,11 +1937,12 @@ public function getPendingApproval(Request $request)
             'department_id' => $user->department_id,
         ]);
 
-        if (($user->role_id == 2 || $user->role_id == 3) && empty($user->department_id)) {
+        // Validasi department untuk role 2 dan 3
+        if (in_array($user->role_id, [2, 3]) && empty($user->department_id)) {
             return json(403, false, 'Akses Ditolak', 'Department tidak valid untuk akses ini.', null);
         }
 
-        // UPDATE: Query untuk status draft (bukan pending)
+        // Query untuk status submit
         $query = TrRiskHeader::with([
             'irDampak:id,label',
             'irKemungkinan:id,label',
@@ -1789,16 +1951,17 @@ public function getPendingApproval(Request $request)
             'department:id,name',
             'optionTargetSatuTahun:id,name,position',
             'createdBy:id,username',
-        ]) ->where('status', 'submit');  // Hanya ambil yang statusnya 'submit'
+        ])->where('status', 'submit');  // Hanya ambil yang statusnya 'submit'
 
-        // PAKSA FILTER DEPARTMENT untuk role 2 dan 3
-        if ($user->role_id == 2 || $user->role_id == 3) {
+        // Filter department berdasarkan role
+        $query->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+            // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
             $query->where('department_id', $user->department_id);
-        }
+        });
 
-        // BLOCK parameter department_id untuk role 2 dan 3
+        // Validasi parameter department_id untuk role 2 dan 3
         if ($request->has('department_id') && $request->department_id) {
-            if ($user->role_id == 2 || $user->role_id == 3) {
+            if (in_array($user->role_id, [2, 3])) {
                 if ((int)$request->department_id !== (int)$user->department_id) {
                     return json(403, false, 'Akses Ditolak', 'Anda hanya dapat melihat data dari department Anda sendiri.', null);
                 }
@@ -1900,15 +2063,25 @@ public function approveRiskHeader(Request $request, $id)
 
         $currentUser = auth()->user();
 
-        // BLOCK langsung untuk role 2 dan 3 jika department berbeda
-        if ($currentUser->role_id == 2 || $currentUser->role_id == 3) {
-            if ((int)$riskHeader->department_id !== (int)$currentUser->department_id) {
-                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menyetujui risk header dari departemen Anda sendiri.', null);
-            }
+        // Role-based approval logic
+        if ($currentUser->role_id == 1) {
+            // Role 1: Dapat approve semua tanpa pengecualian
+            $hasApprovalRight = true;
+        } elseif ($currentUser->role_id == 2) {
+            // Role 2: Hanya bisa approve data dari departemen yang sama atau data yang dibuat sendiri
+            $hasApprovalRight = ((int)$riskHeader->department_id === (int)$currentUser->department_id) ||
+                               ((int)$riskHeader->created_by === (int)$currentUser->id);
+        } elseif ($currentUser->role_id == 3) {
+            // Role 3: Tidak bisa approve
+            $hasApprovalRight = false;
+        } elseif ($currentUser->role_id == 4 || $currentUser->role_id == 5) {
+            // Role 4 dan 5: Hanya bisa approve data yang dibuat oleh role 3
+            $createdByUser = \App\Models\User::find($riskHeader->created_by);
+            $hasApprovalRight = $createdByUser && (int)$createdByUser->role_id === 3;
+        } else {
+            // Role lain tidak diizinkan
+            $hasApprovalRight = false;
         }
-
-        // Validasi approval right menggunakan helper yang sudah diperbaiki
-        $hasApprovalRight = can_user_approve_simple($currentUser->id, $riskHeader->department_id);
 
         if (!$hasApprovalRight) {
             return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
@@ -1987,24 +2160,34 @@ public function rejectRiskHeader(Request $request, $id)
             return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
         }
 
-        // UPDATE: Cek status draft (bukan pending)
-        if ($riskHeader->status !== 'draft') {
+        // UPDATE: Cek status submit (bukan pending)
+        if ($riskHeader->status !== 'submit') {
             return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status draft yang dapat ditolak.', null);
         }
 
         $currentUser = auth()->user();
 
-        // BLOCK langsung untuk role 2 dan 3 jika department berbeda
-        if ($currentUser->role_id == 2 || $currentUser->role_id == 3) {
-            if ((int)$riskHeader->department_id !== (int)$currentUser->department_id) {
-                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menolak risk header dari departemen Anda sendiri.', null);
-            }
+        // Role-based rejection logic (sama dengan approval)
+        if ($currentUser->role_id == 1) {
+            // Role 1: Dapat reject semua tanpa pengecualian
+            $hasRejectRight = true;
+        } elseif ($currentUser->role_id == 2) {
+            // Role 2: Hanya bisa reject data dari departemen yang sama atau data yang dibuat sendiri
+            $hasRejectRight = ((int)$riskHeader->department_id === (int)$currentUser->department_id) ||
+                             ((int)$riskHeader->created_by === (int)$currentUser->id);
+        } elseif ($currentUser->role_id == 3) {
+            // Role 3: Tidak bisa reject
+            $hasRejectRight = false;
+        } elseif ($currentUser->role_id == 4 || $currentUser->role_id == 5) {
+            // Role 4 dan 5: Hanya bisa reject data yang dibuat oleh role 3
+            $createdByUser = \App\Models\User::find($riskHeader->created_by);
+            $hasRejectRight = $createdByUser && (int)$createdByUser->role_id === 3;
+        } else {
+            // Role lain tidak diizinkan
+            $hasRejectRight = false;
         }
 
-        // Validasi approval right menggunakan helper yang sudah diperbaiki
-        $hasApprovalRight = can_user_approve_simple($currentUser->id, $riskHeader->department_id);
-
-        if (!$hasApprovalRight) {
+        if (!$hasRejectRight) {
             return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menolak data ini.', null);
         }
 
@@ -2078,6 +2261,7 @@ public function getRejectedData(Request $request)
     try {
         $user = auth()->user();
 
+        // Validasi department hanya untuk role 2 dan 3
         if (($user->role_id == 2 || $user->role_id == 3) && empty($user->department_id)) {
             return json(403, false, 'Akses Ditolak', 'Department tidak valid untuk akses ini.', null);
         }
@@ -2093,22 +2277,26 @@ public function getRejectedData(Request $request)
             'approvedBy:id,username'
         ])->where('status', 'rejected'); // Hanya ambil yang statusnya 'rejected'
 
-        // PAKSA FILTER DEPARTMENT untuk role 2 dan 3
+        // Filter berdasarkan role
         if ($user->role_id == 2 || $user->role_id == 3) {
+            // Role 2 dan 3: Hanya bisa melihat data dari department mereka sendiri
             $query->where('department_id', $user->department_id);
         }
+        // Role 1, 4, 5: Bisa melihat semua data tanpa filter department
 
         if ($request->has('year') && $request->year) {
             $query->where('year', $request->year);
         }
 
-        // BLOCK parameter department_id untuk role 2 dan 3
+        // Handle parameter department_id
         if ($request->has('department_id') && $request->department_id) {
             if ($user->role_id == 2 || $user->role_id == 3) {
+                // Role 2 dan 3: Validasi bahwa department_id yang diminta sama dengan department mereka
                 if ((int)$request->department_id !== (int)$user->department_id) {
                     return json(403, false, 'Akses Ditolak', 'Anda hanya dapat melihat data dari department Anda sendiri.', null);
                 }
             }
+            // Role 1, 4, 5: Bisa filter berdasarkan department_id apapun
             $query->where('department_id', $request->department_id);
         }
 
@@ -2273,12 +2461,12 @@ public function destroy($id)
         }
 
         $currentUser = auth()->user();
-        $currentUserRole = $currentUser->role_id;
 
-        // VALIDASI HAK AKSES DELETE
-        // Hanya Superadmin (role 1) yang bisa delete
-        if ($currentUserRole !== 1) {
-            return json(404, false, 'Akses Ditolak', 'Hanya Superadmin yang dapat menghapus data risk header.', null);
+        // VALIDASI HAK AKSES DELETE - Hanya role 1 yang bisa hapus
+        $roleCheck = check_role($currentUser, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
         // VALIDASI BUSINESS LOGIC

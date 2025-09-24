@@ -21,6 +21,12 @@ class HeatmapRiskRangeController extends Controller
 
     public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+        $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'start' => 'required|integer',
@@ -54,6 +60,12 @@ class HeatmapRiskRangeController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Check authorization: only role 1 and 2 can update
+       $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'start' => 'required|integer',
@@ -87,6 +99,11 @@ class HeatmapRiskRangeController extends Controller
 
     public function destroy($id)
     {
+        // Check authorization: only role 1 can delete
+       $result = check_role(auth()->user(), 1);
+        if ($result !== true) {
+            return $result; // otomatis balikin JSON 403 kalau bukan role 1
+        }
         try {
             $range = MstHeatmapRiskRange::findOrFail($id);
             $range->delete();

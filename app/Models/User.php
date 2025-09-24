@@ -9,6 +9,8 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 use App\Models\MstRole;
 use App\Models\MstPage;
 use App\Models\MstDepartment;
+use App\Models\permissions;
+use App\Models\RolePermission;
 
 class User extends Authenticatable implements JWTSubject
 {
@@ -93,6 +95,14 @@ public function department()
  public function jabatan()
     {
         return $this->belongsTo(MstJabatan::class, 'jabatan_id');
+    }
+    /**
+     * Relasi many-to-many ke permissions melalui role
+     */
+
+     public function permissions()
+    {
+        return $this->role->permissions();
     }
 
     /**

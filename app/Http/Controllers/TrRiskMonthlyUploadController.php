@@ -31,6 +31,14 @@ class TrRiskMonthlyUploadController extends Controller
 
     public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $validator = Validator::make($request->all(), [
             'header_id' => 'required|exists:tr_risk_header,id',
             'risk_monthly_id' => 'required|exists:tr_risk_monthly,id',
@@ -54,6 +62,14 @@ class TrRiskMonthlyUploadController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Check authorization: only role 1 and 2 can update
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $data = TrRiskMonthlyUpload::find($id);
 
         if (!$data) {
@@ -83,6 +99,14 @@ class TrRiskMonthlyUploadController extends Controller
 
     public function destroy($id)
     {
+        // Check authorization: only role 1 can delete
+        $user = auth()->user();
+        $roleCheck = check_role($user, 1);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $data = TrRiskMonthlyUpload::find($id);
 
         if (!$data) {
@@ -112,55 +136,62 @@ class TrRiskMonthlyUploadController extends Controller
     }
 
     public function deleteTempFile(Request $request)
-{
-    // dd(Storage::disk('s3')->files('semesta'));
+    {
+        // Check authorization: only role 1 and 2 can delete temp files
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
 
-    $filename = $request->get('filename');
-
-    if (!$filename) {
-        return json(400, false, 'Nama file kosong', 'Nama file harus dikirim.', null);
-    }
-
-    // GUNAKAN PARSING YANG SAMA PERSIS SEPERTI destroy()
-    if (filter_var($filename, FILTER_VALIDATE_URL)) {
-        $parsedPath = parse_url($filename, PHP_URL_PATH);
-        $cleanPath = ltrim($parsedPath, '/');
-    } else {
-        $cleanPath = $filename;
-    }
-
-    \Log::info('deleteTempFile - Original: ' . $filename);
-    \Log::info('deleteTempFile - Clean path: ' . $cleanPath);
-
-    // CEK APAKAH FILE ADA SEBELUM DIHAPUS
-    try {
-        $disk = Storage::disk('s3');
-
-        if (!$disk->exists($cleanPath)) {
-            \Log::warning('File not exists: ' . $cleanPath);
-
-            // Debug: Cari file di directory yang sama
-            $directory = dirname($cleanPath);
-            if ($directory === '.') $directory = '';
-
-            $filesInDir = $disk->files($directory);
-            \Log::info('Files in directory: ' . json_encode(array_slice($filesInDir, 0, 5)));
-
-            return json(404, false, 'Data Tidak Ditemukan',
-                       'File tidak ditemukan: ' . $cleanPath,
-                       ['files_in_directory' => array_slice($filesInDir, 0, 10)]);
+        if ($roleCheck !== true) {
+            return $roleCheck;
         }
 
-        // HAPUS FILE (SAMA SEPERTI destroy())
-        $disk->delete($cleanPath);
-        \Log::info('File deleted successfully: ' . $cleanPath);
+        // dd(Storage::disk('s3')->files('semesta'));
 
-        return json(200, true, 'Berhasil', 'File berhasil dihapus.', null);
+        $filename = $request->get('filename');
 
-    } catch (\Exception $e) {
-        \Log::error('Error: ' . $e->getMessage());
-        return json(500, false, 'Gagal Menghapus File', 'Gagal menghapus file: ' . $e->getMessage(), null);
+        if (!$filename) {
+            return json(400, false, 'Nama file kosong', 'Nama file harus dikirim.', null);
+        }
+
+        // GUNAKAN PARSING YANG SAMA PERSIS SEPERTI destroy()
+        if (filter_var($filename, FILTER_VALIDATE_URL)) {
+            $parsedPath = parse_url($filename, PHP_URL_PATH);
+            $cleanPath = ltrim($parsedPath, '/');
+        } else {
+            $cleanPath = $filename;
+        }
+
+        \Log::info('deleteTempFile - Original: ' . $filename);
+        \Log::info('deleteTempFile - Clean path: ' . $cleanPath);
+
+        // CEK APAKAH FILE ADA SEBELUM DIHAPUS
+        try {
+            $disk = Storage::disk('s3');
+
+            if (!$disk->exists($cleanPath)) {
+                \Log::warning('File not exists: ' . $cleanPath);
+
+                // Debug: Cari file di directory yang sama
+                $directory = dirname($cleanPath);
+                if ($directory === '.') $directory = '';
+
+                $filesInDir = $disk->files($directory);
+                \Log::info('Files in directory: ' . json_encode(array_slice($filesInDir, 0, 5)));
+
+                return json(404, false, 'Data Tidak Ditemukan',
+                           'File tidak ditemukan: ' . $cleanPath,
+                           ['files_in_directory' => array_slice($filesInDir, 0, 10)]);
+            }
+
+            // HAPUS FILE (SAMA SEPERTI destroy())
+            $disk->delete($cleanPath);
+            \Log::info('File deleted successfully: ' . $cleanPath);
+
+            return json(200, true, 'Berhasil', 'File berhasil dihapus.', null);
+
+        } catch (\Exception $e) {
+            \Log::error('Error: ' . $e->getMessage());
+            return json(500, false, 'Gagal Menghapus File', 'Gagal menghapus file: ' . $e->getMessage(), null);
+        }
     }
-}
-
 }

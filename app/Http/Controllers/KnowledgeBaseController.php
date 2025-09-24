@@ -13,96 +13,18 @@ use Carbon\Carbon;
 class KnowledgeBaseController extends Controller
 {
     public function index(Request $request)
-{
-    // Eager load relasi creator & updater
-    $query = Knowledgebase::with(['creator', 'updater']);
+    {
+        // Semua role dapat melihat data - tidak perlu pengecekan role
 
-    if ($request->has('type')) {
-        $query->where('type', $request->type);
-    }
+        // Eager load relasi creator & updater
+        $query = Knowledgebase::with(['creator', 'updater']);
 
-    $data = $query->latest()->get();
-
-    $typeMap = [
-        1 => 'NEWS',
-        2 => 'PERDIR',
-        3 => 'SOP',
-        4 => 'SURAT KEPUTUSAN',
-        5 => 'REGULASI',
-    ];
-
-    $data->transform(function ($item) use ($typeMap) {
-        // Enkripsi creator_id
-        $item->creator_id = encrypt_decrypt_md5('enc', $item->creator_id);
-
-        // Mapping type label
-        $item->type_label = $typeMap[$item->type] ?? 'TIDAK DIKETAHUI';
-
-        // created_by_name & updated_by_name
-        $item->created_by_name = get_decrypted_username($item->creator ?? null);
-        $item->updated_by_name = get_decrypted_username($item->updater ?? null);
-
-        // Hapus relasi supaya tidak ikut di JSON
-        unset($item->creator, $item->updater);
-
-        return clean_recursive($item);
-    });
-
-    $perLoad = $request->input('per_load', 6);
-
-    return json(200, true, 'success', 'Data berhasil diambil', [
-        'per_load' => $perLoad,
-        'data' => $data
-    ]);
-}
-    public function show($id)
-{
-    try {
-        \Log::info('Starting show function for ID: ' . $id);
-
-        // Ambil data dengan relasi creator & updater
-        $data = Knowledgebase::with(['creator', 'updater'])->find($id);
-        if (!$data) {
-            return json(404, false, 'not_found', 'Data tidak ditemukan', null);
+        if ($request->has('type')) {
+            $query->where('type', $request->type);
         }
 
-        \Log::info('Basic data loaded successfully');
+        $data = $query->latest()->get();
 
-        // Cek dan validasi encoding field tertentu
-        $fieldsToCheck = ['title', 'description', 'long_description', 'img_path'];
-        foreach ($fieldsToCheck as $field) {
-            try {
-                $value = $data->$field;
-                if ($value !== null) {
-                    $encoding = mb_detect_encoding($value, ['UTF-8', 'ISO-8859-1', 'Windows-1252'], true);
-                    $isValidUtf8 = mb_check_encoding($value, 'UTF-8');
-
-                    \Log::info("Field $field check:", [
-                        'value_length' => strlen($value),
-                        'detected_encoding' => $encoding,
-                        'is_valid_utf8' => $isValidUtf8,
-                        'first_50_chars' => substr($value, 0, 50)
-                    ]);
-
-                    if (!$isValidUtf8) {
-                        \Log::error("Invalid UTF-8 detected in field: $field");
-
-                        if ($encoding) {
-                            $data->$field = mb_convert_encoding($value, 'UTF-8', $encoding);
-                        } else {
-                            $data->$field = null;
-                        }
-                    }
-                }
-            } catch (\Exception $e) {
-                \Log::error("Error checking field $field: " . $e->getMessage());
-                $data->$field = null;
-            }
-        }
-
-        \Log::info('Field validation completed');
-
-        // Mapping type label
         $typeMap = [
             1 => 'NEWS',
             2 => 'PERDIR',
@@ -110,199 +32,286 @@ class KnowledgeBaseController extends Controller
             4 => 'SURAT KEPUTUSAN',
             5 => 'REGULASI',
         ];
-        $data->type_label = $typeMap[$data->type] ?? 'TIDAK DIKETAHUI';
 
-        \Log::info('Type label added');
+        $data->transform(function ($item) use ($typeMap) {
+            // Enkripsi creator_id
+            $item->creator_id = encrypt_decrypt_md5('enc', $item->creator_id);
 
-        // Tambahkan created_by_name dan updated_by_name
-        $data->created_by_name = get_decrypted_username($data->creator ?? null);
-        $data->updated_by_name = get_decrypted_username($data->updater ?? null);
+            // Mapping type label
+            $item->type_label = $typeMap[$item->type] ?? 'TIDAK DIKETAHUI';
 
-        // Siapkan response
-        $responseData = [
-            'id' => $data->id,
-            'title' => $data->title,
-            'description' => $data->description,
-            'long_description' => $data->long_description,
-            'img_path' => $data->img_path,
-            'doc_path' => $data->doc_path,
-            'type' => $data->type,
-            'type_label' => $data->type_label,
-            'creator_id' => encrypt_decrypt_md5('enc', $data->creator_id),
-            'created_by_name' => $data->created_by_name,
-            'updated_by_name' => $data->updated_by_name,
-            'created_at' => $data->created_at,
-            'updated_at' => $data->updated_at,
-        ];
+            // created_by_name & updated_by_name
+            $item->created_by_name = get_decrypted_username($item->creator ?? null);
+            $item->updated_by_name = get_decrypted_username($item->updater ?? null);
 
-        \Log::info('Response data prepared:', $responseData);
+            // Hapus relasi supaya tidak ikut di JSON
+            unset($item->creator, $item->updater);
 
-        return json(200, true, 'success', 'Detail Data', $responseData);
+            return clean_recursive($item);
+        });
 
-    } catch (\Exception $e) {
-        \Log::error('Show function failed at step:', [
-            'error' => $e->getMessage(),
-            'line' => $e->getLine(),
-            'file' => $e->getFile(),
-            'trace' => $e->getTraceAsString()
+        $perLoad = $request->input('per_load', 6);
+
+        return json(200, true, 'success', 'Data berhasil diambil', [
+            'per_load' => $perLoad,
+            'data' => $data
         ]);
-
-        return json(500, false, 'error', 'Gagal mengambil data: ' . $e->getMessage(), null);
     }
-}
+
+    public function show($id)
+    {
+        // Semua role dapat melihat detail data - tidak perlu pengecekan role
+
+        try {
+            \Log::info('Starting show function for ID: ' . $id);
+
+            // Ambil data dengan relasi creator & updater
+            $data = Knowledgebase::with(['creator', 'updater'])->find($id);
+            if (!$data) {
+                return json(404, false, 'not_found', 'Data tidak ditemukan', null);
+            }
+
+            \Log::info('Basic data loaded successfully');
+
+            // Cek dan validasi encoding field tertentu
+            $fieldsToCheck = ['title', 'description', 'long_description', 'img_path'];
+            foreach ($fieldsToCheck as $field) {
+                try {
+                    $value = $data->$field;
+                    if ($value !== null) {
+                        $encoding = mb_detect_encoding($value, ['UTF-8', 'ISO-8859-1', 'Windows-1252'], true);
+                        $isValidUtf8 = mb_check_encoding($value, 'UTF-8');
+
+                        \Log::info("Field $field check:", [
+                            'value_length' => strlen($value),
+                            'detected_encoding' => $encoding,
+                            'is_valid_utf8' => $isValidUtf8,
+                            'first_50_chars' => substr($value, 0, 50)
+                        ]);
+
+                        if (!$isValidUtf8) {
+                            \Log::error("Invalid UTF-8 detected in field: $field");
+
+                            if ($encoding) {
+                                $data->$field = mb_convert_encoding($value, 'UTF-8', $encoding);
+                            } else {
+                                $data->$field = null;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::error("Error checking field $field: " . $e->getMessage());
+                    $data->$field = null;
+                }
+            }
+
+            \Log::info('Field validation completed');
+
+            // Mapping type label
+            $typeMap = [
+                1 => 'NEWS',
+                2 => 'PERDIR',
+                3 => 'SOP',
+                4 => 'SURAT KEPUTUSAN',
+                5 => 'REGULASI',
+            ];
+            $data->type_label = $typeMap[$data->type] ?? 'TIDAK DIKETAHUI';
+
+            \Log::info('Type label added');
+
+            // Tambahkan created_by_name dan updated_by_name
+            $data->created_by_name = get_decrypted_username($data->creator ?? null);
+            $data->updated_by_name = get_decrypted_username($data->updater ?? null);
+
+            // Siapkan response
+            $responseData = [
+                'id' => $data->id,
+                'title' => $data->title,
+                'description' => $data->description,
+                'long_description' => $data->long_description,
+                'img_path' => $data->img_path,
+                'doc_path' => $data->doc_path,
+                'type' => $data->type,
+                'type_label' => $data->type_label,
+                'creator_id' => encrypt_decrypt_md5('enc', $data->creator_id),
+                'created_by_name' => $data->created_by_name,
+                'updated_by_name' => $data->updated_by_name,
+                'created_at' => $data->created_at,
+                'updated_at' => $data->updated_at,
+            ];
+
+            \Log::info('Response data prepared:', $responseData);
+
+            return json(200, true, 'success', 'Detail Data', $responseData);
+
+        } catch (\Exception $e) {
+            \Log::error('Show function failed:', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return json(500, false, 'error', 'Gagal mengambil data: ' . $e->getMessage(), null);
+        }
+    }
 
     public function store(Request $request)
-{
-    $user = JWTAuth::parseToken()->authenticate();
-    if (!in_array($user->role_id, [1, 2, 6, 7])) {
-        return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk membuat data', null);
+    {
+        $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
+
+        $user = auth()->user();
+
+        $array_validation = [
+            'title' => 'required|string|max:255',
+            'img_path' => 'required|string',
+            'doc_path' => 'nullable|string',
+            'description' => 'nullable|string',
+            'long_description' => 'nullable|string',
+            'type' => 'required|in:1,2,3,4,5',
+        ];
+
+        if (check_validation($request->all(), $array_validation)[0] !== 0) {
+            return check_validation($request->all(), $array_validation)[1];
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $Base = Knowledgebase::create([
+                'creator_id' => $user->id,
+                'created_by' => $user->id,
+                'title' => $request->title,
+                'img_path' => $request->img_path,
+                'doc_path' => $request->doc_path,
+                'description' => $request->description,
+                'long_description' => $request->long_description,
+                'type' => $request->type,
+            ]);
+
+            DB::commit();
+
+            // Enkripsi creator_id saja, ID knowledge base tetap plain
+            $Base->creator_id = encrypt_decrypt_md5('enc', $Base->creator_id);
+
+            // Tambahkan type_label
+            $Base->type_label = match ($Base->type) {
+                1 => 'NEWS',
+                2 => 'PERDIR',
+                3 => 'SOP',
+                4 => 'SURAT KEPUTUSAN',
+                5 => 'REGULASI',
+                default => 'TIDAK DIKETAHUI',
+            };
+
+            // Ambil nama user yang didekripsi dari helper
+            $Base->created_by_name = get_decrypted_username($user);
+
+            return json(200, true, 'success', 'Data berhasil disimpan', $Base);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return json(500, false, 'error', 'Gagal menyimpan data: ' . $e->getMessage(), null);
+        }
     }
-
-    $array_validation = [
-        'title' => 'required|string|max:255',
-        'img_path' => 'required|string',
-        'doc_path' => 'nullable|string',
-        'description' => 'nullable|string',
-        'long_description' => 'nullable|string',
-        'type' => 'required|in:1,2,3,4,5',
-    ];
-
-    if (check_validation($request->all(), $array_validation)[0] !== 0) {
-        return check_validation($request->all(), $array_validation)[1];
-    }
-
-    DB::beginTransaction();
-
-    try {
-        $Base = Knowledgebase::create([
-            'creator_id' => $user->id,
-            'created_by' => $user->id,  // <-- tambahkan created_by di sini
-            'title' => $request->title,
-            'img_path' => $request->img_path,
-            'doc_path' => $request->doc_path,
-            'description' => $request->description,
-            'long_description' => $request->long_description,
-            'type' => $request->type,
-        ]);
-
-        DB::commit();
-
-        // Enkripsi creator_id saja, ID knowledge base tetap plain
-        $Base->creator_id = encrypt_decrypt_md5('enc', $Base->creator_id);
-
-        // Tambahkan type_label
-        $Base->type_label = match ($Base->type) {
-            1 => 'NEWS',
-            2 => 'PERDIR',
-            3 => 'SOP',
-            4 => 'SURAT KEPUTUSAN',
-            5 => 'REGULASI',
-            default => 'TIDAK DIKETAHUI',
-        };
-
-        // Ambil nama user yang didekripsi dari helper (asumsi $user adalah model User)
-        $Base->created_by_name = get_decrypted_username($user);
-
-        return json(200, true, 'success', 'Data berhasil disimpan', $Base);
-    } catch (\Exception $e) {
-        DB::rollback();
-        return json(500, false, 'error', 'Gagal menyimpan data: ' . $e->getMessage(), null);
-    }
-}
 
     public function update(Request $request, $id)
-{
-    $user = JWTAuth::parseToken()->authenticate();
-    if (!in_array($user->role_id, [1, 2, 6, 7])) {
-        return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk mengupdate data', null);
+    {
+        $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
+
+        $user = auth()->user(); // FIX: Definisikan variable $user
+
+        $Base = Knowledgebase::find($id);
+        if (!$Base) {
+            return json(404, false, 'not_found', 'Data tidak ditemukan', null);
+        }
+
+        $array_validation = [
+            'title' => 'nullable|string|max:255',
+            'img_path' => 'nullable|string',
+            'doc_path' => 'nullable|string',
+            'description' => 'nullable|string',
+            'long_description' => 'nullable|string',
+            'type' => 'nullable|in:1,2,3,4,5',
+        ];
+
+        $validate = check_validation($request->all(), $array_validation);
+        if ($validate[0] !== 0) {
+            return $validate[1];
+        }
+
+        DB::beginTransaction();
+
+        try {
+            if ($request->filled('title')) {
+                $Base->title = $request->title;
+            }
+
+            if ($request->filled('img_path')) {
+                $Base->img_path = $request->img_path;
+            }
+
+            if ($request->has('description')) {
+                $Base->description = $request->description;
+            }
+
+            if ($request->has('long_description')) {
+                $Base->long_description = $request->long_description;
+            }
+
+            if ($request->has('type')) {
+                $Base->type = $request->type;
+            }
+
+            if ($request->filled('doc_path')) {
+                $Base->doc_path = $request->doc_path;
+            }
+
+            // Set updated_by dengan user yang sedang update
+            $Base->updated_by = $user->id;
+
+            $Base->save();
+            DB::commit();
+
+            // Load relasi untuk mendapatkan nama
+            $Base->load(['creator', 'updater']);
+
+            $Base->creator_id = encrypt_decrypt_md5('enc', $Base->creator_id);
+
+            $Base->type_label = match ($Base->type) {
+                1 => 'NEWS',
+                2 => 'PERDIR',
+                3 => 'SOP',
+                4 => 'SURAT KEPUTUSAN',
+                5 => 'REGULASI',
+                default => 'TIDAK DIKETAHUI',
+            };
+
+            // FIX: Gunakan relasi yang sudah di-load
+            $Base->created_by_name = get_decrypted_username($Base->creator);
+            $Base->updated_by_name = get_decrypted_username($Base->updater);
+
+            // Hapus relasi dari response
+            unset($Base->creator, $Base->updater);
+
+            return json(200, true, 'success', 'Data berhasil diupdate', $Base);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return json(500, false, 'error', 'Gagal update data: ' . $e->getMessage(), null);
+        }
     }
-
-    $Base = Knowledgebase::find($id);
-    if (!$Base) {
-        return json(404, false, 'not_found', 'Data tidak ditemukan', null);
-    }
-
-    $array_validation = [
-        'title' => 'nullable|string|max:255',
-        'img_path' => 'nullable|string',
-        'doc_path' => 'nullable|string',
-        'description' => 'nullable|string',
-        'long_description' => 'nullable|string',
-        'type' => 'nullable|in:1,2,3,4,5',
-    ];
-
-    $validate = check_validation($request->all(), $array_validation);
-    if ($validate[0] !== 0) {
-        return $validate[1];
-    }
-
-    DB::beginTransaction();
-
-    try {
-        if ($request->filled('title')) {
-            $Base->title = $request->title;
-        }
-
-        if ($request->filled('img_path')) {
-            $Base->img_path = $request->img_path;
-        }
-
-        if ($request->has('description')) {
-            $Base->description = $request->description;
-        }
-
-        if ($request->has('long_description')) {
-            $Base->long_description = $request->long_description;
-        }
-
-        if ($request->has('type')) {
-            $Base->type = $request->type;
-        }
-
-        if ($request->filled('doc_path')) {
-            $Base->doc_path = $request->doc_path;
-        }
-
-        // Set updated_by dengan user yang sedang update
-        $Base->updated_by = $user->id;
-
-        $Base->save();
-        DB::commit();
-
-        $Base->creator_id = encrypt_decrypt_md5('enc', $Base->creator_id);
-
-        $Base->type_label = match ($Base->type) {
-            1 => 'NEWS',
-            2 => 'PERDIR',
-            3 => 'SOP',
-            4 => 'SURAT KEPUTUSAN',
-            5 => 'REGULASI',
-            default => 'TIDAK DIKETAHUI',
-        };
-
-        // Ambil user terkait created_by dari model User
-        $createdByUser = \App\Models\User::find($Base->created_by);
-        $Base->created_by_name = get_decrypted_username($createdByUser);
-
-        // Ambil user terkait updated_by untuk nama
-        $updatedByUser = \App\Models\User::find($Base->updated_by);
-        $Base->updated_by_name = get_decrypted_username($updatedByUser);
-
-        unset($Base->creator);
-
-        return json(200, true, 'success', 'Data berhasil diupdate', $Base);
-
-    } catch (\Exception $e) {
-        DB::rollback();
-        return json(500, false, 'error', 'Gagal update data: ' . $e->getMessage(), null);
-    }
-}
 
     public function destroy($id)
     {
-        $user = JWTAuth::parseToken()->authenticate();
-        if (!in_array($user->role_id, [1, 6])) {
-            return json(403, false, 'forbidden', 'Anda tidak memiliki izin untuk menghapus data', null);
+        $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
         }
 
         $Base = Knowledgebase::find($id);
@@ -332,11 +341,17 @@ class KnowledgeBaseController extends Controller
     public function trackReader($id)
     {
         try {
-            $user = JWTAuth::parseToken()->authenticate();
+            // FIX: Semua authenticated user bisa tracking, bukan hanya role 1
+            if (!auth()->check()) {
+                return json(401, false, 'unauthenticated', 'User tidak terautentikasi', null);
+            }
 
+            $user = auth()->user(); // FIX: Definisikan variable $user
+
+            // FIX: Cari knowledge base
             $knowledge = Knowledgebase::find($id);
             if (!$knowledge) {
-                return json(404, false, 'not_found', 'Knowledge Base tidak ditemukan', null);
+                return json(404, false, 'not_found', 'Knowledge base tidak ditemukan', null);
             }
 
             $existing = KnowledgeBaseReader::where('user_id', $user->id)
@@ -345,7 +360,7 @@ class KnowledgeBaseController extends Controller
 
             if ($existing) {
                 return json(200, true, 'reader_exists', 'User sudah membaca knowledge ini', [
-                    'knowledge_title' => $knowledge->title ?? null,
+                    'knowledge_title' => $knowledge->title,
                     'read_at' => $existing->created_at->timezone('Asia/Jakarta')->toDateTimeString(),
                 ]);
             }
@@ -356,7 +371,7 @@ class KnowledgeBaseController extends Controller
             ]);
 
             return json(200, true, 'reader_tracked', 'Pembacaan berhasil dicatat', [
-                'knowledge_title' => $knowledge->title ?? null,
+                'knowledge_title' => $knowledge->title,
                 'read_at' => $reader->created_at->timezone('Asia/Jakarta')->toDateTimeString(),
             ]);
 

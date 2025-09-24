@@ -22,6 +22,12 @@ class HeatmapLabelController extends Controller
 
     public function store(Request $request)
     {
+        // Check authorization: only role 1 and 2 can store
+      $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
+
         $validator = Validator::make($request->all(), [
             'type' => 'required|in:dampak,kemungkinan',
             'label' => 'required|string',
@@ -49,6 +55,12 @@ class HeatmapLabelController extends Controller
 
     public function update(Request $request, $type, $id)
     {
+        // Check authorization: only role 1 and 2 can update
+       $result = check_role(auth()->user(), [1, 2]);
+        if ($result !== true) {
+            return $result;
+        }
+
         $validator = Validator::make($request->all(), [
             'skala' => 'required|integer|min:1|max:5',
             'label' => 'required|string'
@@ -87,6 +99,11 @@ class HeatmapLabelController extends Controller
 
     public function destroy($type, $id)
     {
+        // Check authorization: only role 1 can delete
+       $result = check_role(auth()->user(), 1);
+    if ($result !== true) {
+        return $result; // otomatis balikin JSON 403 kalau bukan role 1
+    }
         if ($type === 'dampak') {
             $data = MstHeatmapDampak::find($id);
             if (!$data) {

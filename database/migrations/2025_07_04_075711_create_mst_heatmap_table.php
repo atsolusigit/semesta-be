@@ -10,13 +10,13 @@ return new class extends Migration {
         Schema::create('mst_heatmap', function (Blueprint $table) {
             $table->id(); // UNSIGNED BIGINT
             $table->unsignedBigInteger('dampak');
-            $table->unsignedBigInteger('kemungkinan'); // alias kemungkinan
+            $table->unsignedBigInteger('probabilitas'); // alias kemungkinan
             $table->integer('result');
             $table->timestamps();
 
             // Foreign Keys
             $table->foreign('dampak')->references('id')->on('mst_heatmap_dampak')->onDelete('cascade');
-            $table->foreign('kemungkinan')->references('id')->on('mst_heatmap_kemungkinan')->onDelete('cascade');
+            $table->foreign('probabilitas')->references('id')->on('mst_heatmap_kemungkinan')->onDelete('cascade');
         });
     }
 

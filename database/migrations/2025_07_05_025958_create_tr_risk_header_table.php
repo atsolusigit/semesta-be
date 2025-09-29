@@ -40,6 +40,10 @@ return new class extends Migration {
             $table->unsignedBigInteger('department_id')->nullable();
             $table->integer('year')->nullable();                 // contoh: 2024
 
+             $table->enum('status', ['draft', 'submit', 'approved', 'rejected', 'close'])
+                ->default('draft')
+                ->comment('Status approval header');
+
             $table->timestamps();
         });
     }

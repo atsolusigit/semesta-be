@@ -29,6 +29,7 @@ use App\Http\Controllers\RiskTimelinePdfController;
 use App\Http\Controllers\MstJabatanController;
 use App\Http\Controllers\MstApprovalController;
 use App\Http\Controllers\MstMonthRecommendationController;
+use App\Http\Controllers\TrRcsaHeaderController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -306,3 +307,10 @@ Route::get('/test-export-risk/{format}', [ExportRiskController::class, 'testExpo
 // Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-entry/{id}/residual', [TrRiskMonthlyEntryController::class, 'updateResidual']);
 // Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-entry/{id}/residual-and-finalize', [TrRiskMonthlyEntryController::class, 'updateResidualAndFinalize']);
 // Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-entry/{id}/bulk-update-quantitative', [TrRiskMonthlyEntryController::class, 'bulkUpdateQuantitative']);
+
+// ===================== RCSA =====================
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-header', [TrRcsaHeaderController::class, 'index']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->post('/rcsa-header', [TrRcsaHeaderController::class, 'store']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'destroy']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'show']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-sasaran', [TrRcsaHeaderController::class, 'sasaran']);

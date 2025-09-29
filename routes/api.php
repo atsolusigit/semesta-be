@@ -178,6 +178,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/risk-header', [TrRiskHeaderController::class, 'index']);                            // List all risk headers (semua role)
     Route::get('/risk-headers/pending-approval', [TrRiskHeaderController::class, 'getPendingApproval']); // List pending approval (semua role)
     Route::get('/risk-headers/rejected', [TrRiskHeaderController::class, 'getRejectedData']);        // List rejected data (semua role)
+    Route::get('/tasks/monitoring', [TrRiskHeaderController::class, 'getTaskRealisasiMonitoring']);  // List task monitoring (semua role)
     Route::get('/risk-header/{id}', [TrRiskHeaderController::class, 'show']);                        // Detail risk header (semua role)
     Route::get('/risk-monitoring', [TrRiskHeaderController::class, 'monitoring']);                   // Risk monitoring (semua role)
     Route::post('/risk-header', [TrRiskHeaderController::class, 'store']);                           // Tambah risk header (role 1,2,3)
@@ -213,9 +214,11 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/risk-monthly', [TrRiskMonthlyController::class, 'index']);                                    // List all monthly data (role 1,2,3)
 
     // Recommendation functions (letakkan SEBELUM /{id})
-    Route::get('/risk-monthly/recommendations', [TrRiskMonthlyController::class, 'getRecommendationMonths']);   // Get bulan rekomendasi
+    Route::get('/risk-monthly/{headerId}/recommendations', [TrRiskMonthlyController::class, 'getRecommendationMonths']);   // Get bulan rekomendasi by header_id
     Route::post('/risk-monthly/{id}/save-note', [TrRiskMonthlyController::class, 'saveNoteRecommendation']);    // Save note rekomendasi
     Route::post('/risk-monthly/{id}/submit-recommendation', [TrRiskMonthlyController::class, 'submitRecommendation']); // Submit rekomendasi
+    Route::post('/risk-monthly/{id}/approve-recommendation', [TrRiskMonthlyController::class, 'approveRecommendation']); // Approve rekomendasi
+    Route::post('/risk-monthly/{id}/reject-recommendation', [TrRiskMonthlyController::class, 'rejectRecommendation']); // Reject rekomendasi
 
     // Approval workflow
     Route::get('/risk-monthly/pending-approvals', [TrRiskMonthlyController::class, 'getPendingApprovals']);   // Pending approvals (role 1,2,3)

@@ -2537,4 +2537,86 @@ public function destroy($id)
     }
 }
 
+public function getTaskRealisasiMonitoring()
+{
+    try {
+        $user = \Auth::user();
+
+        $query = TrRiskHeader::with([
+            'department:id,name',
+            'monthlyData' => function ($q) {
+                $q->where('is_finalize', true);
+            }
+        ]);
+
+        // Role 2 dan 3 hanya bisa melihat data department mereka
+        if (in_array($user->role_id, [2, 3])) {
+            $query->where('department_id', $user->department_id);
+        }
+        // Role 1,4,5 bisa melihat semua data (tidak ada filter)
+
+        $headers = $query->get();
+
+        $result = [];
+        $no = 1;
+
+        foreach ($headers as $header) {
+            // Risk Owner
+            $riskOwner = $header->department->name ?? '-';
+
+            // Peristiwa Risiko
+            $peristiwa = $header->peristiwa_risiko ?? '-';
+
+            // Rencana Penanganan
+            $rencana = $header->mitigasi ?? '-';
+
+            // Waktu Pelaksanaan → ambil bulan awal & akhir finalisasi
+            $finalizedMonths = $header->monthlyData->pluck('month')->toArray();
+            $waktuPelaksanaan = '-';
+
+            if (!empty($finalizedMonths)) {
+                $startMonth = min($finalizedMonths);
+                $endMonth   = max($finalizedMonths);
+
+                $startDate = \Carbon\Carbon::createFromDate($header->year, $startMonth, 1)->startOfMonth();
+                $endDate   = \Carbon\Carbon::createFromDate($header->year, $endMonth, 1)->endOfMonth();
+
+                $waktuPelaksanaan = $startDate->format('Y-m-d') . ' s/d ' . $endDate->format('Y-m-d');
+            }
+
+            //  PIC
+            $pic = get_decrypted_name((object)['id' => $header->created_by]) .
+                ' - ' . ($header->department->name ?? '');
+
+            //  Ambil target angka dari kolom target_quantitative_satu_tahun (tipe TEXT)
+            $targetText = $header->target_quantitative_satu_tahun ?? '';
+            preg_match('/\d+/', str_replace('.', '', $targetText), $matches);
+            $targetValue = isset($matches[0]) ? (float)$matches[0] : 0;
+
+            //  Hitung Total Realisasi
+            $totalRealisasi = $header->monthlyData->sum(function ($m) {
+                return (float) str_replace(',', '', $m->realization_quantitative ?? 0);
+            });
+
+            //  Hitung Persentase Realisasi
+            $realisasi = $targetValue > 0 ? round(($totalRealisasi / $targetValue) * 100, 2) : 0;
+
+            $result[] = [
+                'no' => $no++,
+                'risk_owner' => $riskOwner,
+                'peristiwa_risiko' => $peristiwa,
+                'rencana_penanganan' => $rencana,
+                'waktu_pelaksanaan' => $waktuPelaksanaan,
+                'pic' => $pic,
+                'realisasi' => $realisasi . '%',
+            ];
+        }
+
+        return json(200, true, 'Task Realisasi Monitoring Mitigasi berhasil diambil', null, $result);
+
+    } catch (\Exception $e) {
+        return json(500, false, 'Terjadi kesalahan', $e->getMessage(), null);
+    }
+}
+
 }

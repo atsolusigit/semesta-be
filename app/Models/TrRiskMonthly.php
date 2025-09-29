@@ -51,6 +51,12 @@ class TrRiskMonthly extends Model
         'updated_at',
         'finalized_by',
         'entries',
+        'approval_status',
+        'approved_by',
+        'approved_at',
+        'rejected_by',
+        'rejected_at',
+        'rejection_note',
 
         'note_recommendation',
         'is_submitted_recommendation',

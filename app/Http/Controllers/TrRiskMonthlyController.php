@@ -1545,11 +1545,6 @@ public function getRecommendationMonths(Request $request, $headerId)
           ->orWhere('tr_risk_monthly.is_submitted_recommendation', true);
     });
 
-    // Kalau role 2 atau 3 → filter department
-    if (in_array($user->role_id, [2,3])) {
-        $monthlyQuery->where('tr_risk_monthly.department_id', $user->department_id);
-    }
-
     $data = $monthlyQuery->orderBy('m.id', 'asc')->orderBy('tr_risk_monthly.id', 'desc')->get()->map(function ($item) {
         // Status berdasarkan approval_status enum
         $status = $item->approval_status ?? 'pending';
@@ -1586,6 +1581,7 @@ public function getRecommendationMonths(Request $request, $headerId)
             'is_submitted'        => (bool) $item->is_submitted_recommendation,
             'submitted_by'        => $submitted_by_name,
             'submitted_at'        => $item->recommendation_submitted_at,
+            'recommendation_submitted_at' => $item->recommendation_submitted_at,
             'approval_status'     => $item->approval_status,
             'approved_by'         => $approved_by_name,
             'approved_at'         => $item->approved_at,

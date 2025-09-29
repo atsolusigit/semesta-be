@@ -1942,7 +1942,7 @@ public function getPendingApproval(Request $request)
             return json(403, false, 'Akses Ditolak', 'Department tidak valid untuk akses ini.', null);
         }
 
-        // Query untuk status submit
+        // Query tanpa filter status
         $query = TrRiskHeader::with([
             'irDampak:id,label',
             'irKemungkinan:id,label',
@@ -1951,7 +1951,7 @@ public function getPendingApproval(Request $request)
             'department:id,name',
             'optionTargetSatuTahun:id,name,position',
             'createdBy:id,username',
-        ])->where('status', 'submit');  // Hanya ambil yang statusnya 'submit'
+        ]);
 
         // Filter department berdasarkan role
         $query->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
@@ -2023,6 +2023,7 @@ public function getPendingApproval(Request $request)
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
                 'risk_status' => $riskHeader->status,
+                'desc' => clean_string($riskHeader->desc),
                 'created_at' => $riskHeader->created_at,
                 'created_by_name' => $createdByName,
                 'target_quantitative_satu_tahun' => format_target_quantitative($riskHeader->target_quantitative_satu_tahun),

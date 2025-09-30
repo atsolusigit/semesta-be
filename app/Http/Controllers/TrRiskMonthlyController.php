@@ -1514,6 +1514,10 @@ public function getRecommendationMonths(Request $request, $headerId)
         return $roleCheck;
     }
 
+    // Get approval_notes from tr_risk_header
+    $headerApprovalNotes = TrRiskHeader::where('id', $headerId)
+        ->value('approval_notes');
+
     $monthlyQuery = TrRiskMonthly::select(
         'tr_risk_monthly.id',
         'tr_risk_monthly.month',
@@ -1545,7 +1549,7 @@ public function getRecommendationMonths(Request $request, $headerId)
           ->orWhere('tr_risk_monthly.is_submitted_recommendation', true);
     });
 
-    $data = $monthlyQuery->orderBy('m.id', 'asc')->orderBy('tr_risk_monthly.id', 'desc')->get()->map(function ($item) {
+    $data = $monthlyQuery->orderBy('m.id', 'asc')->orderBy('tr_risk_monthly.id', 'desc')->get()->map(function ($item) use ($headerApprovalNotes) {
         // Status berdasarkan approval_status enum
         $status = $item->approval_status ?? 'pending';
         if (!$item->is_submitted_recommendation) {
@@ -1589,18 +1593,20 @@ public function getRecommendationMonths(Request $request, $headerId)
             'rejected_at'         => $item->rejected_at,
             'rejection_note'      => $item->rejection_note,
             'approval_notes'      => $item->approval_notes,
+            'header_approval_notes' => $headerApprovalNotes,
         ];
     });
 
     return json(200, true, 'Data Ditemukan', 'Daftar bulan rekomendasi berhasil diambil.', $data);
 }
 
+// Simpan note rekomendasi dan langsung submit(Yang digunakan sekarang)
 public function saveNoteRecommendation(Request $request, $id)
 {
     $user = Auth::user();
 
-    // Hanya role 1,2,4,5 yang boleh save (role 3 hanya GET)
-    $roleCheck = check_role($user, [1,2,4,5]);
+    // hanya role 1 dan 5 yang boleh simpan note rekomendasi
+    $roleCheck = check_role($user, [1,5]);
 
     if ($roleCheck !== true) {
         return $roleCheck;
@@ -1620,7 +1626,7 @@ public function saveNoteRecommendation(Request $request, $id)
         return json(403, false, 'Forbidden', 'Tidak punya akses untuk mengubah data departemen lain.', null);
     }
 
-    // PERUBAHAN: Pengecekan status yang lebih ketat
+    // Pengecekan status yang lebih ketat - hanya bisa diubah jika belum submit atau status rejected
     if ($monthly->is_submitted_recommendation && $monthly->approval_status !== 'rejected') {
         if ($monthly->approval_status === 'approved') {
             return json(400, false, 'Tidak Bisa Diubah', 'Rekomendasi bulan ini sudah disetujui dan tidak bisa diubah lagi.', null);
@@ -1632,28 +1638,34 @@ public function saveNoteRecommendation(Request $request, $id)
     $monthly->note_recommendation = $request->note_recommendation;
     $monthly->updated_by = $user->id;
 
+    // Langsung submit setelah save
+    $monthly->is_submitted_recommendation = true;
+    $monthly->recommendation_submitted_by = $user->id;
+    $monthly->recommendation_submitted_at = now();
+
     // Reset status jika sedang di-edit ulang setelah reject
     if ($monthly->approval_status === 'rejected') {
         $monthly->approval_status = 'pending';
         $monthly->rejected_by = null;
         $monthly->rejected_at = null;
         $monthly->rejection_note = null;
-        $monthly->is_submitted_recommendation = false;
-        $monthly->recommendation_submitted_by = null;
-        $monthly->recommendation_submitted_at = null;
+    } else if (!$monthly->approval_status || $monthly->approval_status === null) {
+        // Set status pending untuk data baru
+        $monthly->approval_status = 'pending';
     }
 
     $monthly->save();
 
-    return json(200, true, 'Berhasil', 'Catatan rekomendasi berhasil disimpan.', $monthly);
+    return json(200, true, 'Berhasil', 'Catatan rekomendasi berhasil disimpan dan disubmit. Menunggu review.', $monthly);
 }
 
+// Submit rekomendasi (opsi terpisah dari save note)
 public function submitRecommendation(Request $request, $id)
 {
     $user = Auth::user();
 
-    // Hanya role 1,2,4,5 yang boleh submit (role 3 tidak boleh)
-    $roleCheck = check_role($user, [1,2,4,5]);
+    // Hanya role 1 dan 5 yang boleh submit rekomendasi
+    $roleCheck = check_role($user, [1,5]);
     if ($roleCheck !== true) {
         return $roleCheck;
     }
@@ -1695,6 +1707,9 @@ public function submitRecommendation(Request $request, $id)
         $monthly->rejected_by = null;
         $monthly->rejected_at = null;
         $monthly->rejection_note = null;
+    } else if (!$monthly->approval_status || $monthly->approval_status === null) {
+        // Set status pending untuk data baru
+        $monthly->approval_status = 'pending';
     }
 
     $monthly->save();

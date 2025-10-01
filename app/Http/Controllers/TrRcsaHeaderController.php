@@ -30,6 +30,9 @@ class TrRcsaHeaderController extends Controller
             'updatedBy:id,username,id',
             'department:id,name',
         ])
+        ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+            $query->where('unit_kerja_id', $user->department_id);
+        })
         ->when($request->pilihan_sasaran, function ($query) use ($request) {
             $query->where('pilihan_sasaran', 'like', '%' . $request->pilihan_sasaran . '%');
         })
@@ -172,7 +175,8 @@ class TrRcsaHeaderController extends Controller
             'deskripsi_peristiwa_risiko' => 'required|string',
             'existing_control' => 'nullable|string',
             'hasil_yang_diharapkan_perusahaan' => 'required|string',
-            'inherent_eksposur_risiko_kualitatif' => 'required|string',
+            'kategori_dampak'=> 'required|numeric',
+            'inherent_eksposur_risiko_kualitatif' => 'required_if:kategori_dampak,1',
             'inherent_eksposur_risiko_kuantitatif' => 'required|numeric',
             'inherent_level_risiko' => 'required|string',
             'inherent_nilai_dampak' => 'required|numeric',
@@ -182,7 +186,6 @@ class TrRcsaHeaderController extends Controller
             'inherent_skala_risiko' => 'required|numeric',
             'jenis_existing_control'=> 'required|string',
             'jenis_program_dalam_rkap' => 'required|string',
-            'kategori_dampak'=> 'required|numeric',
             'kategori_risiko_bumn' => 'required|string',
             'kategori_risiko_t2_t3_kbumn' => 'required|string',
             'kategori_threshold_kri_aman' => 'required|string',
@@ -253,6 +256,11 @@ class TrRcsaHeaderController extends Controller
                 $data['unit_kerja_id'] = $currentUser->department_id;
             }
 
+            /* PIC */
+            if(!empty($request->input('pic'))){
+                $data['pic'] = $request->input('pic');
+            }
+            /* END PIC */
             $data['status'] = 'draft';
              
         
@@ -320,7 +328,8 @@ class TrRcsaHeaderController extends Controller
             return json(200, true, 'Berhasil Disimpan', $message, $responseData);
 
         } catch (\Throwable $th) {
-            //throw $th;
+            DB::rollBack();
+            return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
 
@@ -442,7 +451,40 @@ class TrRcsaHeaderController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $currentUser = auth()->user();
+
+        $RcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
+        // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+        $query->where('unit_kerja_id', $currentUser->department_id);
+        })->find($id);
+
+        if (!$RcsaHeader) {
+            return json(404, false, 'Data Tidak Ditemukan', 'RCSA tidak ditemukan.', null);
+        }
+
+        if ($RcsaHeader->status === 'approved') {
+            return json(403, false, 'Akses Ditolak', 'Semua data sudah terisi dan di-approve, tidak bisa dirubah lagi.', null);
+        }
+
+        if (in_array($currentUser->role_id, [2, 3])) {
+            if ($request->has('unit_kerja_id') && $request->input('unit_kerja_id') != $currentUser->department_id) {
+                return json(403, false, 'Akses Ditolak', 'Anda tidak dapat mengubah department_id ke department lain.', null);
+            }
+        }
+
+        $residual = TrRcsaResidual::where('rcsa_id', $id)->get();
+        
+        if (empty($residual)) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Data Residual tidak ditemukan.', null);
+        }
+
+        $RisikoList = TrRcsaRencanaRisikoList::where('rcsa_id', $id)->get();
+        if (!$RisikoList) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Data Rencana Risiko List tidak ditemukan.', null);
+        }
+            
+
+        return $this->RcsaUpdate($request, $RcsaHeader, $residual, $RisikoList);
     }
 
     /**
@@ -587,4 +629,213 @@ class TrRcsaHeaderController extends Controller
         ]);
         return json(200, true, 'Data Ditemukan', 'Data rcsa sasaran berhasil diambil.',$cleanData);
     }
+
+    private function RcsaUpdate(Request $request, $rcsaHeader, $residual, $RisikoList)
+    {
+         
+        $allowedFields = [
+            'asumsi_perhitungan_dampak',
+            'deskripsi_dampak',
+            'biaya_perlakuan_risiko',
+            'deskripsi_peristiwa_risiko',
+            'hasil_yang_diharapkan_perusahaan',
+            'inherent_eksposur_risiko_kualitatif',
+            'inherent_eksposur_risiko_kuantitatif',
+            'inherent_level_risiko',
+            'inherent_nilai_dampak',
+            'existing_control',
+            'inherent_nilai_probabilitas',
+            'inherent_skala_dampak',
+            'inherent_skala_probabilitas',
+            'inherent_skala_risiko',
+            'jenis_existing_control',
+            'jenis_program_dalam_rkap',
+            'kategori_dampak',
+            'kategori_risiko_bumn',
+            'kategori_risiko_t2_t3_kbumn',
+            'kategori_threshold_kri_aman',
+            'kategori_threshold_kri_bahaya',
+            'kategori_threshold_kri_hati_hati',
+            'keputusan_penetapan',
+            'key_risk_indicators',
+            'kode_bumn',
+            'nama_bumn',
+            'nilai_limit_risiko',
+            'nilai_risiko_yang_akan_timbul',
+            'opsi_perlakuan_risiko',
+            'output_perlakuan_risiko',
+            'penilaian_efektivitas_kontrol',
+            'penyebab_risiko',
+            'peristiwa_risiko',
+            'perkiraan_waktu_terpapar_risiko',
+            'pilihan_sasaran',
+            'pilihan_strategi',
+            'rencana_perlakuan_risiko',
+            'sasaran_kbumn',
+            'timeline_bulan_akhir',
+            'timeline_bulan_awal',
+            'unit_satuan_kri',
+            'unit_kerja_id',
+            'year'
+        ];
+
+         $validator = Validator::make($request->all(), [
+            'asumsi_perhitungan_dampak' =>'required|string',
+            'deskripsi_dampak' => 'required|string',
+            'biaya_perlakuan_risiko' => 'required|numeric',
+            'deskripsi_peristiwa_risiko' => 'required|string',
+            'existing_control' => 'nullable|string',
+            'hasil_yang_diharapkan_perusahaan' => 'required|string',
+            'kategori_dampak'=> 'required|numeric',
+            'inherent_eksposur_risiko_kualitatif' => 'required_if:kategori_dampak,1',
+            'inherent_eksposur_risiko_kuantitatif' => 'required|numeric',
+            'inherent_level_risiko' => 'required|string',
+            'inherent_nilai_dampak' => 'required|numeric',
+            'inherent_nilai_probabilitas' => 'required|numeric',
+            'inherent_skala_dampak' => 'required|numeric',
+            'inherent_skala_probabilitas' => 'required|numeric',
+            'inherent_skala_risiko' => 'required|numeric',
+            'jenis_existing_control'=> 'required|string',
+            'jenis_program_dalam_rkap' => 'required|string',
+            'kategori_risiko_bumn' => 'required|string',
+            'kategori_risiko_t2_t3_kbumn' => 'required|string',
+            'kategori_threshold_kri_aman' => 'required|string',
+            'kategori_threshold_kri_bahaya' => 'required|string',
+            'kategori_threshold_kri_hati_hati' => 'required|string',
+
+            'keputusan_penetapan' => 'required|numeric',
+            'key_risk_indicators' => 'required|string',
+            'kode_bumn' => 'required|string',
+            'nama_bumn' => 'required|string',
+            'nilai_limit_risiko' => 'required|string',
+            'nilai_risiko_yang_akan_timbul' => 'required|string',
+
+            'opsi_perlakuan_risiko' => 'required|string',
+            'output_perlakuan_risiko' => 'required|string',
+            'penilaian_efektivitas_kontrol' => 'required|string',
+            'penyebab_risiko' => 'required|string',
+            'peristiwa_risiko' => 'required|string',
+            'perkiraan_waktu_terpapar_risiko' => 'required|string',
+            'pic' => 'nullable|string',
+            'pilihan_sasaran' => 'required|string',
+            'pilihan_strategi'=> 'required|string',
+            'rencana_perlakuan_risiko' => 'required|string',
+            'sasaran_kbumn' => 'required|string',
+            'timeline_bulan_akhir' => 'required|date',
+            // 'timeline_bulan_awal' => 'required|date',
+            // 'unit_satuan_kri' => 'required|string',
+            'unit_kerja_id' => 'required|numeric',
+            'year'=> 'required|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        }
+
+        $currentUser = auth()->user();
+        $dataResidual = (array) $request->input('dataResidual');
+        $dataRisikoList = (array) $request->input('dataRisikoList');
+        // dd($dataResidual);
+        try {
+            DB::beginTransaction();
+
+          //Residual
+            foreach ($dataResidual as $itemRes) {
+                TrRcsaResidual::where('id',$itemRes['id'])
+                ->where('rcsa_id', $itemRes['rcsa_id'])
+                ->update([
+                    'kuartal' => $itemRes['kuartal'],
+                    'residual_skala_dampak' => $itemRes['residual_skala_dampak'],
+                    'residual_nilai_dampak' => $itemRes['residual_nilai_dampak'],
+                    'residual_skala_probabilitas' => $itemRes['residual_skala_probabilitas'],
+                    'residual_nilai_probabilitas' => $itemRes['residual_nilai_probabilitas'],
+                    'residual_eksposur_risiko_kuantitatif' => $itemRes['residual_eksposur_risiko_kuantitatif'],
+                    'residual_eksposur_risiko_kualitatif' => $itemRes['residual_eksposur_risiko_kualitatif'],
+                    'residual_skala_risiko' => $itemRes['residual_skala_risiko'],
+                    'residual_level_risiko' => $itemRes['residual_level_risiko']
+                ]);
+            }
+
+            //RisikoList
+            foreach ($dataRisikoList as $itemReq) {
+                TrRcsaRencanaRisikoList::where('id',$itemReq['id'])
+                ->where('rcsa_id', $itemReq['rcsa_id'])
+                ->update([
+                    'jenis_rencana_perlakuan_risiko' => $itemReq['jenis_rencana_perlakuan_risiko']
+                ]);
+            }
+
+            // HANYA AMBIL DATA YANG DIIZINKAN
+            $updateData = [];
+            foreach ($allowedFields as $field) {
+                if ($request->has($field)) {
+                    $updateData[$field] = $request->input($field);
+                }
+            }
+
+            $updateData['updated_by'] = auth()->id();
+
+            // Superadmin (role 1) boleh ubah departemen dari request
+            if ($currentUser->role_id == 1) {
+                if ($request->has('unit_kerja_id')) {
+                    $updateData['unit_kerja_id'] = $request->input('unit_kerja_id');
+                }
+            } else {
+                // Role lain (2, 3) selalu pakai department_id user
+                $updateData['unit_kerja_id'] = $currentUser->department_id;
+            }
+
+            /* PIC */
+            if(!empty($request->input('pic'))){
+                $updateData['pic'] = $request->input('pic');
+            }
+            /* END PIC */
+        
+           $rcsaHeader->update($updateData);
+           
+           DB::commit();
+           $rcsaHeader->refresh();
+           $rcsaHeader->load([
+                'department:id,name',
+                'createdBy:id,username',
+            ]);
+
+           $createdByName = 'Unknown User';
+            try {
+                $createdByName = get_decrypted_name($rcsaHeader->createdBy);
+            } catch (\Throwable $e) {
+                \Log::warning("Error handling createdBy: {$e->getMessage()}");
+            }
+            
+            $responseData = [
+                'id' => $rcsaHeader->id,
+                'pilihan_sasaran' => clean_string($rcsaHeader->pilihan_sasaran),
+                'pilihan_strategi' => clean_string($rcsaHeader->pilihan_strategi),
+                'asumsi_perhitungan_dampak' => clean_string($rcsaHeader->asumsi_perhitungan_dampak),
+                'deskripsi_dampak' => clean_string($rcsaHeader->deskripsi_dampak),
+                'biaya_perlakuan_risiko' => clean_string($rcsaHeader->biaya_perlakuan_risiko),
+                'deskripsi_peristiwa_risiko' => clean_string($rcsaHeader->deskripsi_peristiwa_risiko),
+                'existing_control' => clean_string($rcsaHeader->existing_control),
+                'inherent_nilai_probabilitas' => clean_string($rcsaHeader->inherent_nilai_probabilitas),
+                'inherent_skala_dampak' => clean_string($rcsaHeader->inherent_skala_dampak),
+                'inherent_skala_probabilitas' => clean_string($rcsaHeader->inherent_skala_probabilitas),
+                'inherent_skala_risiko' => clean_string($rcsaHeader->inherent_skala_risiko),
+                'jenis_existing_control' => clean_string($rcsaHeader->jenis_existing_control),
+                'department_id' => $rcsaHeader->unit_kerja_id,
+                'status' => $rcsaHeader->status,
+                'year' => $rcsaHeader->year,
+                'updated_at' => $rcsaHeader->updated_at,
+                'created_at' => $rcsaHeader->created_at,
+                'created_by' => $rcsaHeader->created_by,
+                'created_by_name' => $createdByName
+            ];
+
+            return json(200, true, 'Berhasil Diupdate', 'Data draft berhasil diupdate. Silakan submit data ketika sudah siap untuk proses approval.', $responseData);
+
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $e->getMessage());
+        }
+    }
+    
 }

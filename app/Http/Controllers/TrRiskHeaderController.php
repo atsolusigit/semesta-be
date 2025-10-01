@@ -2051,6 +2051,7 @@ public function getPendingApproval(Request $request)
                 'created_by_name' => $createdByName,
                 'target_quantitative_satu_tahun' => format_target_quantitative($riskHeader->target_quantitative_satu_tahun),
                 'biaya_perlakuan_risiko' => number_format($riskHeader->biaya_perlakuan_risiko ?? 0, 0, ',', '.'),
+                'notes' => $riskHeader->approval_notes,
             ];
         });
 
@@ -2388,7 +2389,7 @@ public function getRejectedData(Request $request)
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
                 'risk_status' => $riskHeader->status,
-                'approval_notes' => clean_string($riskHeader->approval_notes),
+                'notes' => clean_string($riskHeader->approval_notes),
                 'rejected_by' => $riskHeader->approved_by,
                 'rejected_by_name' => $approvedByName,
                 'rejected_at' => $riskHeader->approved_at,

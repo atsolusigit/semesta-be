@@ -285,6 +285,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/approval/{id}', [MstApprovalController::class, 'destroy']);                     // Hapus approval (role 1)
 });
 
+// ===================== MST MONTH RECOMMENDATION =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/month-recommendation', [MstMonthRecommendationController::class, 'index']);                          // List all month recommendations (semua role)
     Route::post('/month-recommendation', [MstMonthRecommendationController::class, 'store']);                         // Tambah month recommendation (role 1,2)
@@ -317,4 +318,5 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->post('/
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'destroy']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'show']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-sasaran', [TrRcsaHeaderController::class, 'sasaran']);
+
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->put('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'update']);

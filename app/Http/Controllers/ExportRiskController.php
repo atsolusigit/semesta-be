@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class ExportRiskController extends Controller
 {
+    private $colorMap = [];
+
     public function export(Request $request, $format)
     {
         // Validasi format yang didukung
@@ -60,7 +62,8 @@ class ExportRiskController extends Controller
                     'realization_note',
                     'status_risiko',
                     'start_date',
-                    'month'
+                    'month',
+                    'note_recommendation'
                 ]);
 
                 if (!empty($filterYear)) {
@@ -219,7 +222,8 @@ class ExportRiskController extends Controller
         'departmentName' => $departmentName,
         'riskRegisterData' => $riskExportData,
         'monitoringData' => $monitoringData,
-        'heatmapData' => $heatmapData
+        'heatmapData' => $heatmapData,
+        'colorMap' => $this->getColorMapping()
     ]);
 
     $pdf->setPaper('A4', 'landscape');
@@ -285,11 +289,9 @@ class ExportRiskController extends Controller
                 'status_risiko' => '',
             ];
         } else {
-            // PERBAIKAN: Gunakan formatTargetBulan dan formatRealizationBulan
             $targetBulan = $this->formatTargetBulan($monthly);
             $realisasiBulan = $this->formatRealizationBulan($monthly);
 
-            // Hitung persentase
             $target = $monthly->target_quantitative ?? 0;
             $realization = $monthly->realization_quantitative ?? 0;
 
@@ -302,7 +304,6 @@ class ExportRiskController extends Controller
             $monthlyData = $monthly;
         }
 
-        // PERBAIKAN: Format target 1 tahun menggunakan method formatTarget
         $target1Tahun = $this->formatTarget(
             $header->target_quantitative_satu_tahun ?? 0,
             $header->target_kualitatif_satu_tahun ?? ''
@@ -338,12 +339,12 @@ class ExportRiskController extends Controller
             'biaya_perlakuan' => $this->formatCurrency($header->biaya_perlakuan_risiko ?? 0),
             'status_risiko' => $monthlyData->status_risiko ?? '',
             'realization_note' => $monthlyData->realization_note ?? '',
+            'note_recommendation' => $monthlyData->note_recommendation ?? '',
         ];
     }
 
     return $data;
 }
-
 
     /**
      * Prepare data untuk Monitoring PDF
@@ -740,7 +741,8 @@ private function formatTarget($quantitative, $qualitative)
                         'residual_risk_posisi_risiko',
                         'residual_risk_level_risiko',
                         'start_date',
-                        'month'
+                        'month',
+                        'note_recommendation',
                     ]);
 
                     if (!empty($filterYear)) {
@@ -826,4 +828,39 @@ private function formatTarget($quantitative, $qualitative)
             ], 500);
         }
     }
+
+    /**
+ * Get risk color based on position PDF
+ */
+private function getRiskColorByPosition($posisi)
+{
+    // Convert posisi ke integer
+    $posisi = (int)$posisi;
+
+    // Load color map jika belum
+    if (empty($this->colorMap)) {
+        $this->colorMap = $this->getColorMapping();
+    }
+
+    // Cek di colorMap yang sudah di-load dari database
+    if (isset($this->colorMap[$posisi])) {
+        return $this->colorMap[$posisi]['color'];
+    }
+
+    // Fallback manual berdasarkan range dari database
+    if ($posisi >= 1 && $posisi <= 5) {
+        return '#00B050'; // Low - Hijau
+    } elseif ($posisi >= 6 && $posisi <= 11) {
+        return '#62b334'; // Low To Moderate - Hijau Muda
+    } elseif ($posisi >= 12 && $posisi <= 15) {
+        return '#d2da15'; // Moderate - Kuning
+    } elseif ($posisi >= 16 && $posisi <= 19) {
+        return '#FFC000'; // Moderate To High - Orange
+    } elseif ($posisi >= 20 && $posisi <= 25) {
+        return '#FF0000'; // High - Merah
+    }
+
+    // Default putih jika tidak ada match
+    return '#FFFFFF';
+}
 }

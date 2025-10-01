@@ -317,3 +317,4 @@ Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->post('/
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'destroy']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'show']);
 Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-sasaran', [TrRcsaHeaderController::class, 'sasaran']);
+Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->put('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'update']);

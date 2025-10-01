@@ -1950,7 +1950,7 @@ public function getPendingApproval(Request $request)
             'rrKemungkinan:id,label',
             'department:id,name',
             'optionTargetSatuTahun:id,name,position',
-            'createdBy:id,username',
+            'createdBy:id,name',
         ]);
 
         // Filter department berdasarkan role
@@ -1969,18 +1969,41 @@ public function getPendingApproval(Request $request)
             $query->where('department_id', $request->department_id);
         }
 
+        // Filter berdasarkan tahun
+        if ($request->has('year') && $request->year) {
+            $query->where('year', $request->year);
+        }
+
+        // Filter pencarian
+        if ($request->has('search') && $request->search) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('jenis_risiko', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('sasaran', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('peristiwa_risiko', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('penyebab_risiko', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('dampak_risiko', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('internal_control', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('mitigasi', 'like', '%' . $searchTerm . '%')
+                    ->orWhereHas('department', function ($q) use ($searchTerm) {
+                        $q->where('name', 'like', '%' . $searchTerm . '%');
+                    })
+                    ->orWhereHas('createdBy', function ($q) use ($searchTerm) {
+                        $q->whereRaw("CAST(AES_DECRYPT(name, CONCAT('SM', id)) AS CHAR) LIKE ?", ['%' . $searchTerm . '%']);
+                    });
+            });
+        }
+
         \Log::info('Pending approval query', [
             'sql' => $query->toSql(),
             'bindings' => $query->getBindings()
         ]);
 
-        if ($request->has('year') && $request->year) {
-            $query->where('year', $request->year);
-        }
+        // Pagination
+        $perPage = $request->has('per_page') ? (int)$request->per_page : 10;
+        $pendingData = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
-        $pendingData = $query->orderBy('created_at', 'desc')->get();
-
-        $responseData = $pendingData->map(function ($riskHeader) {
+        $responseData = $pendingData->getCollection()->map(function ($riskHeader) {
             $createdByName = 'Unknown User';
             try {
                 $createdByName = get_decrypted_name($riskHeader->createdBy);
@@ -2031,7 +2054,18 @@ public function getPendingApproval(Request $request)
             ];
         });
 
-        return json(200, true, 'Data Berhasil Diambil', 'Data pending approval berhasil diambil.', $responseData);
+        // Format response dengan pagination
+        $paginationData = [
+            'data' => $responseData,
+            'current_page' => $pendingData->currentPage(),
+            'last_page' => $pendingData->lastPage(),
+            'per_page' => $pendingData->perPage(),
+            'total' => $pendingData->total(),
+            'from' => $pendingData->firstItem(),
+            'to' => $pendingData->lastItem(),
+        ];
+
+        return json(200, true, 'Data Berhasil Diambil', 'Data pending approval berhasil diambil.', $paginationData);
 
     } catch (\Exception $e) {
         return json(500, false, 'Gagal Mengambil Data', 'Terjadi kesalahan sistem.', $e->getMessage());
@@ -2538,7 +2572,7 @@ public function destroy($id)
     }
 }
 
-public function getTaskRealisasiMonitoring()
+public function getTaskRealisasiMonitoring(Request $request)
 {
     try {
         $user = \Auth::user();
@@ -2547,7 +2581,8 @@ public function getTaskRealisasiMonitoring()
             'department:id,name',
             'monthlyData' => function ($q) {
                 $q->where('is_finalize', true);
-            }
+            },
+            'createdBy:id,name'
         ]);
 
         // Role 2 dan 3 hanya bisa melihat data department mereka
@@ -2556,10 +2591,32 @@ public function getTaskRealisasiMonitoring()
         }
         // Role 1,4,5 bisa melihat semua data (tidak ada filter)
 
-        $headers = $query->get();
+        // Filter pencarian
+        if ($request->has('search') && $request->search) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('peristiwa_risiko', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('mitigasi', 'like', '%' . $searchTerm . '%')
+                    ->orWhereHas('department', function ($q) use ($searchTerm) {
+                        $q->where('name', 'like', '%' . $searchTerm . '%');
+                    })
+                    ->orWhereHas('createdBy', function ($q) use ($searchTerm) {
+                        $q->whereRaw("CAST(AES_DECRYPT(name, CONCAT('SM', id)) AS CHAR) LIKE ?", ['%' . $searchTerm . '%']);
+                    });
+            });
+        }
+
+        // Filter berdasarkan tahun
+        if ($request->has('year') && $request->year) {
+            $query->where('year', $request->year);
+        }
+
+        // Pagination
+        $perPage = $request->has('per_page') ? (int)$request->per_page : 10;
+        $headers = $query->paginate($perPage);
 
         $result = [];
-        $no = 1;
+        $no = ($headers->currentPage() - 1) * $headers->perPage() + 1;
 
         foreach ($headers as $header) {
             // Risk Owner
@@ -2613,7 +2670,18 @@ public function getTaskRealisasiMonitoring()
             ];
         }
 
-        return json(200, true, 'Task Realisasi Monitoring Mitigasi berhasil diambil', null, $result);
+        // Format response dengan pagination
+        $paginationData = [
+            'data' => $result,
+            'current_page' => $headers->currentPage(),
+            'last_page' => $headers->lastPage(),
+            'per_page' => $headers->perPage(),
+            'total' => $headers->total(),
+            'from' => $headers->firstItem(),
+            'to' => $headers->lastItem(),
+        ];
+
+        return json(200, true, 'Task Realisasi Monitoring Mitigasi berhasil diambil', null, $paginationData);
 
     } catch (\Exception $e) {
         return json(500, false, 'Terjadi kesalahan', $e->getMessage(), null);

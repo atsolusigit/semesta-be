@@ -735,16 +735,51 @@ private function buildDataRows(): array
         $sheet->getStyle($currencyRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
     }
 
-    /**
-     * Apply colors to risk level column - Tetap di kolom P
-     */
-    private function applyRiskLevelColors(Worksheet $sheet): void
-    {
-        $rowIndex = self::DATA_START_ROW;
 
-        foreach ($this->headers as $header) {
-            $levelRisiko = $header->residual_target_level_risiko ?? '';
-            $color = $this->getRiskColor($levelRisiko);
+    /**
+ * Get risk color based on position
+ */
+private function getRiskColorByPosition($posisi): string
+{
+    // Convert posisi ke integer
+    $posisi = (int)$posisi;
+
+    // Cek di colorMap yang sudah di-load dari database
+    if (isset($this->colorMap[$posisi])) {
+        return ltrim($this->colorMap[$posisi]['color'], '#');
+    }
+
+    // Fallback manual berdasarkan range dari database
+    if ($posisi >= 1 && $posisi <= 5) {
+        return '00B050'; // Low - Hijau
+    } elseif ($posisi >= 6 && $posisi <= 11) {
+        return '62b334'; // Low To Moderate - Hijau Muda
+    } elseif ($posisi >= 12 && $posisi <= 15) {
+        return 'd2da15'; // Moderate - Kuning
+    } elseif ($posisi >= 16 && $posisi <= 19) {
+        return 'FFC000'; // Moderate To High - Orange
+    } elseif ($posisi >= 20 && $posisi <= 25) {
+        return 'FF0000'; // High - Merah
+    }
+
+    // Default putih jika tidak ada match
+    return 'FFFFFF';
+}
+
+   /**
+ * Apply colors to risk level column - MENGGUNAKAN POSISI RISIKO
+ */
+private function applyRiskLevelColors(Worksheet $sheet): void
+{
+    $rowIndex = self::DATA_START_ROW;
+
+    foreach ($this->headers as $header) {
+        // GUNAKAN POSISI RISIKO untuk color mapping (bukan level risiko string)
+        $posisiRisiko = $header->residual_target_posisi_risiko ?? 0;
+
+        // Hanya apply color jika posisi > 0
+        if ($posisiRisiko > 0) {
+            $color = $this->getRiskColorByPosition($posisiRisiko);
 
             // Apply color ke kolom P (Level Risiko)
             $sheet->getStyle("P{$rowIndex}")->applyFromArray([
@@ -753,10 +788,11 @@ private function buildDataRows(): array
                     'startColor' => ['argb' => 'FF' . $color]
                 ]
             ]);
-
-            $rowIndex++;
         }
+
+        $rowIndex++;
     }
+}
 
     /**
      * Set row heights

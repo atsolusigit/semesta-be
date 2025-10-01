@@ -87,12 +87,12 @@
         }
 
         /* Warnai otomatis sel level risiko berdasarkan data-level (tanpa ubah HTML) */
-        .risk-level-cell { font-weight: bold; }
+        /* .risk-level-cell { font-weight: bold; }
         .risk-level-cell[data-level="Low"]               { background-color: #00B050; color: #000; }
         .risk-level-cell[data-level="Low to Moderate"]   { background-color: #92D050; color: #000; }
         .risk-level-cell[data-level="Moderate"]          { background-color: #FFFF00; color: #000; }
         .risk-level-cell[data-level="Moderate to High"]  { background-color: #FFC000; color: #000; }
-        .risk-level-cell[data-level="High"]              { background-color: #FF0000; color: #fff; }
+        .risk-level-cell[data-level="High"]              { background-color: #FF0000; color: #fff; } */
 
         /* ==== Monitoring ==== */
         .monitoring-table th { height: 35px; }
@@ -243,182 +243,307 @@
     </style>
 </head>
 <body>
-    <!-- HALAMAN 1: RISK REGISTER -->
-    <div class="header-section">
-        <div class="header-title">KERTAS KERJA RISK REGISTER</div>
-        <div class="header-subtitle">PT. KAWASAN BERIKAT NUSANTARA</div>
-        <div class="header-info">UNIT KERJA : {{ $headers->first()->department->name ?? 'TIDAK DIKETAHUI' }}</div>
-        <div class="header-info">PERIODE : BULAN {{ strtoupper($monthName) }} {{ $year }}</div>
-    </div>
+      <!-- HALAMAN 1A: RISK REGISTER - BAGIAN 1 -->
+<div class="header-section">
+    <div class="header-title">KERTAS KERJA RISK REGISTER - BAGIAN 1</div>
+    <div class="header-subtitle">PT. KAWASAN BERIKAT NUSANTARA</div>
+    <div class="header-info">UNIT KERJA : {{ $headers->first()->department->name ?? 'TIDAK DIKETAHUI' }}</div>
+    <div class="header-info">PERIODE : BULAN {{ strtoupper($monthName) }} {{ $year }}</div>
+</div>
 
-    <table class="risk-register-table">
-        <thead>
-            <tr>
-                <th rowspan="2" class="col-no">NO</th>
-                <th rowspan="2" class="col-code">KODE RISIKO</th>
-                <th rowspan="2" class="col-type">JENIS RISIKO</th>
-                <th rowspan="2" class="col-target">SASARAN</th>
-                <th rowspan="2" class="col-event">PERISTIWA RISIKO</th>
-                <th rowspan="2" class="col-cause">PENYEBAB RISIKO</th>
-                <th rowspan="2" class="col-impact">DAMPAK RISIKO</th>
-                <th colspan="4">INHERENT RISK</th>
-                <th rowspan="2" class="col-control">INTERNAL CONTROL</th>
-                <th rowspan="2" class="col-amount">TARGET s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th rowspan="2" class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th rowspan="2" class="col-percent">% s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th colspan="4">RESIDUAL RISK</th>
-                <th rowspan="2" class="col-amount">TARGET 1 TAHUN</th>
-                <th rowspan="2" class="col-amount">REALISASI S/D BULAN {{ strtoupper($monthName) }}</th>
-                <th colspan="4">RESIDUAL RISK</th>
-                <th rowspan="2" class="col-treatment">PERLAKUAN RISIKO (MITIGASI)</th>
-                <th rowspan="2" class="col-amount">BIAYA PERLAKUAN RISIKO</th>
-                <th colspan="4">RESIDUAL TARGET</th>
-                <th rowspan="2" class="col-status">STATUS RISIKO</th>
-            </tr>
-            <tr>
-                <th class="col-level">DAMPAK</th>
-                <th class="col-level">KEMUNGKINAN</th>
-                <th class="col-level">POSISI RISIKO</th>
-                <th class="col-level">LEVEL RISIKO</th>
-                <th class="col-level">DAMPAK</th>
-                <th class="col-level">KEMUNGKINAN</th>
-                <th class="col-level">POSISI RISIKO</th>
-                <th class="col-level">LEVEL RISIKO</th>
-                <th class="col-level">DAMPAK</th>
-                <th class="col-level">KEMUNGKINAN</th>
-                <th class="col-level">POSISI RISIKO</th>
-                <th class="col-level">LEVEL RISIKO</th>
-                <th class="col-level">DAMPAK</th>
-                <th class="col-level">KEMUNGKINAN</th>
-                <th class="col-level">POSISI RISIKO</th>
-                <th class="col-level">LEVEL RISIKO</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($riskRegisterData as $row)
-            <tr>
-                <td class="text-center">{{ $row['no'] }}</td>
-                <td class="text-center">{{ $row['risk_code'] }}</td>
-                <td class="text-left">{{ $row['jenis_risiko'] }}</td>
-                <td class="text-left">{{ $row['sasaran'] }}</td>
-                <td class="text-left">{{ $row['peristiwa_risiko'] }}</td>
-                <td class="text-left">{{ $row['penyebab_risiko'] }}</td>
-                <td class="text-left">{{ $row['dampak_risiko'] }}</td>
-                <td class="text-center">{{ $row['inherent_risk_level_dampak'] }}</td>
-                <td class="text-center">{{ $row['inherent_risk_level_kemungkinan'] }}</td>
-                <td class="text-center">{{ $row['inherent_risk_posisi_risiko'] }}</td>
-                <td class="text-center risk-level-cell" data-level="{{ $row['inherent_risk_level_risiko'] }}">{{ $row['inherent_risk_level_risiko'] }}</td>
-                <td class="text-left">{{ $row['internal_control'] }}</td>
-                <td class="text-center">{{ $row['target_bulan'] }}</td>
-                <td class="text-center">{{ $row['realisasi_bulan'] }}</td>
-                <td class="text-center">{{ $row['percentage'] }}</td>
-                <td class="text-center">{{ $row['residual_risk_level_dampak'] }}</td>
-                <td class="text-center">{{ $row['residual_risk_level_kemungkinan'] }}</td>
-                <td class="text-center">{{ $row['residual_risk_posisi_risiko'] }}</td>
-                <td class="text-center risk-level-cell" data-level="{{ $row['residual_risk_level_risiko'] }}">{{ $row['residual_risk_level_risiko'] }}</td>
-                <td class="text-left">{{ $row['target_1_tahun'] }}</td>
-                <td class="text-center">{{ $row['realisasi_duplicate'] }}</td>
-                <td class="text-center">{{ $row['residual_target_level_dampak'] }}</td>
-                <td class="text-center">{{ $row['residual_target_level_kemungkinan'] }}</td>
-                <td class="text-center">{{ $row['residual_target_posisi_risiko'] }}</td>
-                <td class="text-center risk-level-cell" data-level="{{ $row['residual_target_level_risiko'] }}">{{ $row['residual_target_level_risiko'] }}</td>
-                <td class="text-left">{{ $row['perlakuan_risiko'] }}</td>
-                <td class="text-right">{{ $row['biaya_perlakuan'] }}</td>
-                <td class="text-center">{{ $row['residual_target_level_dampak'] }}</td>
-                <td class="text-center">{{ $row['residual_target_level_kemungkinan'] }}</td>
-                <td class="text-center">{{ $row['residual_target_posisi_risiko'] }}</td>
-                <td class="text-center risk-level-cell" data-level="{{ $row['residual_target_level_risiko'] }}">{{ $row['residual_target_level_risiko'] }}</td>
-                <td class="text-center">{{ $row['status_risiko'] }}</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
+<table class="risk-register-table">
+    <thead>
+        <tr>
+            <th rowspan="2" class="col-no">NO</th>
+            <th rowspan="2" class="col-code">KODE RISIKO</th>
+            <th rowspan="2" class="col-type">JENIS RISIKO</th>
+            <th rowspan="2" class="col-target">SASARAN</th>
+            <th rowspan="2" class="col-event">PERISTIWA RISIKO</th>
+            <th rowspan="2" class="col-cause">PENYEBAB RISIKO</th>
+            <th rowspan="2" class="col-impact">DAMPAK RISIKO</th>
+            <th colspan="4">INHERENT RISK</th>
+            <th rowspan="2" class="col-control">INTERNAL CONTROL</th>
+            <th rowspan="2" class="col-amount">TARGET s/d BULAN {{ strtoupper($monthName) }}</th>
+            <th rowspan="2" class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
+            <th rowspan="2" class="col-percent">% s/d BULAN {{ strtoupper($monthName) }}</th>
+            <th colspan="4">RESIDUAL RISK</th>
+            <th rowspan="2" class="col-amount">TARGET 1 TAHUN</th>
+        </tr>
+        <tr>
+            <th class="col-level">DAMPAK</th>
+            <th class="col-level">KEMUNGKINAN</th>
+            <th class="col-level">POSISI RISIKO</th>
+            <th class="col-level">LEVEL RISIKO</th>
+            <th class="col-level">DAMPAK</th>
+            <th class="col-level">KEMUNGKINAN</th>
+            <th class="col-level">POSISI RISIKO</th>
+            <th class="col-level">LEVEL RISIKO</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($riskRegisterData as $row)
+        <tr>
+            <td class="text-center">{{ $row['no'] }}</td>
+            <td class="text-center">{{ $row['risk_code'] }}</td>
+            <td class="text-left">{{ $row['jenis_risiko'] }}</td>
+            <td class="text-left">{{ $row['sasaran'] }}</td>
+            <td class="text-left">{{ $row['peristiwa_risiko'] }}</td>
+            <td class="text-left">{{ $row['penyebab_risiko'] }}</td>
+            <td class="text-left">{{ $row['dampak_risiko'] }}</td>
+            <td class="text-center">{{ $row['inherent_risk_level_dampak'] }}</td>
+            <td class="text-center">{{ $row['inherent_risk_level_kemungkinan'] }}</td>
+            <td class="text-center">{{ $row['inherent_risk_posisi_risiko'] }}</td>
+            @php
+                $inherentColor = '#FFFFFF';
+                if (!empty($row['inherent_risk_posisi_risiko'])) {
+                    $posisi = (int)$row['inherent_risk_posisi_risiko'];
+                    if (isset($colorMap[$posisi])) {
+                        $inherentColor = $colorMap[$posisi]['color'];
+                    } elseif ($posisi >= 1 && $posisi <= 5) {
+                        $inherentColor = '#00B050';
+                    } elseif ($posisi >= 6 && $posisi <= 11) {
+                        $inherentColor = '#62b334';
+                    } elseif ($posisi >= 12 && $posisi <= 15) {
+                        $inherentColor = '#d2da15';
+                    } elseif ($posisi >= 16 && $posisi <= 19) {
+                        $inherentColor = '#FFC000';
+                    } elseif ($posisi >= 20 && $posisi <= 25) {
+                        $inherentColor = '#FF0000';
+                    }
+                }
+            @endphp
+            <td class="text-center" style="background-color: {{ $inherentColor }}; font-weight: bold;">{{ $row['inherent_risk_level_risiko'] }}</td>
+            <td class="text-left">{{ $row['internal_control'] }}</td>
+            <td class="text-center">{{ $row['target_bulan'] }}</td>
+            <td class="text-center">{{ $row['realisasi_bulan'] }}</td>
+            <td class="text-center">{{ $row['percentage'] }}</td>
+            <td class="text-center">{{ $row['residual_risk_level_dampak'] }}</td>
+            <td class="text-center">{{ $row['residual_risk_level_kemungkinan'] }}</td>
+            <td class="text-center">{{ $row['residual_risk_posisi_risiko'] }}</td>
+            @php
+                $residualColor = '#FFFFFF';
+                if (!empty($row['residual_risk_posisi_risiko'])) {
+                    $posisi = (int)$row['residual_risk_posisi_risiko'];
+                    if (isset($colorMap[$posisi])) {
+                        $residualColor = $colorMap[$posisi]['color'];
+                    } elseif ($posisi >= 1 && $posisi <= 5) {
+                        $residualColor = '#00B050';
+                    } elseif ($posisi >= 6 && $posisi <= 11) {
+                        $residualColor = '#62b334';
+                    } elseif ($posisi >= 12 && $posisi <= 15) {
+                        $residualColor = '#d2da15';
+                    } elseif ($posisi >= 16 && $posisi <= 19) {
+                        $residualColor = '#FFC000';
+                    } elseif ($posisi >= 20 && $posisi <= 25) {
+                        $residualColor = '#FF0000';
+                    }
+                }
+            @endphp
+            <td class="text-center" style="background-color: {{ $residualColor }}; font-weight: bold;">{{ $row['residual_risk_level_risiko'] }}</td>
+            <td class="text-left">{{ $row['target_1_tahun'] }}</td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+
+<!-- HALAMAN 1B: RISK REGISTER - BAGIAN 2 -->
+<div class="page-break"></div>
+
+<div class="header-section">
+    <div class="header-title">KERTAS KERJA RISK REGISTER - BAGIAN 2</div>
+    <div class="header-subtitle">PT. KAWASAN BERIKAT NUSANTARA</div>
+    <div class="header-info">UNIT KERJA : {{ $headers->first()->department->name ?? 'TIDAK DIKETAHUI' }}</div>
+    <div class="header-info">PERIODE : BULAN {{ strtoupper($monthName) }} {{ $year }}</div>
+</div>
+
+<table class="risk-register-table">
+    <thead>
+        <tr>
+            <th rowspan="2" class="col-no">NO</th>
+            <th rowspan="2" class="col-code">KODE RISIKO</th>
+            <th rowspan="2" class="col-amount">REALISASI S/D BULAN {{ strtoupper($monthName) }}</th>
+            <th colspan="4">RESIDUAL RISK</th>
+            <th rowspan="2" class="col-treatment">PERLAKUAN RISIKO (MITIGASI)</th>
+            <th rowspan="2" class="col-amount">BIAYA PERLAKUAN RISIKO</th>
+            <th colspan="4">RESIDUAL TARGET</th>
+            <th rowspan="2" class="col-status">STATUS RISIKO</th>
+            <th rowspan="2" class="col-recommendation">REKOMENDASI</th>
+        </tr>
+        <tr>
+            <th class="col-level">DAMPAK</th>
+            <th class="col-level">KEMUNGKINAN</th>
+            <th class="col-level">POSISI RISIKO</th>
+            <th class="col-level">LEVEL RISIKO</th>
+            <th class="col-level">DAMPAK</th>
+            <th class="col-level">KEMUNGKINAN</th>
+            <th class="col-level">POSISI RISIKO</th>
+            <th class="col-level">LEVEL RISIKO</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($riskRegisterData as $row)
+        <tr>
+            <td class="text-center">{{ $row['no'] }}</td>
+            <td class="text-center">{{ $row['risk_code'] }}</td>
+            <td class="text-center">{{ $row['realisasi_duplicate'] }}</td>
+            <td class="text-center">{{ $row['residual_risk_level_dampak'] }}</td>
+            <td class="text-center">{{ $row['residual_risk_level_kemungkinan'] }}</td>
+            <td class="text-center">{{ $row['residual_risk_posisi_risiko'] }}</td>
+            @php
+                $residualColor = '#FFFFFF';
+                if (!empty($row['residual_risk_posisi_risiko'])) {
+                    $posisi = (int)$row['residual_risk_posisi_risiko'];
+                    if (isset($colorMap[$posisi])) {
+                        $residualColor = $colorMap[$posisi]['color'];
+                    } elseif ($posisi >= 1 && $posisi <= 5) {
+                        $residualColor = '#00B050';
+                    } elseif ($posisi >= 6 && $posisi <= 11) {
+                        $residualColor = '#62b334';
+                    } elseif ($posisi >= 12 && $posisi <= 15) {
+                        $residualColor = '#d2da15';
+                    } elseif ($posisi >= 16 && $posisi <= 19) {
+                        $residualColor = '#FFC000';
+                    } elseif ($posisi >= 20 && $posisi <= 25) {
+                        $residualColor = '#FF0000';
+                    }
+                }
+            @endphp
+            <td class="text-center" style="background-color: {{ $residualColor }}; font-weight: bold;">{{ $row['residual_risk_level_risiko'] }}</td>
+            <td class="text-left">{{ $row['perlakuan_risiko'] }}</td>
+            <td class="text-right">{{ $row['biaya_perlakuan'] }}</td>
+            <td class="text-center">{{ $row['residual_target_level_dampak'] }}</td>
+            <td class="text-center">{{ $row['residual_target_level_kemungkinan'] }}</td>
+            <td class="text-center">{{ $row['residual_target_posisi_risiko'] }}</td>
+            @php
+                $targetColor = '#FFFFFF';
+                if (!empty($row['residual_target_posisi_risiko'])) {
+                    $posisi = (int)$row['residual_target_posisi_risiko'];
+                    if (isset($colorMap[$posisi])) {
+                        $targetColor = $colorMap[$posisi]['color'];
+                    } elseif ($posisi >= 1 && $posisi <= 5) {
+                        $targetColor = '#00B050';
+                    } elseif ($posisi >= 6 && $posisi <= 11) {
+                        $targetColor = '#62b334';
+                    } elseif ($posisi >= 12 && $posisi <= 15) {
+                        $targetColor = '#d2da15';
+                    } elseif ($posisi >= 16 && $posisi <= 19) {
+                        $targetColor = '#FFC000';
+                    } elseif ($posisi >= 20 && $posisi <= 25) {
+                        $targetColor = '#FF0000';
+                    }
+                }
+            @endphp
+            <td class="text-center" style="background-color: {{ $targetColor }}; font-weight: bold;">{{ $row['residual_target_level_risiko'] }}</td>
+            <td class="text-center">{{ $row['status_risiko'] }}</td>
+            <td class="text-left">{{ $row['note_recommendation'] ?? '' }}</td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
 
   <!-- HALAMAN 2: MONITORING RISIKO -->
-@php
-    use Carbon\Carbon;
+    @php
+        use Carbon\Carbon;
 
-    // Pastikan dapat angka bulan
-    try {
-        $monthNumber = Carbon::parse("1 {$monthName} {$year}")->month;
-    } catch (\Exception $e) {
-        $monthNumber = 1; // default Januari
-    }
+        try {
+            $monthNumber = Carbon::parse("1 {$monthName} {$year}")->month;
+        } catch (\Exception $e) {
+            $monthNumber = 1;
+        }
 
-    // Hitung triwulan
-    if ($monthNumber >= 1 && $monthNumber <= 3) {
-        $triwulan = 'TRIWULAN PERTAMA';
-    } elseif ($monthNumber >= 4 && $monthNumber <= 6) {
-        $triwulan = 'TRIWULAN KEDUA';
-    } elseif ($monthNumber >= 7 && $monthNumber <= 9) {
-        $triwulan = 'TRIWULAN KETIGA';
-    } else {
-        $triwulan = 'TRIWULAN KEEMPAT';
-    }
-@endphp
+        if ($monthNumber >= 1 && $monthNumber <= 3) {
+            $triwulan = 'TRIWULAN PERTAMA';
+        } elseif ($monthNumber >= 4 && $monthNumber <= 6) {
+            $triwulan = 'TRIWULAN KEDUA';
+        } elseif ($monthNumber >= 7 && $monthNumber <= 9) {
+            $triwulan = 'TRIWULAN KETIGA';
+        } else {
+            $triwulan = 'TRIWULAN KEEMPAT';
+        }
+    @endphp
 
-<div class="page-break" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; padding: 20px 0;">
-    <div class="header-section" style="text-align: center; margin-bottom: 20px;">
-        <div class="header-title">KERTAS KERJA MONITORING RISIKO</div>
-        <div class="header-subtitle">PT. KAWASAN BERIKAT NUSANTARA</div>
-        <div class="header-info">UNIT KERJA : {{ $headers->first()->department->name ?? 'TIDAK DIKETAHUI' }}</div>
-        <div class="header-info">PERIODE : BULAN {{ strtoupper($monthName) }} {{ $year }}</div>
+    <div class="page-break" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; padding: 20px 0;">
+        <div class="header-section" style="text-align: center; margin-bottom: 20px;">
+            <div class="header-title">KERTAS KERJA MONITORING RISIKO</div>
+            <div class="header-subtitle">PT. KAWASAN BERIKAT NUSANTARA</div>
+            <div class="header-info">UNIT KERJA : {{ $headers->first()->department->name ?? 'TIDAK DIKETAHUI' }}</div>
+            <div class="header-info">PERIODE : BULAN {{ strtoupper($monthName) }} {{ $year }}</div>
+        </div>
+
+        <table class="monitoring-table" style="margin: 0 auto;">
+            <thead>
+                <tr>
+                    <th rowspan="3" class="col-no" style="vertical-align: middle;">NO</th>
+                    <th rowspan="3" class="col-code" style="vertical-align: middle;">KODE RISIKO</th>
+                    <th rowspan="3" class="col-type" style="vertical-align: middle;">JENIS RISIKO</th>
+                    <th rowspan="3" class="col-event" style="vertical-align: middle;">PERISTIWA RISIKO</th>
+                    <th rowspan="3" class="col-cause" style="vertical-align: middle;">PENYEBAB RISIKO</th>
+                    <th colspan="4">WAKTU PELAKSANAAN</th>
+                    <th rowspan="3" class="col-percent" style="vertical-align: middle;">% s/d BULAN {{ strtoupper($monthName) }}</th>
+                    <th rowspan="3" class="col-percent" style="vertical-align: middle;">% TARGET TAHUN {{ $year }}</th>
+                    <th rowspan="3" class="col-amount" style="vertical-align: middle;">BIAYA PERLAKUAN RISIKO</th>
+                    <th colspan="4">RESIDUAL TARGET RISK</th>
+                    <th rowspan="3" class="col-treatment" style="vertical-align: middle;">EVALUASI PERLAKUAN RISIKO</th>
+                </tr>
+                <tr>
+                    <th colspan="4">TAHUN {{ $year }}<br>{{ $triwulan }}<br>BULAN {{ strtoupper($monthName) }}</th>
+                    <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL DAMPAK</th>
+                    <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL KEMUNGKINAN</th>
+                    <th rowspan="2" class="col-level" style="vertical-align: middle;">POSISI RISIKO</th>
+                    <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL RISIKO</th>
+                </tr>
+                <tr>
+                    <th class="col-amount">TARGET s/d BULAN {{ strtoupper($monthName) }}</th>
+                    <th class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
+                    <th class="col-amount">TARGET 1 TAHUN</th>
+                    <th class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($monitoringData as $row)
+                <tr>
+                    <td class="text-center">{{ $row['no'] }}</td>
+                    <td class="text-center">{{ $row['risk_code'] }}</td>
+                    <td class="text-left">{{ $row['jenis_risiko'] }}</td>
+                    <td class="text-left">{{ $row['peristiwa_risiko'] }}</td>
+                    <td class="text-left">{{ $row['penyebab_risiko'] }}</td>
+                    <td class="text-center">{{ $row['target_bulan'] }}</td>
+                    <td class="text-center">{{ $row['realisasi_bulan'] }}</td>
+                    <td class="text-left">{{ $row['target_1_tahun'] }}</td>
+                    <td class="text-center">{{ $row['realisasi_duplicate'] }}</td>
+                    <td class="text-center">{{ $row['percentage_bulan'] }}</td>
+                    <td class="text-center">{{ $row['percentage_tahun'] }}</td>
+                    <td class="text-left">{{ $row['biaya_perlakuan'] }}</td>
+                    <td class="text-center">{{ $row['level_dampak'] }}</td>
+                    <td class="text-center">{{ $row['level_kemungkinan'] }}</td>
+                    <td class="text-center">{{ $row['posisi_risiko'] }}</td>
+                    {{-- MONITORING LEVEL RISIKO - GUNAKAN POSISI UNTUK WARNA --}}
+                    @php
+                        $monColor = '#FFFFFF';
+                        if (!empty($row['posisi_risiko'])) {
+                            $posisi = (int)$row['posisi_risiko'];
+                            if (isset($colorMap[$posisi])) {
+                                $monColor = $colorMap[$posisi]['color'];
+                            } elseif ($posisi >= 1 && $posisi <= 5) {
+                                $monColor = '#00B050';
+                            } elseif ($posisi >= 6 && $posisi <= 11) {
+                                $monColor = '#62b334';
+                            } elseif ($posisi >= 12 && $posisi <= 15) {
+                                $monColor = '#d2da15';
+                            } elseif ($posisi >= 16 && $posisi <= 19) {
+                                $monColor = '#FFC000';
+                            } elseif ($posisi >= 20 && $posisi <= 25) {
+                                $monColor = '#FF0000';
+                            }
+                        }
+                    @endphp
+                    <td class="text-center" style="background-color: {{ $monColor }}; font-weight: bold;">{{ $row['level_risiko'] }}</td>
+                    <td class="text-left">{{ $row['evaluasi_perlakuan'] ?? '' }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
     </div>
-
-    <table class="monitoring-table" style="margin: 0 auto;">
-        <thead>
-            <tr>
-                <th rowspan="3" class="col-no" style="vertical-align: middle;">NO</th>
-                <th rowspan="3" class="col-code" style="vertical-align: middle;">KODE RISIKO</th>
-                <th rowspan="3" class="col-type" style="vertical-align: middle;">JENIS RISIKO</th>
-                <th rowspan="3" class="col-event" style="vertical-align: middle;">PERISTIWA RISIKO</th>
-                <th rowspan="3" class="col-cause" style="vertical-align: middle;">PENYEBAB RISIKO</th>
-                <th colspan="4">WAKTU PELAKSANAAN</th>
-                <th rowspan="3" class="col-percent" style="vertical-align: middle;">% s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th rowspan="3" class="col-percent" style="vertical-align: middle;">% TARGET TAHUN {{ $year }}</th>
-                <th rowspan="3" class="col-amount" style="vertical-align: middle;">BIAYA PERLAKUAN RISIKO</th>
-                <th colspan="4">RESIDUAL TARGET RISK</th>
-                <th rowspan="3" class="col-treatment" style="vertical-align: middle;">EVALUASI PERLAKUAN RISIKO</th>
-            </tr>
-            <tr>
-                <th colspan="4">TAHUN {{ $year }}<br>{{ $triwulan }}<br>BULAN {{ strtoupper($monthName) }}</th>
-                <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL DAMPAK</th>
-                <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL KEMUNGKINAN</th>
-                <th rowspan="2" class="col-level" style="vertical-align: middle;">POSISI RISIKO</th>
-                <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL RISIKO</th>
-            </tr>
-            <tr>
-                <th class="col-amount">TARGET s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
-                <th class="col-amount">TARGET 1 TAHUN</th>
-                <th class="col-amount">REALISASI s/d BULAN {{ strtoupper($monthName) }}</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($monitoringData as $row)
-            <tr>
-                <td class="text-center">{{ $row['no'] }}</td>
-                <td class="text-center">{{ $row['risk_code'] }}</td>
-                <td class="text-left">{{ $row['jenis_risiko'] }}</td>
-                <td class="text-left">{{ $row['peristiwa_risiko'] }}</td>
-                <td class="text-left">{{ $row['penyebab_risiko'] }}</td>
-                <td class="text-center">{{ $row['target_bulan'] }}</td>
-                <td class="text-center">{{ $row['realisasi_bulan'] }}</td>
-                <td class="text-left">{{ $row['target_1_tahun'] }}</td>
-                <td class="text-center">{{ $row['realisasi_duplicate'] }}</td>
-                <td class="text-center">{{ $row['percentage_bulan'] }}</td>
-                <td class="text-center">{{ $row['percentage_tahun'] }}</td>
-                <td class="text-left">{{ $row['biaya_perlakuan'] }}</td>
-                <td class="text-center">{{ $row['level_dampak'] }}</td>
-                <td class="text-center">{{ $row['level_kemungkinan'] }}</td>
-                <td class="text-center">{{ $row['posisi_risiko'] }}</td>
-                <td class="text-center risk-level-cell" data-level="{{ $row['level_risiko'] }}">{{ $row['level_risiko'] }}</td>
-                <td class="text-left">{{ $row['evaluasi_perlakuan'] ?? '' }}</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-</div>
 
 <!-- HALAMAN 3: PETA RISIKO (HEATMAP) -->
 <div class="page-break">

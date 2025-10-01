@@ -1612,9 +1612,23 @@ public function saveNoteRecommendation(Request $request, $id)
         return $roleCheck;
     }
 
-    $request->validate([
+    // Validasi dengan custom message
+    $validator = \Validator::make($request->all(), [
         'note_recommendation' => 'required|string',
+    ], [
+        'note_recommendation.required' => 'Maaf anda belum mengisi Rekomendasi'
     ]);
+
+    if ($validator->fails()) {
+        return json(400, false, 'Validasi Gagal', 'Maaf anda belum mengisi Rekomendasi', null);
+    }
+
+    // Pengecekan tambahan untuk memastikan note_recommendation tidak kosong setelah di-trim
+    $noteRecommendation = trim($request->note_recommendation);
+
+    if (empty($noteRecommendation)) {
+        return json(400, false, 'Validasi Gagal', 'Maaf anda belum mengisi data', null);
+    }
 
     $monthly = TrRiskMonthly::find($id);
     if (!$monthly) {
@@ -1635,7 +1649,7 @@ public function saveNoteRecommendation(Request $request, $id)
         }
     }
 
-    $monthly->note_recommendation = $request->note_recommendation;
+    $monthly->note_recommendation = $noteRecommendation;
     $monthly->updated_by = $user->id;
 
     // Langsung submit setelah save
@@ -1770,9 +1784,23 @@ public function rejectRecommendation(Request $request, $id)
         return $roleCheck;
     }
 
-    $request->validate([
+    // pengecekan validasi
+    $validator = \Validator::make($request->all(), [
         'rejection_note' => 'required|string',
+    ], [
+        'rejection_note.required' => 'Maaf anda belum mengisi data'
     ]);
+
+    if ($validator->fails()) {
+        return json(400, false, 'Validasi Gagal', 'Maaf anda belum mengisi data', null);
+    }
+
+    // Pengecekan tambahan untuk memastikan rejection_note tidak kosong setelah di-trim
+    $rejectionNote = trim($request->rejection_note);
+
+    if (empty($rejectionNote)) {
+        return json(400, false, 'Validasi Gagal', 'Maaf anda belum mengisi data', null);
+    }
 
     $monthly = TrRiskMonthly::find($id);
     if (!$monthly) {
@@ -1795,7 +1823,7 @@ public function rejectRecommendation(Request $request, $id)
     $monthly->approval_status = 'rejected';
     $monthly->rejected_by     = $user->id;
     $monthly->rejected_at     = now();
-    $monthly->rejection_note  = $request->rejection_note;
+    $monthly->rejection_note  = $rejectionNote;
     $monthly->save();
 
     return json(200, true, 'Berhasil', 'Rekomendasi berhasil ditolak. User dapat melakukan perbaikan dan submit ulang.', $monthly);

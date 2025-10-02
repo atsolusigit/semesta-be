@@ -44,6 +44,9 @@ class TrRiskHeader extends Model
         'approved_by',
         'approved_at',
         'created_by_role',
+        'menrisk_note',
+        'menrisk_by',
+        'menrisk_at',
     ];
 
     protected $casts = [
@@ -53,6 +56,10 @@ class TrRiskHeader extends Model
 
     protected $appends = [
         'target_satu_tahun_option_name'
+    ];
+
+    protected $dates = [
+        'menrisk_at',
     ];
 
     // =====================================
@@ -273,5 +280,9 @@ public function residualTargetHeatmapRange()
     public function scopeLatestProcessCode($query)
     {
         return $query->orderBy('process_code', 'desc');
+    }
+      public function menriskUser()
+    {
+        return $this->belongsTo(User::class, 'menrisk_by');
     }
 }

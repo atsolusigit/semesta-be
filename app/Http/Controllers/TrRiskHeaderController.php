@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Models\MstDepartment;
 use App\Models\MstJabatan;
 use App\Models\MstApproval;
+use Illuminate\Support\Facades\Auth;
 
 class TrRiskHeaderController extends Controller
 {
@@ -309,6 +310,7 @@ public function index(Request $request)
             'rr_dampak' => $item->rrDampak ?? null,
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             // 'department' => $item->department ?? null,
+            'menrisk_note' => $item->menrisk_note ?? '',
 
             // Array rekomendasi di level header
             'rekomendasi' => $rekomendasi,
@@ -2052,6 +2054,7 @@ public function getPendingApproval(Request $request)
                 'target_quantitative_satu_tahun' => format_target_quantitative($riskHeader->target_quantitative_satu_tahun),
                 'biaya_perlakuan_risiko' => number_format($riskHeader->biaya_perlakuan_risiko ?? 0, 0, ',', '.'),
                 'notes' => $riskHeader->approval_notes,
+                'menrisk_note' => clean_string($riskHeader->menrisk_note),
             ];
         });
 
@@ -2092,51 +2095,53 @@ public function approveRiskHeader(Request $request, $id)
             return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
         }
 
-        // UPDATE: Cek status draft (bukan pending)
-        if ($riskHeader->status !== 'submit') {
-            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status draft yang dapat disetujui.', null);
-        }
-
         $currentUser = auth()->user();
+        $roleId = $currentUser->role_id ?? null;
 
-        // Role-based approval logic
-        if ($currentUser->role_id == 1) {
-            // Role 1: Dapat approve semua tanpa pengecualian
-            $hasApprovalRight = true;
-        } elseif ($currentUser->role_id == 2) {
-            // Role 2: Hanya bisa approve data dari departemen yang sama atau data yang dibuat sendiri
-            $hasApprovalRight = ((int)$riskHeader->department_id === (int)$currentUser->department_id) ||
-                               ((int)$riskHeader->created_by === (int)$currentUser->id);
-        } elseif ($currentUser->role_id == 3) {
-            // Role 3: Tidak bisa approve
-            $hasApprovalRight = false;
-        } elseif ($currentUser->role_id == 4 || $currentUser->role_id == 5) {
-            // Role 4 dan 5: Hanya bisa approve data yang dibuat oleh role 3
-            $createdByUser = \App\Models\User::find($riskHeader->created_by);
-            $hasApprovalRight = $createdByUser && (int)$createdByUser->role_id === 3;
-        } else {
-            // Role lain tidak diizinkan
-            $hasApprovalRight = false;
+        // Hanya role 1 dan 2 yang boleh approve
+        if (!in_array($roleId, [1, 2])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
         }
 
-        if (!$hasApprovalRight) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
+        // Jika role 2, hanya boleh approve data departemen sendiri
+        if ($roleId === 2 && $riskHeader->department_id !== $currentUser->department_id) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda hanya dapat menyetujui data dari departemen Anda sendiri.', null);
         }
 
-        // UPDATE: Status menjadi approved dan is_complete false
+        // Cek apakah data di-reject oleh MenRisk
+        if ($riskHeader->status === 'rejected' && $riskHeader->menrisk_by !== null) {
+            return json(400, false, 'Perlu Revisi User',
+                'Data ini telah direject oleh Manajemen Risiko. User harus memperbaiki data dan submit ulang sebelum dapat di-review SPV Unit.',
+                [
+                    'menrisk_note' => $riskHeader->menrisk_note,
+                    'menrisk_rejected_at' => $riskHeader->menrisk_at,
+                    'next_step' => 'Tunggu user update dan submit ulang'
+                ]);
+        }
+
+        // Hanya bisa approve jika status submit
+        if ($riskHeader->status !== 'submit') {
+            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat disetujui.', null);
+        }
+
+        // Update: Status approved, is_complete tetap false, reset field MenRisk
         $riskHeader->update([
             'status' => 'approved',
-            'is_complete' => false, // Masih belum complete karena masih ada 4 field yang perlu diisi
+            'is_complete' => false, // Tetap false sampai MenRisk approve
             'approval_notes' => $request->approval_notes,
-            'approved_by' => auth()->id(),
-            'approved_at' => now()
+            'approved_by' => $currentUser->id,
+            'approved_at' => now(),
+            // Reset MenRisk fields jika sebelumnya pernah direject
+            'menrisk_by' => null,
+            'menrisk_at' => null,
+            'menrisk_note' => null
         ]);
 
         \App\Models\MstApproval::where('document_id', $id)
             ->update([
                 'status' => 'approved',
                 'tanggal' => now(),
-                'note' => $request->approval_notes ?? 'Approved via risk header'
+                'note' => $request->approval_notes ?? 'Approved by SPV Unit'
             ]);
 
         DB::commit();
@@ -2153,8 +2158,7 @@ public function approveRiskHeader(Request $request, $id)
             \Log::warning("Error handling approvedBy: {$e->getMessage()}");
         }
 
-        // UPDATE: Pesan dan field sesuai dengan store logic
-        return json(200, true, 'Berhasil Disetujui', '14 field dasar berhasil disetujui dan terkunci. Silakan lengkapi 4 field tambahan untuk menyelesaikan data.', [
+        return json(200, true, 'Berhasil Disetujui', 'Risk header telah disetujui oleh SPV Unit dan menunggu persetujuan Manajemen Risiko.', [
             'id' => $riskHeader->id,
             'status' => $riskHeader->status,
             'is_complete' => $riskHeader->is_complete,
@@ -2162,13 +2166,8 @@ public function approveRiskHeader(Request $request, $id)
             'approved_by' => $riskHeader->approved_by,
             'approved_by_name' => $approvedByName,
             'approved_at' => $riskHeader->approved_at,
-            'next_step' => 'Silakan isi 4 field tambahan melalui proses update',
-            'fields_to_complete' => [
-                'internal_control',
-                'target_quantitative_satu_tahun',
-                'target_satu_tahun_option',
-                'target_satu_tahun_notes'
-            ]
+            'next_step' => 'Menunggu approval dari Manajemen Risiko',
+            'workflow' => 'SPV Approved → Waiting MenRisk Approval → User dapat isi 4 field tambahan'
         ]);
 
     } catch (\Exception $e) {
@@ -2196,42 +2195,29 @@ public function rejectRiskHeader(Request $request, $id)
             return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
         }
 
-        // UPDATE: Cek status submit (bukan pending)
-        if ($riskHeader->status !== 'submit') {
-            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status draft yang dapat ditolak.', null);
-        }
-
         $currentUser = auth()->user();
+        $roleId = $currentUser->role_id ?? null;
 
-        // Role-based rejection logic (sama dengan approval)
-        if ($currentUser->role_id == 1) {
-            // Role 1: Dapat reject semua tanpa pengecualian
-            $hasRejectRight = true;
-        } elseif ($currentUser->role_id == 2) {
-            // Role 2: Hanya bisa reject data dari departemen yang sama atau data yang dibuat sendiri
-            $hasRejectRight = ((int)$riskHeader->department_id === (int)$currentUser->department_id) ||
-                             ((int)$riskHeader->created_by === (int)$currentUser->id);
-        } elseif ($currentUser->role_id == 3) {
-            // Role 3: Tidak bisa reject
-            $hasRejectRight = false;
-        } elseif ($currentUser->role_id == 4 || $currentUser->role_id == 5) {
-            // Role 4 dan 5: Hanya bisa reject data yang dibuat oleh role 3
-            $createdByUser = \App\Models\User::find($riskHeader->created_by);
-            $hasRejectRight = $createdByUser && (int)$createdByUser->role_id === 3;
-        } else {
-            // Role lain tidak diizinkan
-            $hasRejectRight = false;
+        // Hanya role 1 dan 2 yang boleh reject
+        if (!in_array($roleId, [1, 2])) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menolak data ini.', null);
         }
 
-        if (!$hasRejectRight) {
-            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menolak data ini.', null);
+        // Role 2 hanya boleh reject departemen sendiri
+        if ($roleId === 2 && $riskHeader->department_id !== $currentUser->department_id) {
+            return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menolak data dari departemen Anda sendiri.', null);
+        }
+
+        // Hanya bisa reject jika status submit
+        if ($riskHeader->status !== 'submit') {
+            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat ditolak.', null);
         }
 
         $riskHeader->update([
             'status' => 'rejected',
             'is_complete' => false,
             'approval_notes' => $request->approval_notes,
-            'approved_by' => auth()->id(),
+            'approved_by' => $currentUser->id,
             'approved_at' => now()
         ]);
 
@@ -2242,7 +2228,7 @@ public function rejectRiskHeader(Request $request, $id)
                 'note' => $request->approval_notes
             ]);
 
-        // UPDATE: Clear hanya 4 field tambahan yang memang tidak boleh diisi di store
+        // Clear 4 field tambahan yang tidak boleh diisi di store
         $riskHeader->update([
             'internal_control' => null,
             'target_quantitative_satu_tahun' => null,
@@ -2265,8 +2251,7 @@ public function rejectRiskHeader(Request $request, $id)
             \Log::warning("Error handling approvedBy: {$e->getMessage()}");
         }
 
-        // UPDATE: Pesan dan field list sesuai dengan store logic
-        return json(200, true, 'Berhasil Ditolak', 'Risk header berhasil ditolak. Silakan perbaiki 14 field dasar sesuai catatan penolakan.', [
+        return json(200, true, 'Berhasil Ditolak', 'Risk header berhasil ditolak oleh SPV Unit. Silakan perbaiki 14 field dasar sesuai catatan penolakan.', [
             'id' => $riskHeader->id,
             'status' => $riskHeader->status,
             'is_complete' => $riskHeader->is_complete,
@@ -2274,7 +2259,7 @@ public function rejectRiskHeader(Request $request, $id)
             'rejected_by' => $riskHeader->approved_by,
             'rejected_by_name' => $rejectedByName,
             'rejected_at' => $riskHeader->approved_at,
-            'next_step' => 'Perbaiki 14 field dasar dan submit ulang untuk review',
+            'next_step' => 'Perbaiki 14 field dasar dan submit ulang untuk review SPV Unit',
             'editable_fields' => [
                 'department_id', 'risk_code', 'jenis_risiko', 'year', 'sasaran', 'peristiwa_risiko', 'penyebab_risiko',
                 'dampak_risiko', 'inherent_risk_level_dampak', 'inherent_risk_level_kemungkinan',
@@ -2406,6 +2391,125 @@ public function getRejectedData(Request $request)
         return json(500, false, 'Gagal Mengambil Data', 'Terjadi kesalahan sistem.', $e->getMessage());
     }
 }
+
+// Approve by MenRisk
+public function approveMenrisk(Request $request, $id)
+{
+    try {
+        $user = Auth::user();
+
+        if (!in_array($user->role_id, [1, 4])) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk approve tahap Manajemen Risiko.', null);
+        }
+
+        $header = TrRiskHeader::find($id);
+        if (!$header) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        $validated = $request->validate([
+            'menrisk_note' => 'nullable|string',
+        ]);
+
+        if ($header->status !== 'approved') {
+            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status approved yang dapat di-approve MenRisk.', null);
+        }
+
+        if ($header->menrisk_by !== null) {
+            return json(400, false, 'Sudah Disetujui', 'Data ini sudah pernah di-approve oleh Manajemen Risiko.', null);
+        }
+
+        // Setelah MenRisk approve, user BARU BISA isi 4 field tambahan
+        // is_complete tetap false sampai 4 field diisi
+        $header->menrisk_note = $request->input('menrisk_note');
+        $header->menrisk_by = $user->id;
+        $header->menrisk_at = now();
+        $header->is_complete = false; // Tetap false, tunggu user isi 4 field
+        $header->save();
+
+        return json(200, true, 'Berhasil Disetujui', 'Header berhasil di-approve oleh Manajemen Risiko. User sekarang dapat melengkapi 4 field tambahan.', [
+            'id' => $header->id,
+            'status' => $header->status,
+            'is_complete' => $header->is_complete,
+            'menrisk_note' => $header->menrisk_note,
+            'menrisk_by' => $header->menrisk_by,
+            'menrisk_at' => $header->menrisk_at,
+            'next_step' => 'User dapat melengkapi 4 field tambahan melalui proses update',
+            'fields_to_complete' => [
+                'internal_control',
+                'target_quantitative_satu_tahun',
+                'target_satu_tahun_option',
+                'target_satu_tahun_notes'
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error approveMenrisk: ' . $e->getMessage());
+        return json(500, false, 'Gagal Approve', 'Terjadi kesalahan sistem saat approve MenRisk.', $e->getMessage());
+    }
+}
+
+// Reject by MenRisk
+public function rejectMenrisk(Request $request, $id)
+{
+    try {
+        $user = Auth::user();
+
+        // Hanya role 1 dan 4 yang boleh reject MenRisk
+        if (!in_array($user->role_id, [1, 4])) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk reject tahap Manajemen Risiko.', null);
+        }
+
+        $header = TrRiskHeader::find($id);
+        if (!$header) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        // Validasi catatan (WAJIB saat reject)
+        $validated = $request->validate([
+            'menrisk_note' => 'required|string',
+        ]);
+
+        // Pastikan hanya data dengan status approved yang bisa direject MenRisk
+        // Dan pastikan belum pernah di-approve MenRisk (menrisk_by masih null)
+        if ($header->status !== 'approved') {
+            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status approved yang dapat di-reject MenRisk.', null);
+        }
+
+        // Cek apakah sudah pernah di-approve MenRisk
+        if ($header->menrisk_by !== null && $header->is_complete) {
+            return json(400, false, 'Tidak Dapat Direject', 'Data yang sudah fully approved tidak dapat direject. Gunakan fitur revisi jika perlu perubahan.', null);
+        }
+
+        // Saat MenRisk reject, kembalikan ke status rejected
+        // SPV Unit perlu approve ulang setelah user memperbaiki
+        $header->menrisk_note = $request->input('menrisk_note');
+        $header->menrisk_by = $user->id;
+        $header->menrisk_at = now();
+        $header->status = 'rejected';
+        $header->is_complete = false;
+        // Reset approval SPV Unit agar harus approve ulang
+        $header->approved_by = null;
+        $header->approved_at = null;
+        $header->approval_notes = null;
+        $header->save();
+
+        return json(200, true, 'Berhasil Ditolak', 'Header berhasil di-reject oleh Manajemen Risiko. User perlu memperbaiki data dan submit ulang untuk review SPV Unit.', [
+            'id' => $header->id,
+            'status' => $header->status,
+            'is_complete' => $header->is_complete,
+            'menrisk_note' => $header->menrisk_note,
+            'menrisk_by' => $header->menrisk_by,
+            'menrisk_at' => $header->menrisk_at,
+            'next_step' => 'User perbaiki data → Submit → SPV Unit approve → MenRisk approve'
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error rejectMenrisk: ' . $e->getMessage());
+        return json(500, false, 'Gagal Reject', 'Terjadi kesalahan sistem saat reject MenRisk.', $e->getMessage());
+    }
+}
+
 
 /**
  * Helper function untuk menentukan apakah request ini adalah penyimpanan lengkap

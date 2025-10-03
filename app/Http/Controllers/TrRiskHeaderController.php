@@ -311,6 +311,7 @@ public function index(Request $request)
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             // 'department' => $item->department ?? null,
             'menrisk_note' => $item->menrisk_note ?? '',
+            'spv_note' => $item->approval_notes ?? '',
 
             // Array rekomendasi di level header
             'rekomendasi' => $rekomendasi,
@@ -1957,7 +1958,6 @@ public function getPendingApproval(Request $request)
 
         // Filter department berdasarkan role
         $query->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
-            // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
             $query->where('department_id', $user->department_id);
         });
 
@@ -2027,6 +2027,12 @@ public function getPendingApproval(Request $request)
                     ->toArray();
             }
 
+            // Status override untuk MenRisk approve → final
+            $displayStatus = $riskHeader->status;
+            if ($riskHeader->menrisk_by !== null) {
+                $displayStatus = 'final';
+            }
+
             return [
                 'id' => $riskHeader->id,
                 'department_id' => $riskHeader->department_id,
@@ -2047,7 +2053,7 @@ public function getPendingApproval(Request $request)
                     'id' => $riskHeader->department->id,
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
-                'risk_status' => $riskHeader->status,
+                'risk_status' => $displayStatus, //  Status sudah dioverride
                 'desc' => clean_string($riskHeader->desc),
                 'created_at' => $riskHeader->created_at,
                 'created_by_name' => $createdByName,
@@ -2076,6 +2082,7 @@ public function getPendingApproval(Request $request)
     }
 }
 
+// Approve risk header oleh SPV Unit (role 1 dan 2)
 public function approveRiskHeader(Request $request, $id)
 {
     $validator = Validator::make($request->all(), [
@@ -2420,16 +2427,16 @@ public function approveMenrisk(Request $request, $id)
         }
 
         // Setelah MenRisk approve, user BARU BISA isi 4 field tambahan
-        // is_complete tetap false sampai 4 field diisi
         $header->menrisk_note = $request->input('menrisk_note');
         $header->menrisk_by = $user->id;
         $header->menrisk_at = now();
-        $header->is_complete = false; // Tetap false, tunggu user isi 4 field
+        $header->is_complete = false;
         $header->save();
 
+        //  Status database tetap 'approved', tapi JSON kita override jadi 'final'
         return json(200, true, 'Berhasil Disetujui', 'Header berhasil di-approve oleh Manajemen Risiko. User sekarang dapat melengkapi 4 field tambahan.', [
             'id' => $header->id,
-            'status' => $header->status,
+            'status' => 'final', // ⬅️ override status JSON di sini
             'is_complete' => $header->is_complete,
             'menrisk_note' => $header->menrisk_note,
             'menrisk_by' => $header->menrisk_by,
@@ -2690,12 +2697,10 @@ public function getTaskRealisasiMonitoring(Request $request)
             'createdBy:id,name'
         ]);
 
-        // Role 2 dan 3 hanya bisa melihat data department mereka
+        // Filter berdasarkan role
         if (in_array($user->role_id, [2, 3])) {
             $query->where('department_id', $user->department_id);
         }
-        // Role 1,4,5 bisa melihat semua data (tidak ada filter)
-
         // Filter pencarian
         if ($request->has('search') && $request->search) {
             $searchTerm = $request->search;
@@ -2711,12 +2716,10 @@ public function getTaskRealisasiMonitoring(Request $request)
             });
         }
 
-        // Filter berdasarkan tahun
         if ($request->has('year') && $request->year) {
             $query->where('year', $request->year);
         }
 
-        // Pagination
         $perPage = $request->has('per_page') ? (int)$request->per_page : 10;
         $headers = $query->paginate($perPage);
 
@@ -2724,16 +2727,11 @@ public function getTaskRealisasiMonitoring(Request $request)
         $no = ($headers->currentPage() - 1) * $headers->perPage() + 1;
 
         foreach ($headers as $header) {
-            // Risk Owner
             $riskOwner = $header->department->name ?? '-';
-
-            // Peristiwa Risiko
             $peristiwa = $header->peristiwa_risiko ?? '-';
-
-            // Rencana Penanganan
             $rencana = $header->mitigasi ?? '-';
 
-            // Waktu Pelaksanaan → ambil bulan awal & akhir finalisasi
+            // ==================== WAKTU PELAKSANAAN =====================
             $finalizedMonths = $header->monthlyData->pluck('month')->toArray();
             $waktuPelaksanaan = '-';
 
@@ -2747,22 +2745,39 @@ public function getTaskRealisasiMonitoring(Request $request)
                 $waktuPelaksanaan = $startDate->format('Y-m-d') . ' s/d ' . $endDate->format('Y-m-d');
             }
 
-            //  PIC
             $pic = get_decrypted_name((object)['id' => $header->created_by]) .
                 ' - ' . ($header->department->name ?? '');
 
-            //  Ambil target angka dari kolom target_quantitative_satu_tahun (tipe TEXT)
+            // ==================== KUANTITATIF =====================
             $targetText = $header->target_quantitative_satu_tahun ?? '';
             preg_match('/\d+/', str_replace('.', '', $targetText), $matches);
             $targetValue = isset($matches[0]) ? (float)$matches[0] : 0;
 
-            //  Hitung Total Realisasi
-            $totalRealisasi = $header->monthlyData->sum(function ($m) {
+            $totalRealisasiQuant = $header->monthlyData->sum(function ($m) {
                 return (float) str_replace(',', '', $m->realization_quantitative ?? 0);
             });
 
-            //  Hitung Persentase Realisasi
-            $realisasi = $targetValue > 0 ? round(($totalRealisasi / $targetValue) * 100, 2) : 0;
+            $realisasiPercent = 0;
+            if ($targetValue > 0 && $totalRealisasiQuant > 0) {
+                $realisasiPercent = round(($totalRealisasiQuant / $targetValue) * 100, 2);
+            }
+
+            // ==================== KUALITATIF =====================
+            if ($realisasiPercent === 0) {
+                // Cek data bulan Desember (12) yang finalize
+                $desemberMonthly = $header->monthlyData->firstWhere('month', 12);
+                if ($desemberMonthly && $desemberMonthly->realization_kualitatif) {
+                    $qualVal = (float) str_replace('%', '', $desemberMonthly->realization_kualitatif);
+                    $realisasiPercent = $qualVal;
+                } else {
+                    // Jika tidak ada Desember, ambil bulan terakhir finalize
+                    $lastMonthly = $header->monthlyData->sortByDesc('month')->first();
+                    if ($lastMonthly && $lastMonthly->realization_kualitatif) {
+                        $qualVal = (float) str_replace('%', '', $lastMonthly->realization_kualitatif);
+                        $realisasiPercent = $qualVal;
+                    }
+                }
+            }
 
             $result[] = [
                 'no' => $no++,
@@ -2771,11 +2786,10 @@ public function getTaskRealisasiMonitoring(Request $request)
                 'rencana_penanganan' => $rencana,
                 'waktu_pelaksanaan' => $waktuPelaksanaan,
                 'pic' => $pic,
-                'realisasi' => $realisasi . '%',
+                'realisasi' => $realisasiPercent . '%',
             ];
         }
 
-        // Format response dengan pagination
         $paginationData = [
             'data' => $result,
             'current_page' => $headers->currentPage(),

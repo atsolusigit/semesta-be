@@ -311,6 +311,7 @@ public function index(Request $request)
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             // 'department' => $item->department ?? null,
             'menrisk_note' => $item->menrisk_note ?? '',
+            'spv_note' => $item->approval_notes ?? '',
 
             // Array rekomendasi di level header
             'rekomendasi' => $rekomendasi,

@@ -2027,9 +2027,9 @@ public function getPendingApproval(Request $request)
                     ->toArray();
             }
 
-            // Status override untuk MenRisk approve → final
+           // Status override untuk MenRisk approve → final
             $displayStatus = $riskHeader->status;
-            if ($riskHeader->menrisk_by !== null) {
+            if ($riskHeader->menrisk_by !== null && $riskHeader->status === 'approved') {
                 $displayStatus = 'final';
             }
 

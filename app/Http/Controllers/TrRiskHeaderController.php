@@ -1957,7 +1957,6 @@ public function getPendingApproval(Request $request)
 
         // Filter department berdasarkan role
         $query->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
-            // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
             $query->where('department_id', $user->department_id);
         });
 
@@ -2027,6 +2026,12 @@ public function getPendingApproval(Request $request)
                     ->toArray();
             }
 
+            // Status override untuk MenRisk approve → final
+            $displayStatus = $riskHeader->status;
+            if ($riskHeader->menrisk_by !== null) {
+                $displayStatus = 'final';
+            }
+
             return [
                 'id' => $riskHeader->id,
                 'department_id' => $riskHeader->department_id,
@@ -2047,7 +2052,7 @@ public function getPendingApproval(Request $request)
                     'id' => $riskHeader->department->id,
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
-                'risk_status' => $riskHeader->status,
+                'risk_status' => $displayStatus, //  Status sudah dioverride
                 'desc' => clean_string($riskHeader->desc),
                 'created_at' => $riskHeader->created_at,
                 'created_by_name' => $createdByName,
@@ -2076,6 +2081,7 @@ public function getPendingApproval(Request $request)
     }
 }
 
+// Approve risk header oleh SPV Unit (role 1 dan 2)
 public function approveRiskHeader(Request $request, $id)
 {
     $validator = Validator::make($request->all(), [
@@ -2420,16 +2426,16 @@ public function approveMenrisk(Request $request, $id)
         }
 
         // Setelah MenRisk approve, user BARU BISA isi 4 field tambahan
-        // is_complete tetap false sampai 4 field diisi
         $header->menrisk_note = $request->input('menrisk_note');
         $header->menrisk_by = $user->id;
         $header->menrisk_at = now();
-        $header->is_complete = false; // Tetap false, tunggu user isi 4 field
+        $header->is_complete = false;
         $header->save();
 
+        //  Status database tetap 'approved', tapi JSON kita override jadi 'final'
         return json(200, true, 'Berhasil Disetujui', 'Header berhasil di-approve oleh Manajemen Risiko. User sekarang dapat melengkapi 4 field tambahan.', [
             'id' => $header->id,
-            'status' => $header->status,
+            'status' => 'final', // ⬅️ override status JSON di sini
             'is_complete' => $header->is_complete,
             'menrisk_note' => $header->menrisk_note,
             'menrisk_by' => $header->menrisk_by,

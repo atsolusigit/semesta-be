@@ -30,6 +30,7 @@ use App\Http\Controllers\MstJabatanController;
 use App\Http\Controllers\MstApprovalController;
 use App\Http\Controllers\MstMonthRecommendationController;
 use App\Http\Controllers\TrRcsaHeaderController;
+use App\Http\Controllers\LostEventController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -293,6 +294,15 @@ Route::middleware(['auth:api'])->group(function () {
     Route::post('/month-recommendation', [MstMonthRecommendationController::class, 'store']);                         // Tambah month recommendation (role 1,2)
     Route::put('/month-recommendation/{id}', [MstMonthRecommendationController::class, 'update']);                    // Update month recommendation (role 1,2)
     Route::delete('/month-recommendation/{id}', [MstMonthRecommendationController::class, 'destroy']);                // Hapus month recommendation (role 1)
+});
+
+// ===================== LOST EVENT =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/lost-events', [LostEventController::class, 'index']); // List header < 50%
+    Route::get('/lost-events/{id}', [LostEventController::class, 'show']);
+    Route::get('/lost-events/detail/{id}', [LostEventController::class, 'detail']); // Detail by lost_event_id
+    Route::put('/lost-events/{id}', [LostEventController::class, 'update']); // Update by lost_event_id
+    Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
 });
 
 // Route untuk debug data

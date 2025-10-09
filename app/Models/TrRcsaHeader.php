@@ -60,6 +60,8 @@ class TrRcsaHeader extends Model
         'created_by',
         'updated_by',
         'year',
+        'submitted_at',
+        'submitted_by',
     ];
 
 

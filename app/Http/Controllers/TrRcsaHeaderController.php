@@ -11,6 +11,7 @@ use App\Models\TrRcsaHeader;
 use App\Models\TrRcsaResidual;
 use App\Models\TrRcsaRencanaRisikoList;
 use PhpParser\Node\Stmt\TryCatch;
+use App\Models\MstJabatan;
 
 class TrRcsaHeaderController extends Controller
 {
@@ -33,16 +34,19 @@ class TrRcsaHeaderController extends Controller
         ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
             $query->where('unit_kerja_id', $user->department_id);
         })
-        ->when($request->pilihan_sasaran, function ($query) use ($request) {
-            $query->where('pilihan_sasaran', 'like', '%' . $request->pilihan_sasaran . '%');
+        ->whereHas('department', function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%');
         })
-        ->when($request->pilihan_sasaran, function ($query) use ($request) {
-            $query->where('pilihan_strategi', 'like', '%' . $request->pilihan_strategi . '%');
-        })
+        ->orWhere('peristiwa_risiko', 'like', "%{$request->search}%")
+        ->orWhere('status', 'like', "%{$request->search}%")
         ->orderBy('id', 'desc');
 
         // Pagination, ambil data per halaman
         $data = $query->paginate($perPage);
+
+        if (empty($data->items())) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Data rcsa header tidak ditemukan.', null);
+        }
         
         $resData = collect($data->items())->map(function ($item) {
 
@@ -121,6 +125,10 @@ class TrRcsaHeaderController extends Controller
      */
     public function store(Request $request)
     {
+        $result = check_role(auth()->user(), [1, 2, 3]);
+        if ($result !== true) {
+            return $result;
+        }
         
         $allowedFields = [
             'asumsi_perhitungan_dampak',
@@ -453,6 +461,12 @@ class TrRcsaHeaderController extends Controller
     {
         $currentUser = auth()->user();
 
+        // Validasi role: hanya role 1, 2, 3 yang diizinkan
+        $roleCheck = check_role($currentUser, [1, 2, 3]);
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
         $RcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
         // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
         $query->where('unit_kerja_id', $currentUser->department_id);
@@ -484,7 +498,7 @@ class TrRcsaHeaderController extends Controller
         }
             
 
-        return $this->RcsaUpdate($request, $RcsaHeader, $residual, $RisikoList);
+        return $this->RcsaUpdate($request, $RcsaHeader, $id);
     }
 
     /**
@@ -506,7 +520,7 @@ class TrRcsaHeaderController extends Controller
 
             // VALIDASI HAK AKSES DELETE
             // Hanya Superadmin (role 1) yang bisa delete
-            if ($currentUserRole !== 1 ||  $currentUserRole !== 3) {
+            if ($currentUserRole !== 1 ) {
                 return json(404, false, 'Akses Ditolak', 'Hanya Superadmin dan User biasa yang dapat menghapus data RCSA.', null);
             }
 
@@ -630,7 +644,7 @@ class TrRcsaHeaderController extends Controller
         return json(200, true, 'Data Ditemukan', 'Data rcsa sasaran berhasil diambil.',$cleanData);
     }
 
-    private function RcsaUpdate(Request $request, $rcsaHeader, $residual, $RisikoList)
+    private function RcsaUpdate(Request $request, $rcsaHeader, $rcsa_id)
     {
          
         $allowedFields = [
@@ -756,14 +770,25 @@ class TrRcsaHeaderController extends Controller
                 ]);
             }
 
-            //RisikoList
-            foreach ($dataRisikoList as $itemReq) {
-                TrRcsaRencanaRisikoList::where('id',$itemReq['id'])
-                ->where('rcsa_id', $itemReq['rcsa_id'])
-                ->update([
-                    'jenis_rencana_perlakuan_risiko' => $itemReq['jenis_rencana_perlakuan_risiko']
-                ]);
+             /********* HAPUS RCSA Risiko List **********/
+            TrRcsaRencanaRisikoList::where('rcsa_id', $rcsa_id)->delete();
+
+            //Insert kembali RisikoList
+
+            if(!empty($dataRisikoList)){
+                foreach($dataRisikoList as $itemList){
+                    $mergedRList[] = array_merge($itemList, $rcsa_id);
+                }
+
+                TrRcsaRencanaRisikoList::insert($mergedRList);
             }
+            // foreach ($dataRisikoList as $itemReq) {
+            //     TrRcsaRencanaRisikoList::where('id',$itemReq['id'])
+            //     ->where('rcsa_id', $itemReq['rcsa_id'])
+            //     ->update([
+            //         'jenis_rencana_perlakuan_risiko' => $itemReq['jenis_rencana_perlakuan_risiko']
+            //     ]);
+            // }
 
             // HANYA AMBIL DATA YANG DIIZINKAN
             $updateData = [];
@@ -837,5 +862,104 @@ class TrRcsaHeaderController extends Controller
             return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
+
+    public function submit(Request $request, $id)
+    {
+        $currentUser = auth()->user();
+
+        $roleCheck = check_role($currentUser, [1, 2, 3]);
+
+        if ($roleCheck !== true) {
+            return $roleCheck;
+        }
+
+        $rcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
+            // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+            $query->where('unit_kerja_id', $currentUser->department_id);
+        })->find($id);
+
+        if (!$rcsaHeader) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        if ($rcsaHeader->status !== 'draft') {
+            return json(403, false, 'Akses Ditolak', 'Hanya data dengan status draft yang dapat disubmit.', null);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $rcsaHeader->update([
+                'status' => 'submit',
+                'submitted_at' => now(),
+                'submitted_by' => auth()->id()
+            ]);
+
+            $jabatanId = null;
+
+            if ($currentUser->jabatan_id) {
+                $jabatanId = $currentUser->jabatan_id;
+            } else {
+                $jabatan = MstJabatan::where('department_id', $rcsaHeader->unit_kerja_id)->first();
+                $jabatanId = $jabatan ? $jabatan->id : null;
+            }
+
+            $existingApproval = \App\Models\MstApproval::where('document_id', $rcsaHeader->id)->first();
+
+            if ($existingApproval) {
+                $existingApproval->update([
+                    'tahun' => $rcsaHeader->year,
+                    'jabatan_id' => $jabatanId,
+                    'status' => 'pending',
+                    'tanggal' => null,
+                    'note' => null
+                ]);
+            } else {
+                // Buat approval entry baru
+                \App\Models\MstApproval::create([
+                    'document_id' => $rcsaHeader->id,
+                    'tahun' => $rcsaHeader->year,
+                    'posisi' => 1,
+                    'jabatan_id' => $jabatanId,
+                    'status' => 'pending',
+                    'tanggal' => null,
+                    'note' => null
+                ]);
+            }
+
+            DB::commit();
+
+            $rcsaHeader->refresh();
+            $responseData = [
+                'id' => $rcsaHeader->id,
+                'pilihan_sasaran' => clean_string($rcsaHeader->pilihan_sasaran),
+                'pilihan_strategi' => clean_string($rcsaHeader->pilihan_strategi),
+                'asumsi_perhitungan_dampak' => clean_string($rcsaHeader->asumsi_perhitungan_dampak),
+                'deskripsi_dampak' => clean_string($rcsaHeader->deskripsi_dampak),
+                'biaya_perlakuan_risiko' => clean_string($rcsaHeader->biaya_perlakuan_risiko),
+                'deskripsi_peristiwa_risiko' => clean_string($rcsaHeader->deskripsi_peristiwa_risiko),
+                'existing_control' => clean_string($rcsaHeader->existing_control),
+                'inherent_nilai_probabilitas' => clean_string($rcsaHeader->inherent_nilai_probabilitas),
+                'inherent_skala_dampak' => clean_string($rcsaHeader->inherent_skala_dampak),
+                'inherent_skala_probabilitas' => clean_string($rcsaHeader->inherent_skala_probabilitas),
+                'inherent_skala_risiko' => clean_string($rcsaHeader->inherent_skala_risiko),
+                'jenis_existing_control' => clean_string($rcsaHeader->jenis_existing_control),
+                'department_id' => $rcsaHeader->unit_kerja_id,
+                'status' => $rcsaHeader->status,
+                'year' => $rcsaHeader->year,
+                'updated_at' => $rcsaHeader->updated_at,
+                'created_at' => $rcsaHeader->created_at,
+                'created_by' => $rcsaHeader->created_by
+                // 'created_by_name' => $createdByName,
+            ];
+
+            return json(200, true, 'Berhasil Submit', 'Data berhasil disubmit untuk proses persetujuan. Status berubah menjadi submit dan data tidak dapat diedit hingga ada keputusan persetujuan.', $responseData);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return json(500, false, 'Gagal Submit', 'Terjadi kesalahan sistem.', $e->getMessage());
+        }
+    }
+
     
 }

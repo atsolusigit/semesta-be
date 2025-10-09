@@ -753,8 +753,9 @@ class TrRcsaHeaderController extends Controller
         try {
             DB::beginTransaction();
 
-          //Residual
+            //Residual
             foreach ($dataResidual as $itemRes) {
+                // dd($itemRes['residual_eksposur_risiko_kualitatif']);
                 TrRcsaResidual::where('id',$itemRes['id'])
                 ->where('rcsa_id', $itemRes['rcsa_id'])
                 ->update([
@@ -774,14 +775,15 @@ class TrRcsaHeaderController extends Controller
             TrRcsaRencanaRisikoList::where('rcsa_id', $rcsa_id)->delete();
 
             //Insert kembali RisikoList
-
+            $concat_rcsaid = ['rcsa_id' => $rcsa_id];
             if(!empty($dataRisikoList)){
+                 $mergedRList = array();
                 foreach($dataRisikoList as $itemList){
-                    $mergedRList[] = array_merge($itemList, $rcsa_id);
+                    $mergedRList[] = array_merge($itemList, $concat_rcsaid);
                 }
-
                 TrRcsaRencanaRisikoList::insert($mergedRList);
             }
+
             // foreach ($dataRisikoList as $itemReq) {
             //     TrRcsaRencanaRisikoList::where('id',$itemReq['id'])
             //     ->where('rcsa_id', $itemReq['rcsa_id'])

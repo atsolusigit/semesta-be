@@ -285,4 +285,9 @@ public function residualTargetHeatmapRange()
     {
         return $this->belongsTo(User::class, 'menrisk_by');
     }
+
+        public function rcsaHeader()
+    {
+        return $this->belongsTo(TrRcsaHeader::class, 'rcsa_header_id', 'id');
+    }
 }

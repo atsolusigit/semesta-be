@@ -325,10 +325,12 @@ Route::get('/test-export-risk/{format}', [ExportRiskController::class, 'testExpo
 // Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2'])->put('/risk-monthly-entry/{id}/bulk-update-quantitative', [TrRiskMonthlyEntryController::class, 'bulkUpdateQuantitative']);
 
 // ===================== RCSA =====================
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-header', [TrRcsaHeaderController::class, 'index']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->post('/rcsa-header', [TrRcsaHeaderController::class, 'store']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1'])->delete('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'destroy']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'show']);
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->get('/rcsa-sasaran', [TrRcsaHeaderController::class, 'sasaran']);
-
-Route::middleware(['auth:api', RoleAccessMiddleware::class . ':1,2,3'])->put('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'update']);
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/rcsa-header', [TrRcsaHeaderController::class, 'index']);
+    Route::post('/rcsa-header', [TrRcsaHeaderController::class, 'store']);
+    Route::delete('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'destroy']);
+    Route::get('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'show']);
+    Route::get('/rcsa-sasaran', [TrRcsaHeaderController::class, 'sasaran']);
+    Route::put('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'update']);
+    Route::post('/rcsa-header/{id}/submit', [TrRcsaHeaderController::class, 'submit']);
+});

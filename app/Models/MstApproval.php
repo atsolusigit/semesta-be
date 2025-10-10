@@ -11,6 +11,7 @@ class MstApproval extends Model
 
     protected $fillable = [
         'document_id',
+        'type_document',
         'tahun',
         'posisi',
         'jabatan_id',

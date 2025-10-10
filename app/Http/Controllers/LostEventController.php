@@ -30,40 +30,42 @@ class LostEventController extends Controller
     $search = $request->query('search'); // ← Tambahan search
 
     $headers = TrRiskHeader::with([
-        'department:id,name',
-        'optionTargetSatuTahun:id,name,type',
-        'monthlyData' => function ($query) {
-            $query->where('is_finalize', true)->orderBy('month', 'asc');
-        }
-    ])
-    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
-        $query->where('department_id', $user->department_id);
-    })
-    ->when($request->tahun, function ($query) use ($request) {
-        $query->where('year', $request->tahun);
-    })
-    ->when($request->department, function ($query) use ($request) {
-        $query->whereHas('department', function ($q) use ($request) {
-            $q->where('name', 'like', '%' . $request->department . '%');
+    'department:id,name',
+    'optionTargetSatuTahun:id,name,type',
+    'monthlyData' => function ($query) {
+        $query->where('is_finalize', true)->orderBy('month', 'asc');
+    }
+])
+->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+    $query->where('department_id', $user->department_id);
+})
+->when($request->tahun, function ($query) use ($request) {
+    $query->where('year', $request->tahun);
+})
+->when($request->department_id, function ($query) use ($request) {
+    $query->where('department_id', $request->department_id);
+}) // Tambahan filter berdasarkan ID departemen
+->when($request->department, function ($query) use ($request) {
+    $query->whereHas('department', function ($q) use ($request) {
+        $q->where('name', 'like', '%' . $request->department . '%');
+    });
+})
+->when($request->jenis_risiko, function ($query) use ($request) {
+    $query->where('jenis_risiko', 'like', '%' . $request->jenis_risiko . '%');
+})
+->when($search, function ($query) use ($search) {
+    $query->where(function ($q) use ($search) {
+        $q->where('year', 'like', '%' . $search . '%')
+        ->orWhere('jenis_risiko', 'like', '%' . $search . '%')
+        ->orWhere('peristiwa_risiko', 'like', '%' . $search . '%')
+        ->orWhere('mitigasi', 'like', '%' . $search . '%')
+        ->orWhereHas('department', function ($dept) use ($search) {
+            $dept->where('name', 'like', '%' . $search . '%');
         });
-    })
-    ->when($request->jenis_risiko, function ($query) use ($request) {
-        $query->where('jenis_risiko', 'like', '%' . $request->jenis_risiko . '%');
-    })
-    // TAMBAHAN: Filter search
-    ->when($search, function ($query) use ($search) {
-        $query->where(function ($q) use ($search) {
-            $q->where('year', 'like', '%' . $search . '%')
-            ->orWhere('jenis_risiko', 'like', '%' . $search . '%')
-            ->orWhere('peristiwa_risiko', 'like', '%' . $search . '%')
-            ->orWhere('mitigasi', 'like', '%' . $search . '%')
-            ->orWhereHas('department', function ($dept) use ($search) {
-                $dept->where('name', 'like', '%' . $search . '%');
-            });
-        });
-    })
-    ->orderBy('id', 'desc')
-    ->get();
+    });
+})
+->orderBy('id', 'desc')
+->get();
 
     $filteredData = collect();
 

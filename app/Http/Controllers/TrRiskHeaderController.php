@@ -51,6 +51,7 @@ public function index(Request $request)
         'headerEntry.optionTargetSatuTahun:id,name,position',
         'createdBy:id,username,id',
         'updatedBy:id,username,id',
+        'approval:document_id,type_document,status,tahun,jabatan_id'
     ])
     // Filter hanya data yang sudah di-approve
     // ->where('status', 'approved')
@@ -249,7 +250,7 @@ public function index(Request $request)
 
         // Tentukan risk status berdasarkan kondisi
         $riskStatus = $item->status;
-               if ($isHeaderComplete && $allMonthsFinalized) {
+        if ($isHeaderComplete && $allMonthsFinalized) {
             $riskStatus = 'close'; // Otomatis close jika semua data lengkap dan finalisasi
         } elseif ($item->status === 'approved' && !$isHeaderComplete) {
             $riskStatus = 'pending'; // Approved tapi data header belum lengkap
@@ -261,6 +262,7 @@ public function index(Request $request)
         return [
             'id' => $item->id,
             'risk_status' => $riskStatus, // *** DIUBAH: sekarang menggunakan $riskStatus ***
+            'type_document' => $item->approval->type_document ?? null,
             'department_id' => $item->department_id,
             'department_name' => $item->department->name ?? '',
             'is_header_complete' => $isHeaderComplete, // *** TAMBAHAN BARU ***
@@ -396,7 +398,8 @@ public function show($id)
         'updatedBy',
         'monthlyData' => function($query) {
             $query->orderBy('month', 'asc')->with(['uploads', 'createdBy', 'updatedBy']);
-        }
+        },
+        'approval:document_id,type_document,status,tahun,jabatan_id'
     ])
     // Hapus filter status agar bisa menampilkan semua status
     ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
@@ -601,6 +604,7 @@ public function show($id)
     $orderedData = [
         'id' => $data->id,
         'risk_status' => $riskStatus, // *** DIUBAH: sekarang menggunakan $riskStatus ***
+        'type_document' => $data->approval->type_document ?? null,
         'department_id' => $data->department_id,
         'department_name' => $data->department->name ?? '',
         'is_header_complete' => $isHeaderComplete, // *** TAMBAHAN BARU ***
@@ -1595,6 +1599,7 @@ public function submit(Request $request, $id)
         if ($existingApproval) {
             // Update existing approval entry
             $existingApproval->update([
+                'type_document' => 'Risk Profile',
                 'tahun' => $riskHeader->year,
                 'jabatan_id' => $jabatanId,
                 'status' => 'pending',
@@ -1605,6 +1610,7 @@ public function submit(Request $request, $id)
             // Buat approval entry baru
             \App\Models\MstApproval::create([
                 'document_id' => $riskHeader->id,
+                'type_document' => 'Risk Profile',
                 'tahun' => $riskHeader->year,
                 'posisi' => 1,
                 'jabatan_id' => $jabatanId,
@@ -1954,6 +1960,7 @@ public function getPendingApproval(Request $request)
             'department:id,name',
             'optionTargetSatuTahun:id,name,position',
             'createdBy:id,name',
+            'approval:document_id,type_document,status,tahun,jabatan_id'
         ]);
 
         // Filter department berdasarkan role
@@ -2027,7 +2034,7 @@ public function getPendingApproval(Request $request)
                     ->toArray();
             }
 
-           // Status override untuk MenRisk approve → final
+            // Status override untuk MenRisk approve → final
             $displayStatus = $riskHeader->status;
             if ($riskHeader->menrisk_by !== null && $riskHeader->status === 'approved') {
                 $displayStatus = 'final';
@@ -2035,6 +2042,7 @@ public function getPendingApproval(Request $request)
 
             return [
                 'id' => $riskHeader->id,
+                'type_document' => $riskHeader->approval->type_document ?? null,
                 'department_id' => $riskHeader->department_id,
                 'department_name' => $riskHeader->department ? clean_string($riskHeader->department->name) : null,
                 'year' => $riskHeader->year,

@@ -290,4 +290,9 @@ public function residualTargetHeatmapRange()
     {
         return $this->belongsTo(TrRcsaHeader::class, 'rcsa_header_id', 'id');
     }
+
+    public function approval()
+    {
+        return $this->hasOne(MstApproval::class, 'document_id', 'id');
+    }
 }

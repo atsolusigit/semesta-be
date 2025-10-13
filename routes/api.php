@@ -31,6 +31,7 @@ use App\Http\Controllers\MstApprovalController;
 use App\Http\Controllers\MstMonthRecommendationController;
 use App\Http\Controllers\TrRcsaHeaderController;
 use App\Http\Controllers\LostEventController;
+use App\Http\Controllers\RencanaInvestasiController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -333,4 +334,12 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/rcsa-sasaran', [TrRcsaHeaderController::class, 'sasaran']);
     Route::put('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'update']);
     Route::post('/rcsa-header/{id}/submit', [TrRcsaHeaderController::class, 'submit']);
+});
+
+// ===================== RENCANA INVESTASI =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/investasi', [RencanaInvestasiController::class, 'index']);
+    Route::post('/investasi', [RencanaInvestasiController::class, 'store']);
+    Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
+    // Route::delete('/rcsa-header/{id}', [RencanaInvestasiController::class, 'destroy']);
 });

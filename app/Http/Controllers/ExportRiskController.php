@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TrRiskHeader;
+use App\Models\LostEvent;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\MultiSheetRiskExport;
@@ -863,4 +864,241 @@ private function getRiskColorByPosition($posisi)
     // Default putih jika tidak ada match
     return '#FFFFFF';
 }
+
+/**
+ * Export Lost Event
+ */
+public function exportLostEvent(Request $request, $format)
+{
+    // Validasi format
+    if (!in_array($format, ['excel', 'pdf'])) {
+        return response()->json([
+            'status' => 400,
+            'success' => false,
+            'message' => 'Format tidak didukung',
+            'data' => 'Format yang didukung: excel, pdf'
+        ], 400);
+    }
+
+    $user = Auth::user();
+
+    $filterYear = $request->get('year');
+    $filterType = strtolower($request->get('type', ''));
+    $filterDepartment = $request->get('department_id');
+    $search = $request->get('search');
+
+    // Ambil data header
+    $headers = TrRiskHeader::with([
+        'department:id,name',
+        'optionTargetSatuTahun:id,name,type',
+        'monthlyData' => function ($query) {
+            $query->where('is_finalize', true)->orderBy('month', 'asc');
+        }
+    ])
+    ->when($filterYear, function ($query) use ($filterYear) {
+        $query->where('year', $filterYear);
+    })
+    ->when($filterDepartment, function ($query) use ($filterDepartment) {
+        $query->where('department_id', $filterDepartment);
+    })
+    ->when($search, function ($query) use ($search) {
+        $query->where(function ($q) use ($search) {
+            $q->where('year', 'like', '%' . $search . '%')
+              ->orWhere('jenis_risiko', 'like', '%' . $search . '%')
+              ->orWhere('peristiwa_risiko', 'like', '%' . $search . '%')
+              ->orWhereHas('department', function ($dept) use ($search) {
+                  $dept->where('name', 'like', '%' . $search . '%');
+              });
+        });
+    })
+    ->orderBy('id', 'desc')
+    ->get()
+    ->unique('id')
+    ->values();
+
+    if ($headers->isEmpty()) {
+        return response()->json([
+            'status' => 404,
+            'success' => false,
+            'message' => 'Tidak ada data Lost Event untuk diexport.',
+        ], 404);
+    }
+
+    $filteredData = collect();
+
+    foreach ($headers as $item) {
+        $targetType = optional($item->optionTargetSatuTahun)->type;
+
+        if (!$targetType) {
+            if (!empty($item->target_quantitative_satu_tahun) && preg_match('/\d/', $item->target_quantitative_satu_tahun)) {
+                $targetType = 'kuantitatif';
+            } elseif (!empty($item->target_satu_tahun_notes)) {
+                $targetType = 'kualitatif';
+            }
+        }
+
+        $normalizedType = strtolower($targetType ?? 'unknown');
+
+        // Hitung persentase capaian
+        $percentage = 0;
+        if (in_array($normalizedType, ['kuantitatif', 'quantitative'])) {
+            $totalTarget = 0;
+            $totalRealisasi = 0;
+            foreach ($item->monthlyData as $monthly) {
+                $targetNum = (float) preg_replace('/[^0-9]/', '', $monthly->target_quantitative ?? '0');
+                $realNum = (float) preg_replace('/[^0-9]/', '', $monthly->realization_quantitative ?? '0');
+                $totalTarget += $targetNum;
+                $totalRealisasi += $realNum;
+            }
+            if ($totalTarget > 0) {
+                $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+            }
+        } elseif (in_array($normalizedType, ['kualitatif', 'qualitative'])) {
+            $desemberData = $item->monthlyData->firstWhere('month', 12);
+            if ($desemberData && !empty($desemberData->realization_kualitatif)) {
+                $realText = trim(str_replace(['%', ','], ['', '.'], $desemberData->realization_kualitatif));
+                $percentage = round((float) $realText, 2);
+            }
+        }
+
+        $item->calculated_percentage = $percentage;
+        $item->detected_type = $normalizedType;
+        $filteredData->push($item);
+    }
+
+    if ($filteredData->isEmpty()) {
+        return response()->json([
+            'status' => 404,
+            'success' => false,
+            'message' => 'Data Lost Event tidak ditemukan untuk filter tersebut.',
+        ], 404);
+    }
+
+    // Ambil data Lost Event
+    $headerIds = $filteredData->pluck('id')->toArray();
+    $lostEvents = \App\Models\LostEvent::whereIn('header_id', $headerIds)
+        ->withTrashed()
+        ->get()
+        ->keyBy('header_id');
+
+    if ($lostEvents->isEmpty()) {
+        return response()->json([
+            'status' => 404,
+            'success' => false,
+            'message' => 'Tidak ada data Lost Event untuk diexport.',
+        ], 404);
+    }
+
+    // Siapkan data export
+    $exportData = $this->prepareLostEventData($filteredData, $lostEvents);
+    if (empty($exportData)) {
+        return response()->json([
+            'status' => 404,
+            'success' => false,
+            'message' => 'Tidak ada data Lost Event untuk diexport.',
+        ], 404);
+    }
+
+    $departmentName = $this->getDepartmentNameFromHeaders($filteredData, $filterDepartment);
+    $yearName = $filterYear ?? 'SEMUA_TAHUN';
+
+    try {
+        if ($format === 'excel') {
+            return $this->exportLostEventExcel($exportData, $yearName, $departmentName);
+        } else {
+            return $this->exportLostEventPdf($exportData, $yearName, $departmentName);
+        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 500,
+            'success' => false,
+            'message' => 'Gagal melakukan export.',
+            'data' => ['error' => $e->getMessage()],
+        ], 500);
+    }
+}
+
+/**
+ * Prepare data untuk export
+ */
+private function prepareLostEventData($headers, $lostEvents)
+{
+    $data = [];
+    $no = 1;
+
+    foreach ($headers as $item) {
+        $lostEvent = $lostEvents->get($item->id);
+
+        if (!$lostEvent) {
+            continue;
+        }
+
+        $data[] = [
+            'no' => $no++,
+            'tahun' => $item->year,
+            'risk_owner_department' => optional($item->department)->name ?? '',
+            'jenis_risiko' => $item->jenis_risiko ?? '',
+            'nama_kejadian' => $lostEvent->nama_kejadian ?? '',
+            'identifikasi_kejadian' => $item->peristiwa_risiko ?? '',
+            'kategori_kejadian' => $lostEvent->kategori_kejadian ?? '',
+            'sumber_penyebab_kejadian' => $lostEvent->sumber_penyebab_kejadian ?? '',
+            'penyebab_kejadian' => $item->penyebab_risiko ?? '',
+            'penanganan_saat_kejadian' => $lostEvent->penanganan_saat_kejadian ?? '',
+            'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian ?? '',
+            'pihak_terkait' => $lostEvent->pihak_terkait ?? '',
+            'status_asuransi' => $lostEvent->status_asuransi ?? '',
+            'kategori_risiko_bumn' => $lostEvent->kategori_risiko_bumn ?? '',
+            'kategori_risiko_t2_t3_kbumn' => $lostEvent->kategori_risiko_t2_t3_kbumn ?? '',
+            'penjelasan_kerugian' => $lostEvent->penjelasan_kerugian ?? '',
+            'nilai_kerugian' => $lostEvent->nilai_kerugian ?? 0,
+            'nilai_kerugian_formatted' => $this->formatCurrency($lostEvent->nilai_kerugian ?? 0),
+            'kejadian_berulang' => $lostEvent->kejadian_berulang ?? '',
+            'frekuensi_kejadian' => $lostEvent->frekuensi_kejadian ?? '',
+            'mitigasi_yang_direncanakan' => $item->mitigasi ?? '',
+            'realisasi_mitigasi' => $lostEvent->realisasi_mitigasi ?? '',
+            'perbaikan_mendatang' => $lostEvent->perbaikan_mendatang ?? '',
+            'nilai_premi' => $lostEvent->nilai_premi ?? 0,
+            'nilai_premi_formatted' => $this->formatCurrency($lostEvent->nilai_premi ?? 0),
+            'nilai_klaim' => $lostEvent->nilai_klaim ?? 0,
+            'nilai_klaim_formatted' => $this->formatCurrency($lostEvent->nilai_klaim ?? 0),
+            'realization_percentage' => number_format($item->calculated_percentage, 2) . '%',
+            'type' => $item->detected_type ?? 'unknown',
+        ];
+    }
+
+    return $data;
+}
+
+/**
+ * Export Lost Event ke Excel
+ */
+private function exportLostEventExcel($data, $year, $departmentName)
+{
+    $filename = "Lost_Event_Report_{$departmentName}_{$year}_" . time() . ".xlsx";
+
+    return Excel::download(
+        new \App\Exports\LostEventExport($data, $year, $departmentName),
+        $filename
+    );
+}
+
+/**
+ * Export Lost Event ke PDF
+ */
+private function exportLostEventPdf($data, $year, $departmentName)
+{
+    $filename = "Lost_Event_Report_{$departmentName}_{$year}_" . time() . ".pdf";
+
+    $pdf = Pdf::loadView('exports.lost_event_pdf', [
+        'data' => $data,
+        'year' => $year,
+        'departmentName' => $departmentName,
+    ]);
+
+    $pdf->setPaper('A4', 'landscape');
+
+    return $pdf->download($filename);
+}
+
+
 }

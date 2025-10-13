@@ -25,7 +25,7 @@ use App\Http\Controllers\ExportRiskController;
 use App\Http\Controllers\HeatmapController;
 use App\Http\Controllers\TrRiskHeaderEntryController;
 use App\Http\Controllers\TrRiskMonthlyEntryController;
-use App\Http\Controllers\RiskTimelinePdfController;
+// use App\Http\Controllers\RiskTimelinePdfController;
 use App\Http\Controllers\MstJabatanController;
 use App\Http\Controllers\MstApprovalController;
 use App\Http\Controllers\MstMonthRecommendationController;
@@ -257,18 +257,23 @@ Route::middleware(['auth:api'])->group(function () {
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/export-risk/{format}', [ExportRiskController::class, 'export'])
         ->where(['format' => 'pdf|excel'])
-        ->middleware(RoleAccessMiddleware::class . ':1,2,3');                                        // Export risk file (role 1,2,3)
+        ->middleware(RoleAccessMiddleware::class . ':1,2,3'); // Export risk file (role 1,2,3)
 
     Route::get('/export-risk/{id}/preview', [ExportRiskController::class, 'preview'])
         ->where('id', '[0-9]+')
-        ->middleware(RoleAccessMiddleware::class . ':1,2,3');                                        // Preview export risk (role 1,2,3)
+        ->middleware(RoleAccessMiddleware::class . ':1,2,3'); // Preview export risk (role 1,2,3)
+
+    // Export Lost Event (hanya role 1, 4, dan 5)
+    Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])
+        ->where(['format' => 'pdf|excel'])
+        ->middleware(RoleAccessMiddleware::class . ':1,4,5');
 });
 
 // ===================== RISK TIMELINE PDF =====================
-Route::middleware(['auth:api'])->group(function () {
-    Route::get('/risk-timeline/download-pdf/{headerId}', [RiskTimelinePdfController::class, 'downloadTimelinePdf'])
-        ->name('api.risk.timeline.pdf');                                                            // Download timeline PDF (role 1,2,3)
-});
+// Route::middleware(['auth:api'])->group(function () {
+//     Route::get('/risk-timeline/download-pdf/{headerId}', [RiskTimelinePdfController::class, 'downloadTimelinePdf'])
+//         ->name('api.risk.timeline.pdf');                                                            // Download timeline PDF (role 1,2,3)
+// });
 
 // ===================== MST JABATAN =====================
 Route::middleware(['auth:api'])->group(function () {
@@ -305,6 +310,8 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
 });
 
+// Export Lost Event
+Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])->name('export.lost-event');
 // Route untuk debug data
 Route::get('/debug-risk-data', [ExportRiskController::class, 'debugRiskData']);
 

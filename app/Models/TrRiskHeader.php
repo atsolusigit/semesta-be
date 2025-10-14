@@ -47,6 +47,9 @@ class TrRiskHeader extends Model
         'menrisk_note',
         'menrisk_by',
         'menrisk_at',
+        'vp_menrisk_by',
+        'vp_menrisk_at',
+        'vp_menrisk_note',
     ];
 
     protected $casts = [

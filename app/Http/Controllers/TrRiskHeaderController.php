@@ -248,25 +248,37 @@ public function index(Request $request)
             }
         }
 
+        // ================================
+        // Pisahkan risk_status dan override_status
+        // ================================
+        $overrideStatus = $item->status;
+
+        if ($item->menrisk_by !== null && $item->status === 'approved') {
+            $overrideStatus = 'final';
+        } elseif ($item->status === 'rejected') {
+            $overrideStatus = 'rejected';
+        }
+
         // Tentukan risk status berdasarkan kondisi
-        $riskStatus = $item->status;
+        $riskStatus = $overrideStatus;
         if ($isHeaderComplete && $allMonthsFinalized) {
             $riskStatus = 'close'; // Otomatis close jika semua data lengkap dan finalisasi
-        } elseif ($item->status === 'approved' && !$isHeaderComplete) {
+        } elseif ($overrideStatus === 'approved' && !$isHeaderComplete) {
             $riskStatus = 'pending'; // Approved tapi data header belum lengkap
-        } elseif ($item->status === 'approved' && $isHeaderComplete && !$allMonthsFinalized) {
+        } elseif ($overrideStatus === 'approved' && $isHeaderComplete && !$allMonthsFinalized) {
             $riskStatus = 'open'; // Approved, header lengkap, tapi belum semua bulan finalisasi
         }
         // *** AKHIR TAMBAHAN BARU ***
 
         return [
             'id' => $item->id,
-            'risk_status' => $riskStatus, // *** DIUBAH: sekarang menggunakan $riskStatus ***
+            'risk_status' => $riskStatus,
+            'override_status' => $overrideStatus,
             'type_document' => $item->approval->type_document ?? null,
             'department_id' => $item->department_id,
             'department_name' => $item->department->name ?? '',
-            'is_header_complete' => $isHeaderComplete, // *** TAMBAHAN BARU ***
-            'all_months_finalized' => $allMonthsFinalized, // *** TAMBAHAN BARU ***
+            'is_header_complete' => $isHeaderComplete,
+            'all_months_finalized' => $allMonthsFinalized,
             // 'is_complete' => (bool) $item->is_complete,
             'risk_code' => $riskCodes, // Sekarang berupa array dari multiple risk codes
             'process_code' => $item->process_code ?? '',
@@ -314,6 +326,7 @@ public function index(Request $request)
             // 'department' => $item->department ?? null,
             'menrisk_note' => $item->menrisk_note ?? '',
             'spv_note' => $item->approval_notes ?? '',
+            'vp_menrisk_note' => clean_string($item->vp_menrisk_note ?? null),
 
             // Array rekomendasi di level header
             'rekomendasi' => $rekomendasi,
@@ -2034,10 +2047,18 @@ public function getPendingApproval(Request $request)
                     ->toArray();
             }
 
-            // Status override untuk MenRisk approve → final
-            $displayStatus = $riskHeader->status;
+            /// ================================
+            // Pisahkan risk_status dan override_status
+            // ================================
+            $riskStatus = $riskHeader->status;
+            $overrideStatus = $riskHeader->status;
+
             if ($riskHeader->menrisk_by !== null && $riskHeader->status === 'approved') {
-                $displayStatus = 'final';
+                $overrideStatus = 'final';
+                $riskStatus = 'final'; // ← tambahkan ini agar ikut final
+            } elseif ($riskHeader->status === 'rejected') {
+                $overrideStatus = 'rejected';
+                $riskStatus = 'rejected'; // pastikan konsisten juga
             }
 
             return [
@@ -2061,7 +2082,8 @@ public function getPendingApproval(Request $request)
                     'id' => $riskHeader->department->id,
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
-                'risk_status' => $displayStatus, //  Status sudah dioverride
+                'risk_status' => $riskStatus,              // status asli dari DB
+                'override_status' => $overrideStatus,      // status hasil kalkulasi MenRisk
                 'desc' => clean_string($riskHeader->desc),
                 'created_at' => $riskHeader->created_at,
                 'created_by_name' => $createdByName,
@@ -2069,10 +2091,10 @@ public function getPendingApproval(Request $request)
                 'biaya_perlakuan_risiko' => number_format($riskHeader->biaya_perlakuan_risiko ?? 0, 0, ',', '.'),
                 'notes' => $riskHeader->approval_notes,
                 'menrisk_note' => clean_string($riskHeader->menrisk_note),
+                'vp_menrisk_note' => clean_string($riskHeader->vp_menrisk_note ?? null), // tambahan baru
             ];
         });
 
-        // Format response dengan pagination
         $paginationData = [
             'data' => $responseData,
             'current_page' => $pendingData->currentPage(),
@@ -2464,7 +2486,6 @@ public function approveMenrisk(Request $request, $id)
     }
 }
 
-// Reject by MenRisk
 public function rejectMenrisk(Request $request, $id)
 {
     try {
@@ -2503,10 +2524,17 @@ public function rejectMenrisk(Request $request, $id)
         $header->menrisk_at = now();
         $header->status = 'rejected';
         $header->is_complete = false;
+
         // Reset approval SPV Unit agar harus approve ulang
         $header->approved_by = null;
         $header->approved_at = null;
         $header->approval_notes = null;
+
+        // Reset approval VP MenRisk agar bisa approve ulang setelah revisi
+        $header->vp_menrisk_by = null;
+        $header->vp_menrisk_at = null;
+        $header->vp_menrisk_note = null;
+
         $header->save();
 
         return json(200, true, 'Berhasil Ditolak', 'Header berhasil di-reject oleh Manajemen Risiko. User perlu memperbaiki data dan submit ulang untuk review SPV Unit.', [
@@ -2516,12 +2544,107 @@ public function rejectMenrisk(Request $request, $id)
             'menrisk_note' => $header->menrisk_note,
             'menrisk_by' => $header->menrisk_by,
             'menrisk_at' => $header->menrisk_at,
-            'next_step' => 'User perbaiki data → Submit → SPV Unit approve → MenRisk approve'
+            'next_step' => 'User perbaiki data → Submit → SPV Unit approve → VP MenRisk approve → SPV MenRisk approve'
         ]);
 
     } catch (\Exception $e) {
         \Log::error('Error rejectMenrisk: ' . $e->getMessage());
         return json(500, false, 'Gagal Reject', 'Terjadi kesalahan sistem saat reject MenRisk.', $e->getMessage());
+    }
+}
+
+
+public function approveVpMenrisk(Request $request, $id)
+{
+    try {
+        $user = Auth::user();
+
+        // Role VP MenRisk hanya 1 dan 6
+        if (!in_array($user->role_id, [1, 6])) {
+            return json(403, false, 'Akse6 Ditolak', 'Anda tidak memiliki hak untuk approve tahap VP MenRisk.', null);
+        }
+
+        $header = TrRiskHeader::find($id);
+        if (!$header) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        // Cegah approve berulang
+        if ($header->vp_menrisk_by) {
+            return json(400, false, 'Sudah Disetujui', 'Data ini sudah pernah di-approve oleh VP MenRisk.', null);
+        }
+
+        // Update data approve VP MenRisk (tanpa ubah status)
+        $header->update([
+            'vp_menrisk_by' => $user->id,
+            'vp_menrisk_at' => now(),
+            'vp_menrisk_note' => $request->input('vp_menrisk_note', null),
+        ]);
+
+        return json(200, true, 'Berhasil Disetujui', 'Data berhasil di-approve oleh VP MenRisk. Menunggu approval SPV MenRisk.', [
+            'id' => $header->id,
+            'status' => $header->status, // tetap pakai status lama
+            'vp_menrisk_by' => $header->vp_menrisk_by,
+            'vp_menrisk_at' => $header->vp_menrisk_at,
+            'vp_menrisk_note' => $header->vp_menrisk_note,
+            'next_step' => 'Menunggu persetujuan dari SPV MenRisk'
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error approveVpMenrisk: ' . $e->getMessage());
+        return json(500, false, 'Gagal Approve VP MenRisk', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+public function rejectVpMenrisk(Request $request, $id)
+{
+    try {
+        $user = Auth::user();
+
+        if (!in_array($user->role_id, [1, 6])) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk reject tahap VP MenRisk.', null);
+        }
+
+        $validated = $request->validate([
+            'vp_menrisk_note' => 'required|string',
+        ]);
+
+        $header = TrRiskHeader::find($id);
+        if (!$header) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        // Saat VP MenRisk reject → kembali ke status submitted agar diperbaiki user
+       $header->update([
+        'status' => 'rejected',
+        'is_complete' => false,
+        'vp_menrisk_by' => $user->id,
+        'vp_menrisk_at' => now(),
+        'vp_menrisk_note' => $request->vp_menrisk_note,
+
+        // Reset approval SPV Unit agar approve ulang
+        'approved_by' => null,
+        'approved_at' => null,
+        'approval_notes' => null,
+
+        // Reset persetujuan VP MenRisk lama agar tidak terbaca sudah approve
+        'vp_menrisk_by' => null,
+        'vp_menrisk_at' => null,
+        ]);
+
+
+        return json(200, true, 'Berhasil Ditolak', 'Header berhasil di-reject oleh VP MenRisk. User perlu memperbaiki data dan submit ulang.', [
+            'id' => $header->id,
+            'status' => $header->status,
+            'vp_menrisk_note' => $header->vp_menrisk_note,
+            'vp_menrisk_by' => $header->vp_menrisk_by,
+            'vp_menrisk_at' => $header->vp_menrisk_at,
+            'next_step' => 'User perbaiki data → Submit → SPV Unit approve → VP MenRisk approve → SPV MenRisk approve'
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error rejectVpMenrisk: ' . $e->getMessage());
+        return json(500, false, 'Gagal Reject VP MenRisk', 'Terjadi kesalahan sistem.', $e->getMessage());
     }
 }
 

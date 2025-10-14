@@ -11,7 +11,7 @@ use App\Models\TrRcsaHeader;
 use App\Models\TrRcsaResidual;
 use App\Models\TrRcsaRencanaRisikoList;
 use PhpParser\Node\Stmt\TryCatch;
-use App\Models\MstJabatan;
+use App\Models\MstJabatan; 
 
 class TrRcsaHeaderController extends Controller
 {
@@ -534,6 +534,8 @@ class TrRcsaHeaderController extends Controller
 
             /********* HAPUS RCSA Risiko List **********/
             TrRcsaRencanaRisikoList::where('rcsa_id', $rcsaHeader->id)->delete();
+
+            $rcsaHeader->delete();
 
              $deletedData = [
                 'id' => $rcsaHeader->id,

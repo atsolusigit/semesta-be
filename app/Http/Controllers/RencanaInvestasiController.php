@@ -30,6 +30,9 @@ class RencanaInvestasiController extends Controller
         ->when($request->nama_investasi, function ($query) use ($request) {
              $query->where('nama_investasi', 'like', '%' . $request->nama_investasi . '%');
         })
+        ->when($request->jenis_investasi, function ($query) use ($request) {
+            $query->where('jenis_investasi', 'like', '%' . $request->jenis_investasi . '%');
+        })
         ->when($request->tahun, function ($query) use ($request) {
             $query->where('year', $request->tahun);
         })

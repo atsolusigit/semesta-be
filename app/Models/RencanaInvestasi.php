@@ -13,6 +13,7 @@ class RencanaInvestasi extends Model
         'department_name',
         'nama_investasi',
         'kategori_investasi',
+        'jenis_investasi',
         'year',
         'nilai_rkap',
         'nilai_revisi',

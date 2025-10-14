@@ -191,6 +191,8 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/risk-header/{id}', [TrRiskHeaderController::class, 'destroy']);                  // Hapus risk header (role 1)
     Route::patch('/risk-headers/{id}/approve-menrisk', [TrRiskHeaderController::class, 'approveMenrisk']); // Approve menrisk (role 4)
     Route::patch('/risk-headers/{id}/reject-menrisk', [TrRiskHeaderController::class, 'rejectMenrisk']);   // Reject menrisk (role 4)
+    Route::patch('/risk-headers/{id}/approve-vpmenrisk', [TrRiskHeaderController::class, 'approveVpMenrisk']); // Approve VP MenRisk (role 6)
+    Route::patch('/risk-headers/{id}/reject-vpmenrisk', [TrRiskHeaderController::class, 'rejectVpMenrisk']);   // Reject VP MenRisk (role 6)
 });
 
 // ===================== MITIGATION MONTHLY =====================

@@ -76,8 +76,8 @@
 <body>
     <div class="header">
         <h2>LAPORAN LOST EVENT</h2>
-        <p>{{ str_replace('_', ' ', $departmentName) }}</p>
-        <p>Tahun: {{ $year }}</p>
+        {{-- <p>{{ str_replace('_', ' ', $departmentName) }}</p> --}}
+        {{-- <p>Tahun: {{ $year }}</p> --}}
         <p>Tanggal Cetak: {{ date('d/m/Y') }}</p>
     </div>
 

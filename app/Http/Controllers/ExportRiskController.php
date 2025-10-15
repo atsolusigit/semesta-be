@@ -46,6 +46,7 @@ class ExportRiskController extends Controller
         // Ambil data header dengan semua field yang diperlukan untuk semua export
         $headers = TrRiskHeader::with([
             'department:id,name',
+            'jenisRisiko:id,nama_jenis_risiko',
             'monthlyData' => function ($q) use ($filterYear, $filterMonth) {
                 $q->select([
                     'id',
@@ -147,38 +148,36 @@ class ExportRiskController extends Controller
         }
     }
 
-    /**
+        /**
      * Load risk code names untuk multiple risk codes
      */
-    private function loadRiskCodeNames($headers)
-    {
-        foreach ($headers as $header) {
-            if (!empty($header->risk_code)) {
-                // Parse risk_code jika berupa JSON string
-                $riskCodeIds = is_string($header->risk_code) ?
-                    json_decode($header->risk_code, true) : $header->risk_code;
+   private function loadRiskCodeNames($headers)
+{
+    foreach ($headers as $header) {
+        if (!empty($header->risk_code)) {
+            $riskCodeIds = $header->risk_code;
 
-                if (is_array($riskCodeIds)) {
-                    // Query multiple risk codes
-                    $riskCodes = \DB::table('mst_risk_code')
-                        ->whereIn('id', $riskCodeIds)
-                        ->get(['id', 'name']);
-
-                    $header->riskCode = $riskCodes;
-                } else {
-                    // Single risk code
-                    $riskCode = \DB::table('mst_risk_code')
-                        ->where('id', $riskCodeIds)
-                        ->first(['id', 'name']);
-
-                    $header->riskCode = $riskCode ? collect([$riskCode]) : collect([]);
-                }
-            } else {
-                $header->riskCode = collect([]);
+            // String dengan koma → array
+            if (is_string($riskCodeIds) && strpos($riskCodeIds, ',') !== false) {
+                $riskCodeIds = explode(',', $riskCodeIds);
             }
+
+            // Single id → array
+            if (!is_array($riskCodeIds)) {
+                $riskCodeIds = [$riskCodeIds];
+            }
+
+            // Query risk codes
+            $riskCodes = \DB::table('mst_risk_code')
+                ->whereIn('id', $riskCodeIds)
+                ->get(['id', 'code']);
+
+            $header->riskCode = $riskCodes;
+        } else {
+            $header->riskCode = collect([]);
         }
     }
-
+}
     /**
      * Export ke Excel (Multi-sheet)
      */
@@ -313,7 +312,7 @@ class ExportRiskController extends Controller
         $data[] = [
             'no' => $no++,
             'risk_code' => $this->getRiskCodeName($header),
-            'jenis_risiko' => $header->jenis_risiko ?? '',
+            'jenis_risiko' => $header->jenisRisiko->nama_jenis_risiko ?? '',
             'sasaran' => $header->sasaran ?? '',
             'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
             'penyebab_risiko' => $header->penyebab_risiko ?? '',
@@ -381,7 +380,7 @@ class ExportRiskController extends Controller
         $data[] = [
             'no' => $no++,
             'risk_code' => $this->getRiskCodeName($header),
-            'jenis_risiko' => $header->jenis_risiko ?? '',
+            'jenis_risiko' => $header->jenisRisiko->nama_jenis_risiko ?? '',
             'peristiwa_risiko' => $header->peristiwa_risiko ?? '',
             'penyebab_risiko' => $header->penyebab_risiko ?? '',
             'target_bulan' => $targetBulan,
@@ -510,51 +509,38 @@ private function formatTarget($quantitative, $qualitative)
     return $result;
 }
 
-    private function getRiskCodeName($header)
-    {
-        // Kalau sudah ada relasi riskCode
-        if (isset($header->riskCode) && $header->riskCode && $header->riskCode->isNotEmpty()) {
-            return $header->riskCode->map(function ($code) {
-                return (!empty($code->code) ? $code->code . ' - ' : '') . $code->name;
-            })->implode(', ');
-        }
-
-        if (!empty($header->risk_code)) {
-            $riskCodeIds = $header->risk_code;
-
-            // Coba decode JSON
-            if (is_string($riskCodeIds)) {
-                $decoded = json_decode($riskCodeIds, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    $riskCodeIds = $decoded;
-                }
-            }
-
-            // String dengan koma → array
-            if (is_string($riskCodeIds) && str_contains($riskCodeIds, ',')) {
-                $riskCodeIds = explode(',', $riskCodeIds);
-            }
-
-            // Single id → array
-            if (is_numeric($riskCodeIds)) {
-                $riskCodeIds = [$riskCodeIds];
-            }
-
-            if (is_array($riskCodeIds) && !empty($riskCodeIds)) {
-                $riskCodes = DB::table('mst_risk_code')
-                    ->whereIn('id', $riskCodeIds)
-                    ->orderBy('id')
-                    ->get(['name']);
-
-                return $riskCodes->map(function ($rc) {
-                    return (!empty($rc->code) ? $rc->code . ' - ' : '') . $rc->name;
-                })->implode(', ');
-            }
-        }
-
-        return '';
+           private function getRiskCodeName($header)
+{
+    // Kalau sudah ada relasi riskCode
+    if (isset($header->riskCode) && $header->riskCode && $header->riskCode->isNotEmpty()) {
+        return $header->riskCode->pluck('code')->implode(', ');
     }
 
+    if (!empty($header->risk_code)) {
+        $riskCodeIds = $header->risk_code;
+
+        // String dengan koma → array
+        if (is_string($riskCodeIds) && str_contains($riskCodeIds, ',')) {
+            $riskCodeIds = explode(',', $riskCodeIds);
+        }
+
+        // Single id → array
+        if (is_numeric($riskCodeIds)) {
+            $riskCodeIds = [$riskCodeIds];
+        }
+
+        if (is_array($riskCodeIds) && !empty($riskCodeIds)) {
+            $riskCodes = DB::table('mst_risk_code')
+                ->whereIn('id', $riskCodeIds)
+                ->orderBy('id')
+                ->pluck('code');
+
+            return $riskCodes->implode(', ');
+        }
+    }
+
+    return '';
+}
     /**
      * Prepare data untuk Heatmap PDF
      */
@@ -727,6 +713,7 @@ private function formatTarget($quantitative, $qualitative)
         try {
             $headers = TrRiskHeader::with([
                 'department:id,name',
+                'jenisRisiko:id,nama_jenis_risiko',
                 'monthlyData' => function ($q) use ($filterYear, $filterMonth) {
                     $q->select([
                         'id',
@@ -891,6 +878,7 @@ public function exportLostEvent(Request $request, $format)
     $headers = TrRiskHeader::with([
         'department:id,name',
         'optionTargetSatuTahun:id,name,type',
+        'jenisRisiko:id,nama_jenis_risiko',
         'monthlyData' => function ($query) {
             $query->where('is_finalize', true)->orderBy('month', 'asc');
         }
@@ -1037,7 +1025,7 @@ private function prepareLostEventData($headers, $lostEvents)
             'no' => $no++,
             'tahun' => $item->year,
             'risk_owner_department' => optional($item->department)->name ?? '',
-            'jenis_risiko' => $item->jenis_risiko ?? '',
+             'jenis_risiko' => $item->jenisRisiko->nama_jenis_risiko ?? '',
             'nama_kejadian' => $lostEvent->nama_kejadian ?? '',
             'identifikasi_kejadian' => $item->peristiwa_risiko ?? '',
             'kategori_kejadian' => $lostEvent->kategori_kejadian ?? '',

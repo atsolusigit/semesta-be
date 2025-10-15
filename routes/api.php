@@ -355,7 +355,7 @@ Route::middleware(['auth:api'])->group(function () {
 
 
 // check api
-Route::get('/health', function () {
+Route::get('/health-v2', function () {
     return response()->json([
         'status' => 'ok',
         'time' => now()->toDateTimeString(),

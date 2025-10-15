@@ -352,3 +352,12 @@ Route::middleware(['auth:api'])->group(function () {
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
     // Route::delete('/rcsa-header/{id}', [RencanaInvestasiController::class, 'destroy']);
 });
+
+
+// check api
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'time' => now()->toDateTimeString(),
+    ]);
+});

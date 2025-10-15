@@ -1,0 +1,46 @@
+name: Deploy Laravel to Droplet
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+          
+
+      - name: Deploy via SSH
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.DROPLET_IP }} << 'EOF'
+            cd /root/project
+
+            # Pull the latest code from the repository
+            git pull origin master
+            git checkout master
+
+            # Build docker if needed
+            docker compose down
+            docker compose up -d --build
+
+            # Laravel Commands
+            docker compose exec -T app php artisan migrate --force
+            docker compose exec -T app php artisan config:cache
+            docker compose exec -T app php artisan route:cache
+            docker compose exec -T app php artisan view:cache
+
+            # 🧹 Cleanup Docker cache after build
+            docker builder prune -af
+            docker system prune -af --volumes
+          EOF

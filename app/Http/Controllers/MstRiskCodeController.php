@@ -40,7 +40,7 @@ class MstRiskCodeController extends Controller
 
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|unique:mst_risk_code,code',
-            'name' => 'required|string',
+            'name' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -84,7 +84,7 @@ class MstRiskCodeController extends Controller
 
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|unique:mst_risk_code,code,' . $id,
-            'name' => 'required|string',
+            'name' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {

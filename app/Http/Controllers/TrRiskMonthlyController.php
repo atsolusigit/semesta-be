@@ -57,6 +57,7 @@ class TrRiskMonthlyController extends Controller
             return [
                 'id'   => $rc->id,
                 'name' => $rc->name,
+                'code' => $rc->code ?? null, // Tambahkan field code jika ada
             ];
         })->toArray();
 
@@ -197,6 +198,7 @@ public function show($id)
         return [
             'id'   => $rc->id,
             'name' => $rc->name,
+            'code' => $rc->code ?? null, // Tambahkan field code jika ada
         ];
     })->toArray();
 
@@ -295,6 +297,7 @@ public function getByHeader($headerId)
             return [
                 'id'   => $rc->id,
                 'name' => $rc->name,
+                'code' => $rc->code ?? null, // Tambahkan field code jika ada
             ];
         })->toArray();
 

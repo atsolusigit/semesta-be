@@ -35,6 +35,7 @@ public function index(Request $request)
         'rrKemungkinan:id,label',
         'department:id,name',
         'optionTargetSatuTahun:id,name,position,type',
+        'jenisRisiko:id,nama_jenis_risiko', //relasi ke mst_jenis_risiko
         'uploads',
         'monthlyData' => function ($query) {
             $query->orderBy('month', 'asc')
@@ -66,6 +67,18 @@ public function index(Request $request)
         $query->whereHas('department', function ($q) use ($request) {
             $q->where('name', 'like', '%' . $request->unit_kerja . '%');
         });
+    })
+    ->when($request->jenis_risiko, function ($query) use ($request) {
+    // Cek apakah input berupa ID (numeric) atau nama (string)
+    if (is_numeric($request->jenis_risiko)) {
+        // Jika numeric, cari berdasarkan ID
+        $query->where('jenis_risiko', $request->jenis_risiko);
+    } else {
+        // Jika string, cari berdasarkan nama di relasi
+        $query->whereHas('jenisRisiko', function ($q) use ($request) {
+            $q->where('nama_jenis_risiko', 'like', '%' . $request->jenis_risiko . '%');
+        });
+    }
     })
     ->when($request->tahun, function ($query) use ($request) {
         $query->where('year', $request->tahun);
@@ -217,11 +230,12 @@ public function index(Request $request)
         if (!empty($item->risk_code)) {
             $riskCodeIds = explode(',', $item->risk_code);
             $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
-                ->get(['id', 'name'])
+                ->get(['id', 'name', 'code'])
                 ->map(function ($riskCode) {
                     return [
                         'id' => $riskCode->id,
-                        'name' => clean_string($riskCode->name)
+                        'name' => clean_string($riskCode->name),
+                        'code' => $riskCode->code ?? null, // Tambahkan field code jika ada
                     ];
                 })
                 ->toArray();
@@ -282,7 +296,8 @@ public function index(Request $request)
             // 'is_complete' => (bool) $item->is_complete,
             'risk_code' => $riskCodes, // Sekarang berupa array dari multiple risk codes
             'process_code' => $item->process_code ?? '',
-            'jenis_risiko' => $item->jenis_risiko ?? '',
+            'jenis_risiko_id' => $item->jenis_risiko ?? null, // DIUBAH: ID
+            'jenis_risiko' => $item->jenisRisiko->nama_jenis_risiko ?? '', // DIUBAH: NAMA
             'sasaran' => $item->sasaran ?? '',
             'peristiwa_risiko' => $item->peristiwa_risiko ?? '',
             'penyebab_risiko' => $item->penyebab_risiko ?? '',
@@ -407,6 +422,7 @@ public function show($id)
         'rrKemungkinan:id,label',
         'department:id,name',
         'optionTargetSatuTahun:id,name,position,type',
+        'jenisRisiko:id,nama_jenis_risiko', //relasi ke mst_jenis_risiko
         'createdBy',
         'updatedBy',
         'monthlyData' => function($query) {
@@ -570,11 +586,12 @@ public function show($id)
     if (!empty($data->risk_code)) {
         $riskCodeIds = explode(',', $data->risk_code);
         $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
-            ->get(['id', 'name'])
+            ->get(['id', 'name', 'code'])
             ->map(function ($riskCode) {
                 return [
                     'id' => $riskCode->id,
-                    'name' => clean_string($riskCode->name)
+                    'name' => clean_string($riskCode->name),
+                    'code' => $riskCode->code ?? null, // Tambahkan field code jika ada
                 ];
             })
             ->toArray();
@@ -624,7 +641,8 @@ public function show($id)
         'all_months_finalized' => $allMonthsFinalized, // *** TAMBAHAN BARU ***
         'risk_code' => $riskCodes, // Sekarang berupa array dari multiple risk codes
         'process_code' => $data->process_code ?? '',
-        'jenis_risiko' => $data->jenis_risiko ?? '',
+        'jenis_risiko_id' => $data->jenis_risiko ?? null, // DIUBAH: ID
+        'jenis_risiko' => $data->jenisRisiko->nama_jenis_risiko ?? '', // DIUBAH: NAMA
         'sasaran' => $data->sasaran ?? '',
         'peristiwa_risiko' => $data->peristiwa_risiko ?? '',
         'penyebab_risiko' => $data->penyebab_risiko ?? '',
@@ -760,7 +778,7 @@ public function store(Request $request)
         // 14 field wajib untuk penyimpanan awal
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
-        'jenis_risiko' => 'required|string',
+        'jenis_risiko' => 'required|exists:mst_jenis_risiko,id', // harus ada di tabel mst_jenis_risiko
         'year' => 'required|integer',
         'sasaran' => 'required|string',
         'peristiwa_risiko' => 'required|string',
@@ -871,6 +889,7 @@ public function store(Request $request)
             'rrKemungkinan:id,label',
             'department:id,name',
             'createdBy:id,username',
+            'jenisRisiko:id,nama_jenis_risiko', //relasi ke mst_jenis_risiko
         ]);
 
         $createdByName = 'Unknown User';
@@ -883,7 +902,8 @@ public function store(Request $request)
         $responseData = [
             'id' => $riskHeader->id,
             'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
-            'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
+            'jenis_risiko' => $riskHeader->jenis_risiko,// id jenis risiko
+            'jenis_risiko_name' => $riskHeader->jenisRisiko->nama_jenis_risiko ?? null, // nama jenis risiko dari relasi
             'sasaran' => clean_string($riskHeader->sasaran),
             'peristiwa_risiko' => clean_string($riskHeader->peristiwa_risiko),
             'penyebab_risiko' => clean_string($riskHeader->penyebab_risiko),
@@ -1168,7 +1188,7 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
     $validator = Validator::make($request->all(), [
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
-        'jenis_risiko' => 'required|string',
+        'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',// jenis risiko harus ada di tabel mst_jenis_risiko
         'sasaran' => 'required|string',
         'year' => 'required|integer',
         'peristiwa_risiko' => 'required|string',
@@ -1351,7 +1371,7 @@ private function handleDraftUpdate(Request $request, $riskHeader)
     $validator = Validator::make($request->all(), [
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
-        'jenis_risiko' => 'required|string',
+        'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',// jenis risiko harus ada di tabel mst_jenis_risiko
         'sasaran' => 'required|string',
         'year' => 'required|integer',
         'peristiwa_risiko' => 'required|string',
@@ -1485,6 +1505,7 @@ private function buildResponse($riskHeader)
         'department:id,name',
         'optionTargetSatuTahun:id,name,position,type',
         'createdBy:id,username',
+        'jenisRisiko:id,nama_jenis_risiko', //relasi ke mst_jenis_risiko
     ]);
 
     $createdByName = 'Unknown User';
@@ -1499,7 +1520,8 @@ private function buildResponse($riskHeader)
     $responseData = [
         'id' => $riskHeader->id,
         'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
-        'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
+        'jenis_risiko_id' => $riskHeader->jenis_risiko, // DIUBAH: ID
+        'jenis_risiko' => $riskHeader->jenisRisiko->nama_jenis_risiko ?? null, // DIUBAH: NAMA
         'sasaran' => clean_string($riskHeader->sasaran),
         'peristiwa_risiko' => clean_string($riskHeader->peristiwa_risiko),
         'penyebab_risiko' => clean_string($riskHeader->penyebab_risiko),
@@ -1660,6 +1682,7 @@ public function monitoring(Request $request)
         'rrKemungkinan:id,label',
         'department:id,name',
         'optionTargetSatuTahun:id,name,position',
+        'jenisRisiko:id,nama_jenis_risiko', //relasi ke mst_jenis_risiko
         'uploads',
         'monthlyData' => function ($query) {
             $query->orderBy('month', 'asc')->with('uploads');
@@ -1733,11 +1756,12 @@ public function monitoring(Request $request)
         if (!empty($item->risk_code)) {
             $riskCodeIds = explode(',', $item->risk_code);
             $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
-                ->get(['id', 'name'])
+                ->get(['id', 'name', 'code'])
                 ->map(function ($riskCode) {
                     return [
                         'id' => $riskCode->id,
-                        'name' => clean_string($riskCode->name)
+                        'name' => clean_string($riskCode->name),
+                        'code' => clean_string($riskCode->code)
                     ];
                 })
                 ->toArray();
@@ -1846,7 +1870,8 @@ public function monitoring(Request $request)
             'id' => $item->id,
             'risk_code' => $riskCodes, // PERBAIKAN: Gunakan array yang sudah diproses
             'process_code' => $item->process_code ?? '',
-            'jenis_risiko' => $item->jenis_risiko ?? '',
+            'jenis_risiko_id' => $item->jenis_risiko ?? null, // DIUBAH: ID
+            'jenis_risiko' => $item->jenisRisiko->nama_jenis_risiko ?? '', // DIUBAH: NAMA
             'sasaran' => $item->sasaran ?? '',
             'peristiwa_risiko' => $item->peristiwa_risiko ?? '',
             'penyebab_risiko' => $item->penyebab_risiko ?? '',
@@ -1972,6 +1997,7 @@ public function getPendingApproval(Request $request)
             'rrKemungkinan:id,label',
             'department:id,name',
             'optionTargetSatuTahun:id,name,position',
+            'jenisRisiko:id,nama_jenis_risiko', //relasi ke mst_jenis_risiko
             'createdBy:id,name',
             'approval:document_id,type_document,status,tahun,jabatan_id'
         ]);
@@ -2037,11 +2063,12 @@ public function getPendingApproval(Request $request)
             if (!empty($riskHeader->risk_code)) {
                 $riskCodeIds = explode(',', $riskHeader->risk_code);
                 $riskCodes = MstRiskCode::whereIn('id', $riskCodeIds)
-                    ->get(['id', 'name'])
+                    ->get(['id', 'name', 'code'])
                     ->map(function ($item) {
                         return [
                             'id' => $item->id,
-                            'name' => clean_string($item->name)
+                            'name' => clean_string($item->name),
+                            'code' => clean_string($item->code)
                         ];
                     })
                     ->toArray();
@@ -2069,7 +2096,8 @@ public function getPendingApproval(Request $request)
                 'year' => $riskHeader->year,
                 'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
                 'risk_codes' => $riskCodes,
-                'jenis_risiko' => clean_string($riskHeader->jenis_risiko),
+                'jenis_risiko_id' => $riskHeader->jenis_risiko, // DIUBAH: ID
+                'jenis_risiko' => $riskHeader->jenisRisiko->nama_jenis_risiko ?? null, // DIUBAH: NAMA
                 'sasaran' => clean_string($riskHeader->sasaran),
                 'peristiwa_risiko' => clean_string($riskHeader->peristiwa_risiko),
                 'penyebab_risiko' => clean_string($riskHeader->penyebab_risiko),

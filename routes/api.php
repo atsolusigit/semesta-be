@@ -32,6 +32,7 @@ use App\Http\Controllers\MstMonthRecommendationController;
 use App\Http\Controllers\TrRcsaHeaderController;
 use App\Http\Controllers\LostEventController;
 use App\Http\Controllers\RencanaInvestasiController;
+use App\Http\Controllers\MstJenisRisikoController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -313,8 +314,16 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
 });
 
+// ===================== JENIS RISIKO =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/jenis-risiko', [MstJenisRisikoController::class, 'index']);                    // List all jenis risiko (semua role)
+    Route::post('/jenis-risiko', [MstJenisRisikoController::class, 'store']);                   // Tambah jenis risiko (role 1,2)
+    Route::put('/jenis-risiko/{id}', [MstJenisRisikoController::class, 'update']);              // Update jenis risiko (role 1,2)
+    Route::delete('/jenis-risiko/{id}', [MstJenisRisikoController::class, 'destroy']);          // Hapus jenis risiko (role 1)
+});
+
 // Export Lost Event
-Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])->name('export.lost-event');
+// Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])->name('export.lost-event');
 // Route untuk debug data
 Route::get('/debug-risk-data', [ExportRiskController::class, 'debugRiskData']);
 

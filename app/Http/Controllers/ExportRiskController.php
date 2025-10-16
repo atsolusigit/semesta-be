@@ -870,7 +870,7 @@ public function exportLostEvent(Request $request, $format)
     $user = Auth::user();
 
     $filterYear = $request->get('year');
-    $filterType = strtolower($request->get('type', ''));
+    $filterType = strtolower($request->get('type', '')); // <--- Tambahan filter type
     $filterDepartment = $request->get('department_id');
     $search = $request->get('search');
 
@@ -951,7 +951,10 @@ public function exportLostEvent(Request $request, $format)
 
         $item->calculated_percentage = $percentage;
         $item->detected_type = $normalizedType;
-        $filteredData->push($item);
+        // Filter berdasarkan type jika diberikan
+        if (empty($filterType) || $normalizedType === $filterType) {
+            $filteredData->push($item);
+        }
     }
 
     if ($filteredData->isEmpty()) {
@@ -1005,6 +1008,7 @@ public function exportLostEvent(Request $request, $format)
         ], 500);
     }
 }
+
 
 /**
  * Prepare data untuk export

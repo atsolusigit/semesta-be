@@ -340,6 +340,9 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     /**
  * Build data rows from headers - Updated to use new format methods
  */
+/**
+ * Build data rows from headers - Updated to use new format methods
+ */
 private function buildDataRows(): array
 {
     $dataRows = [];
@@ -349,18 +352,14 @@ private function buildDataRows(): array
         // Get monthly data safely
         $monthly = $header->monthlyData?->first();
 
-        // --- Resolve risk name (robust) ---
-        $riskName = '';
+        // --- Resolve risk code (robust) ---
+        $riskCode = '';
 
-        // 1) Jika ada field risk_name langsung gunakan
-        if (!empty($header->risk_name)) {
-            $riskName = $header->risk_name;
+        // 1) Jika relasi riskCode sudah di-load, ambil code-nya
+        if (isset($header->riskCode) && $header->riskCode && is_iterable($header->riskCode) && count($header->riskCode) > 0) {
+            $riskCode = collect($header->riskCode)->pluck('code')->filter()->implode(', ');
         }
-        // 2) Jika relasi riskCode sudah di-load, ambil namanya
-        elseif (isset($header->riskCode) && $header->riskCode && is_iterable($header->riskCode) && count($header->riskCode) > 0) {
-            $riskName = collect($header->riskCode)->pluck('name')->filter()->implode(', ');
-        }
-        // 3) Jika ada field risk_code (bisa berupa JSON string, "1,2", array, atau numeric)
+        // 2) Jika ada field risk_code (bisa berupa JSON string, "1,2", array, atau numeric)
         elseif (!empty($header->risk_code)) {
             $codesField = $header->risk_code;
             $ids = [];
@@ -387,16 +386,17 @@ private function buildDataRows(): array
                 $riskCodes = DB::table('mst_risk_code')
                     ->whereIn('id', $ids)
                     ->orderBy('id')
-                    ->pluck('name');
-                $riskName = $riskCodes->implode(', ');
+                    ->pluck('code');
+                $riskCode = $riskCodes->implode(', ');
             }
         }
-
-        // 4) fallback: pakai jenis_risiko kalau masih kosong
-        if (empty($riskName)) {
-            $riskName = $header->jenis_risiko ?? '';
-        }
         // --- end resolve ---
+
+        // Get jenis risiko name from relation
+        $jenisRisikoName = '';
+        if (isset($header->jenisRisiko) && $header->jenisRisiko) {
+            $jenisRisikoName = $header->jenisRisiko->nama_jenis_risiko ?? '';
+        }
 
         // Get formatted values using the new methods
         $targetBulanan = $this->formatTargetBulan($monthly);
@@ -413,8 +413,8 @@ private function buildDataRows(): array
 
         $dataRows[] = [
             $no,                                                              // 1. NO auto increment
-            $riskName,                                                        // 2. KODE RISIKO (HANYA NAME)
-            $header->jenis_risiko ?? '',                                     // 3. JENIS RISIKO
+            $riskCode,                                                        // 2. KODE RISIKO (CODE)
+            $jenisRisikoName,                                                 // 3. JENIS RISIKO (NAMA)
             $header->peristiwa_risiko ?? '',                                 // 4. PERISTIWA RISIKO
             $header->penyebab_risiko ?? '',                                  // 5. PENYEBAB RISIKO
             $targetBulanan,                                                  // 6. TARGET BULAN (formatted)
@@ -428,7 +428,7 @@ private function buildDataRows(): array
             $header->residual_target_level_kemungkinan ?? '',                // 14. LEVEL KEMUNGKINAN
             $header->residual_target_posisi_risiko ?? '',                    // 15. POSISI RISIKO
             $header->residual_target_level_risiko ?? '',                     // 16. LEVEL RISIKO
-            $monthly->realization_note ?? ''                                 // 17. EVALUASI PERLAKUAN RISIKO (DIPINDAH KE AKHIR)
+            $monthly->realization_note ?? ''                                 // 17. EVALUASI PERLAKUAN RISIKO
         ];
 
         $no++;

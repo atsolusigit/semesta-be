@@ -298,4 +298,9 @@ public function residualTargetHeatmapRange()
     {
         return $this->hasOne(MstApproval::class, 'document_id', 'id');
     }
+
+    public function jenisRisiko()
+    {
+        return $this->belongsTo(MstJenisRisiko::class, 'jenis_risiko');
+    }
 }

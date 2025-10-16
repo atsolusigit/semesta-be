@@ -233,9 +233,7 @@ private function formatRealizationBulan($monthly)
 {
     // Kalau sudah ada relasi riskCode
     if (isset($header->riskCode) && $header->riskCode && $header->riskCode->isNotEmpty()) {
-        return $header->riskCode->map(function ($code) {
-            return (!empty($code->code) ? $code->code . ' - ' : '') . $code->name;
-        })->implode(', ');
+        return $header->riskCode->pluck('code')->implode(', '); // GANTI: hapus semua reference ke ->name
     }
 
     if (!empty($header->risk_code)) {
@@ -263,11 +261,9 @@ private function formatRealizationBulan($monthly)
             $riskCodes = DB::table('mst_risk_code')
                 ->whereIn('id', $riskCodeIds)
                 ->orderBy('id')
-                ->get(['name']);
+                ->pluck('code'); // GANTI: hanya ambil 'code'
 
-            return $riskCodes->map(function ($rc) {
-                return (!empty($rc->code) ? $rc->code . ' - ' : '') . $rc->name;
-            })->implode(', ');
+            return $riskCodes->implode(', ');
         }
     }
 
@@ -316,10 +312,16 @@ private function formatRealizationBulan($monthly)
 
         $riskCode = $this->getRiskCodeName($header);
 
+        // PERBAIKAN: Ambil nama jenis risiko dari relasi
+        $jenisRisikoName = '';
+        if (isset($header->jenisRisiko) && $header->jenisRisiko) {
+            $jenisRisikoName = $header->jenisRisiko->nama_jenis_risiko ?? '';
+        }
+
         $data[] = [
             $no++,
             $riskCode,
-            $header->jenis_risiko ?? '',
+            $jenisRisikoName, // PERBAIKAN: Ganti dari $header->jenis_risiko
             $header->sasaran ?? '',
             $header->peristiwa_risiko ?? '',
             $header->penyebab_risiko ?? '',

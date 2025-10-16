@@ -34,7 +34,6 @@ jobs:
       - name: Detect migration changes
         id: detect
         run: |
-          set -euo pipefail
           BEFORE="${{ github.event.before }}"
           if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
             BEFORE="$(git rev-list --max-parents=0 HEAD | tail -n1)"
@@ -45,20 +44,19 @@ jobs:
             echo "migrate=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Load connection vars (Secrets → Vars → defaults)
-        shell: bash
+      - name: Load connection vars (fallback Secrets -> Vars)
         run: |
-          set -euo pipefail
-          HOST="${{ secrets.SSH_HOST }}";   [ -z "${HOST}" ] && HOST="${{ vars.SSH_HOST }}"
-          USER="${{ secrets.SSH_USER }}";   [ -z "${USER}" ] && USER="${{ vars.SSH_USER }}"
-          PORT="${{ secrets.SSH_PORT }}";   [ -z "${PORT}" ] && PORT="${{ vars.SSH_PORT }}"
-          [ -z "${HOST}" ] && { echo "Missing SSH_HOST"; exit 1; }
-          [ -z "${USER}" ] && { echo "Missing SSH_USER"; exit 1; }
-          [ -z "${PORT}" ] && PORT="22"
-          case "${PORT}" in (*[!0-9]*|"") echo "Invalid SSH_PORT: '${PORT}'"; exit 1;; esac
-          echo "SSH_HOST=${HOST}" >> "$GITHUB_ENV"
-          echo "SSH_USER=${USER}" >> "$GITHUB_ENV"
-          echo "SSH_PORT=${PORT}" >> "$GITHUB_ENV"
+          HOST="${{ secrets.SSH_HOST }}";   [ -z "$HOST" ] && HOST="${{ vars.SSH_HOST }}"
+          PORT="${{ secrets.SSH_PORT }}";   [ -z "$PORT" ] && PORT="${{ vars.SSH_PORT }}"
+          USER="${{ secrets.SSH_USER }}";   [ -z "$USER" ] && USER="${{ vars.SSH_USER }}"
+
+          if [ -z "$HOST" ] || [ -z "$PORT" ] || [ -z "$USER" ]; then
+            echo "Missing SSH_HOST/SSH_PORT/SSH_USER (neither Secrets nor Variables)."; exit 1
+          fi
+
+          echo "SSH_HOST=$HOST" >> $GITHUB_ENV
+          echo "SSH_PORT=$PORT" >> $GITHUB_ENV
+          echo "SSH_USER=$USER" >> $GITHUB_ENV
 
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
@@ -66,31 +64,30 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Configure SSH client
-        shell: bash
         run: |
-          set -euo pipefail
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          ssh-keyscan -p "${SSH_PORT}" "${SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          chmod 644 ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<EOF
-          Host target
-            HostName ${SSH_HOST}
-            User ${SSH_USER}
-            Port ${SSH_PORT}
-            StrictHostKeyChecking accept-new
-          EOF
-          chmod 600 ~/.ssh/config
+          printf "Host ${SSH_HOST}\n  HostName ${SSH_HOST}\n  User ${SSH_USER}\n  Port ${SSH_PORT}\n  StrictHostKeyChecking no\n" > ~/.ssh/config
+
+      - name: Debug SSH values
+        run: |
+          echo "SSH_HOST=${SSH_HOST}"
+          echo "SSH_PORT=${SSH_PORT}"
+          echo "SSH_USER=${SSH_USER}"
+
+      - name: SSH connectivity test
+        run: |
+          ssh -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" "echo Connected OK"
 
       - name: Remote deploy (git hard reset + restart service)
         env:
           RUN_MIGRATIONS: ${{ inputs.run_migrate == 'true' || steps.detect.outputs.migrate == 'true' }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          set -euo pipefail
-          ssh target "bash -lc '
+          ssh -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" "bash -lc '
             set -e
             REPO_DIR=/var/www/html/semesta-be
+
+            echo Updating repo in \$REPO_DIR
             if [ ! -d \"\$REPO_DIR/.git\" ]; then
               mkdir -p \"\$REPO_DIR\"
               git clone ${GIT_REPO_URL} \"\$REPO_DIR\"
@@ -102,17 +99,31 @@ jobs:
               git checkout ${BRANCH} || true
               git reset --hard origin/${BRANCH}
             fi
+
+            echo Installing dependencies...
             if ! command -v composer >/dev/null 2>&1; then
-              echo Composer not found
+              echo Composer not found. Please install Composer on server.
               exit 1
             fi
             composer install --prefer-dist --no-interaction
+
             [ -f .env ] || { echo .env missing; exit 1; }
+
+            echo Clearing caches...
             php artisan optimize:clear || true
+
             if [ \"${RUN_MIGRATIONS}\" = \"true\" ]; then
+              echo Running php artisan migrate --force
               php artisan migrate --force
+            else
+              echo Skip migrate (no migration change detected)
             fi
+
             date --iso-8601=seconds > public/deploy_time.txt
             echo ${GITHUB_SHA} > public/deploy_sha.txt
-            sudo systemctl restart semesta-be || exit 1
+
+            echo Restarting Laravel service...
+            sudo -n systemctl restart semesta-be || (echo Failed restart && exit 1)
+
+            echo Deployment done.
           '"

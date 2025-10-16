@@ -29,11 +29,12 @@ class LostEventController extends Controller
     $search = $request->query('search');
 
     $headers = TrRiskHeader::with([
-        'department:id,name',
-        'optionTargetSatuTahun:id,name,type',
-        'monthlyData' => function ($query) {
-            $query->where('is_finalize', true)->orderBy('month', 'asc');
-        }
+    'department:id,name',
+    'jenisRisiko:id,nama_jenis_risiko',// Relasi ke jenis risiko
+    'optionTargetSatuTahun:id,name,type',
+    'monthlyData' => function ($query) {
+        $query->where('is_finalize', true)->orderBy('month', 'asc');
+    }
     ])
     ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
         $query->where('department_id', $user->department_id);
@@ -50,17 +51,28 @@ class LostEventController extends Controller
         });
     })
     ->when($request->jenis_risiko, function ($query) use ($request) {
-        $query->where('jenis_risiko', 'like', '%' . $request->jenis_risiko . '%');
+    $search = $request->jenis_risiko;
+    if (is_numeric($search)) {
+        // Jika numeric, filter berdasarkan ID
+        $query->where('jenis_risiko', $search);
+    } else {
+        // Jika string, filter berdasarkan nama
+        $query->whereHas('jenisRisiko', function ($q) use ($search) {
+            $q->where('nama_jenis_risiko', 'like', '%' . $search . '%');
+        });
+        }
     })
     ->when($search, function ($query) use ($search) {
         $query->where(function ($q) use ($search) {
             $q->where('year', 'like', '%' . $search . '%')
-              ->orWhere('jenis_risiko', 'like', '%' . $search . '%')
-              ->orWhere('peristiwa_risiko', 'like', '%' . $search . '%')
-              ->orWhere('mitigasi', 'like', '%' . $search . '%')
-              ->orWhereHas('department', function ($dept) use ($search) {
-                  $dept->where('name', 'like', '%' . $search . '%');
-              });
+            ->orWhere('peristiwa_risiko', 'like', '%' . $search . '%')
+            ->orWhere('mitigasi', 'like', '%' . $search . '%')
+            ->orWhereHas('department', function ($dept) use ($search) {
+                $dept->where('name', 'like', '%' . $search . '%');
+            })
+            ->orWhereHas('jenisRisiko', function ($jr) use ($search) {
+                $jr->where('nama_jenis_risiko', 'like', '%' . $search . '%');
+            });
         });
     })
     ->orderBy('id', 'desc')
@@ -145,46 +157,47 @@ class LostEventController extends Controller
         ['path' => request()->url(), 'query' => request()->query()]
     );
 
-    $orderedData = $paginatedData->getCollection()->map(function ($item) use ($lostEvents) {
-        $lostEvent = $lostEvents->get($item->id);
+   $orderedData = $paginatedData->getCollection()->map(function ($item) use ($lostEvents) {
+    $lostEvent = $lostEvents->get($item->id);
 
-        return [
-            'lost_event_id' => $lostEvent->id ?? null,
-            'header_id' => $item->id,
-            'tahun' => $item->year,
-            'risk_owner_department' => optional($item->department)->name ?? '',
-            'jenis_risiko' => $item->jenis_risiko ?? '',
-            'nama_kejadian' => $lostEvent->nama_kejadian ?? '',
-            'identifikasi_kejadian' => $item->peristiwa_risiko ?? '',
-            'kategori_kejadian' => $lostEvent->kategori_kejadian ?? null,
-            'sumber_penyebab_kejadian' => $lostEvent->sumber_penyebab_kejadian ?? null,
-            'penyebab_kejadian' => $item->penyebab_risiko ?? '',
-            'penanganan_saat_kejadian' => $lostEvent->penanganan_saat_kejadian ?? null,
-            'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian ?? null,
-            'pihak_terkait' => $lostEvent->pihak_terkait ?? null,
-            'status_asuransi' => $lostEvent->status_asuransi ?? null,
-            'kategori_risiko_bumn' => null,
-            'kategori_risiko_t2_t3_kbumn' => null,
-            'penjelasan_kerugian' => $lostEvent->penjelasan_kerugian ?? null,
-            'nilai_kerugian' => $lostEvent->nilai_kerugian ?? null,
-            'kejadian_berulang' => $lostEvent->kejadian_berulang ?? null,
-            'frekuensi_kejadian' => $lostEvent->frekuensi_kejadian ?? null,
-            'mitigasi_yang_direncanakan' => $item->mitigasi ?? '',
-            'realisasi_mitigasi' => $lostEvent->realisasi_mitigasi ?? null,
-            'perbaikan_mendatang' => $lostEvent->perbaikan_mendatang ?? null,
-            'nilai_premi' => $lostEvent->nilai_premi ?? null,
-            'nilai_klaim' => $lostEvent->nilai_klaim ?? null,
-            'has_lost_event' => (bool) $lostEvent,
-            'created_at' => $lostEvent?->created_at?->format('Y-m-d'),
-            'updated_at' => $lostEvent?->updated_at?->format('Y-m-d'),
-            'created_by' => $lostEvent->created_by ?? null,
-            'created_by_name' => $lostEvent ? get_decrypted_name($lostEvent->createdBy) : null,
-            'updated_by' => $lostEvent->updated_by ?? null,
-            'updated_by_name' => $lostEvent ? get_decrypted_name($lostEvent->updatedBy) : null,
-            'type' => $item->detected_type ?? 'unknown',
-            'realization_percentage' => $item->calculated_percentage !== null
-                ? rtrim(rtrim(number_format($item->calculated_percentage, 2), '0'), '.') . '%'
-                : null,
+    return [
+        'lost_event_id' => $lostEvent->id ?? null,
+        'header_id' => $item->id,
+        'tahun' => $item->year,
+        'risk_owner_department' => optional($item->department)->name ?? '',
+        'jenis_risiko_id' => $item->jenis_risiko ?? null, // id jenis risiko
+        'jenis_risiko' => $item->jenisRisiko->nama_jenis_risiko ?? '', // nama jenis risiko dari relasi
+        'nama_kejadian' => $lostEvent->nama_kejadian ?? '',
+        'identifikasi_kejadian' => $item->peristiwa_risiko ?? '',
+        'kategori_kejadian' => $lostEvent->kategori_kejadian ?? null,
+        'sumber_penyebab_kejadian' => $lostEvent->sumber_penyebab_kejadian ?? null,
+        'penyebab_kejadian' => $item->penyebab_risiko ?? '',
+        'penanganan_saat_kejadian' => $lostEvent->penanganan_saat_kejadian ?? null,
+        'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian ?? null,
+        'pihak_terkait' => $lostEvent->pihak_terkait ?? null,
+        'status_asuransi' => $lostEvent->status_asuransi ?? null,
+        'kategori_risiko_bumn' => null,
+        'kategori_risiko_t2_t3_kbumn' => null,
+        'penjelasan_kerugian' => $lostEvent->penjelasan_kerugian ?? null,
+        'nilai_kerugian' => $lostEvent->nilai_kerugian ?? null,
+        'kejadian_berulang' => $lostEvent->kejadian_berulang ?? null,
+        'frekuensi_kejadian' => $lostEvent->frekuensi_kejadian ?? null,
+        'mitigasi_yang_direncanakan' => $item->mitigasi ?? '',
+        'realisasi_mitigasi' => $lostEvent->realisasi_mitigasi ?? null,
+        'perbaikan_mendatang' => $lostEvent->perbaikan_mendatang ?? null,
+        'nilai_premi' => $lostEvent->nilai_premi ?? null,
+        'nilai_klaim' => $lostEvent->nilai_klaim ?? null,
+        'has_lost_event' => (bool) $lostEvent,
+        'created_at' => $lostEvent?->created_at?->format('Y-m-d'),
+        'updated_at' => $lostEvent?->updated_at?->format('Y-m-d'),
+        'created_by' => $lostEvent->created_by ?? null,
+        'created_by_name' => $lostEvent ? get_decrypted_name($lostEvent->createdBy) : null,
+        'updated_by' => $lostEvent->updated_by ?? null,
+        'updated_by_name' => $lostEvent ? get_decrypted_name($lostEvent->updatedBy) : null,
+        'type' => $item->detected_type ?? 'unknown',
+        'realization_percentage' => $item->calculated_percentage !== null
+            ? rtrim(rtrim(number_format($item->calculated_percentage, 2), '0'), '.') . '%'
+            : null,
         ];
     })->values();
 
@@ -213,16 +226,17 @@ class LostEventController extends Controller
     }
 
     $header = TrRiskHeader::with([
-        'department:id,name',
-        'optionTargetSatuTahun:id,name,type',
-        'monthlyData' => function ($query) {
-            $query->where('is_finalize', true)->orderBy('month', 'asc');
+    'department:id,name',
+    'jenisRisiko:id,nama_jenis_risiko', // TAMBAHKAN INI
+    'optionTargetSatuTahun:id,name,type',
+    'monthlyData' => function ($query) {
+        $query->where('is_finalize', true)->orderBy('month', 'asc');
         }
     ])
-        ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
-            $query->where('department_id', $user->department_id);
-        })
-        ->find($headerId);
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+        $query->where('department_id', $user->department_id);
+    })
+    ->find($headerId);
 
     if (!$header) {
         return json(404, false, 'Tidak Ditemukan', 'Header tidak ditemukan.', null);
@@ -298,7 +312,7 @@ class LostEventController extends Controller
                 'header_id' => $header->id,
                 'tahun' => $header->year,
                 'risk_owner_department' => optional($header->department)->name ?? '',
-                'jenis_risiko' => $header->jenis_risiko ?? '',
+                'jenis_risiko' => $header->jenisRisiko->nama_jenis_risiko ?? '',
                 'nama_kejadian' => '',
                 'identifikasi_kejadian' => $header->peristiwa_risiko ?? '',
                 'kategori_kejadian' => null,
@@ -338,7 +352,8 @@ class LostEventController extends Controller
         'header_id' => $lostEvent->header_id,
         'tahun' => $lostEvent->tahun,
         'risk_owner_department' => $lostEvent->risk_owner_department,
-        'jenis_risiko' => $lostEvent->jenis_risiko,
+        'jenis_risiko_id' => $header->jenis_risiko ?? null, // id jenis risiko
+        'jenis_risiko' => $lostEvent->jenis_risiko, // nama jenis risiko dari relasi
         'nama_kejadian' => $lostEvent->nama_kejadian,
         'identifikasi_kejadian' => $lostEvent->identifikasi_kejadian,
         'kategori_kejadian' => $lostEvent->kategori_kejadian,
@@ -394,6 +409,7 @@ public function detail($id)
         'updatedBy:id,username',
         'header' => function($query) {
             $query->with([
+                'jenisRisiko:id,nama_jenis_risiko',
                 'optionTargetSatuTahun:id,name,type',
                 'monthlyData' => function ($q) {
                     $q->where('is_finalize', true)->orderBy('month', 'asc');
@@ -468,7 +484,8 @@ public function detail($id)
         'header_id' => $lostEvent->header_id,
         'tahun' => $lostEvent->tahun,
         'risk_owner_department' => $lostEvent->risk_owner_department,
-        'jenis_risiko' => $lostEvent->jenis_risiko,
+        'jenis_risiko_id' => $header->jenis_risiko ?? null, // id jenis risiko
+        'jenis_risiko' => $lostEvent->jenis_risiko, // nama jenis risiko dari relasi
         'nama_kejadian' => $lostEvent->nama_kejadian,
         'identifikasi_kejadian' => $lostEvent->identifikasi_kejadian,
         'kategori_kejadian' => $lostEvent->kategori_kejadian,

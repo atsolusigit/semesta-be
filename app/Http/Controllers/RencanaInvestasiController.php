@@ -30,6 +30,9 @@ class RencanaInvestasiController extends Controller
         ->when($request->nama_investasi, function ($query) use ($request) {
              $query->where('nama_investasi', 'like', '%' . $request->nama_investasi . '%');
         })
+        ->when($request->jenis_investasi, function ($query) use ($request) {
+            $query->where('jenis_investasi', 'like', '%' . $request->jenis_investasi . '%');
+        })
         ->when($request->tahun, function ($query) use ($request) {
             $query->where('year', $request->tahun);
         })
@@ -134,6 +137,7 @@ class RencanaInvestasiController extends Controller
             'department_name',
             'nama_investasi',
             'kategori_investasi',
+            'jenis_investasi',
             'year',
             'nilai_rkap',
             'nilai_revisi',
@@ -146,6 +150,7 @@ class RencanaInvestasiController extends Controller
             'department_name' => 'required|string',
             'nama_investasi' => 'required|string',
             'kategori_investasi' => 'required|string',
+            'jenis_investasi' => 'nullable|string',
             'year'=> 'required|numeric',
             'nilai_rkap' => 'nullable|numeric',
             'nilai_revisi' => 'nullable|numeric',
@@ -198,6 +203,7 @@ class RencanaInvestasiController extends Controller
                 'id' => $rInvest->id,
                 'nama_investasi' => clean_string($rInvest->nama_investasi),
                 'kategori_investasi' => clean_string($rInvest->kategori_investasi),
+                'jenis_investasi' => clean_string($rInvest->jenis_investasi),
                 'nilai_rkap' => clean_string($rInvest->nilai_rkap),
                 'nilai_revisi' => clean_string($rInvest->nilai_revisi),
                 'department_name' => $rInvest->unit_kerja_id,

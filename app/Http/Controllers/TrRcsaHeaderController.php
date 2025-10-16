@@ -11,7 +11,7 @@ use App\Models\TrRcsaHeader;
 use App\Models\TrRcsaResidual;
 use App\Models\TrRcsaRencanaRisikoList;
 use PhpParser\Node\Stmt\TryCatch;
-use App\Models\MstJabatan;
+use App\Models\MstJabatan; 
 
 class TrRcsaHeaderController extends Controller
 {
@@ -30,6 +30,7 @@ class TrRcsaHeaderController extends Controller
             'createdBy:id,username,id',
             'updatedBy:id,username,id',
             'department:id,name',
+            'approvalSvp:id,document_id,note',
         ])
         ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
             $query->where('unit_kerja_id', $user->department_id);
@@ -97,6 +98,7 @@ class TrRcsaHeaderController extends Controller
                 'created_by_name' => get_decrypted_name($item->createdBy),
                 'updated_by' => $item->updated_by ?? null,
                 'updated_by_name' => get_decrypted_name($item->updatedBy),
+                'catatan_svp' => optional($item->approvalSvp)->note,
              ];    
         });
 
@@ -352,6 +354,7 @@ class TrRcsaHeaderController extends Controller
             'createdBy:id,username,id',
             'updatedBy:id,username,id',
             'department:id,name',
+            'approvalSvp:id,document_id,note',
         ])
         ->find($id);
 
@@ -439,7 +442,8 @@ class TrRcsaHeaderController extends Controller
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
                 'dataResidual' => $rcsaResidual,
-                'dataRisikoList' => $rcsaRencanaRisiko,       
+                'dataRisikoList' => $rcsaRencanaRisiko,   
+                'catatan_svp' => optional($item->approvalSvp)->note,    
             ];
          $resData = clean_recursive($resData);
 
@@ -518,9 +522,11 @@ class TrRcsaHeaderController extends Controller
             $currentUser = auth()->user();
             $currentUserRole = $currentUser->role_id;
 
+            $allowAllRolesToDelete = true;
+
             // VALIDASI HAK AKSES DELETE
             // Hanya Superadmin (role 1) yang bisa delete
-            if ($currentUserRole !== 1 ) {
+            if (!$allowAllRolesToDelete && $currentUserRole !== 1 ) {
                 return json(404, false, 'Akses Ditolak', 'Hanya Superadmin dan User biasa yang dapat menghapus data RCSA.', null);
             }
 
@@ -534,6 +540,8 @@ class TrRcsaHeaderController extends Controller
 
             /********* HAPUS RCSA Risiko List **********/
             TrRcsaRencanaRisikoList::where('rcsa_id', $rcsaHeader->id)->delete();
+
+            $rcsaHeader->delete();
 
              $deletedData = [
                 'id' => $rcsaHeader->id,

@@ -92,4 +92,10 @@ class TrRcsaHeader extends Model
         ->select(['id', 'name']);;
     }
 
+    public function approvalSvp()
+    {
+        return $this->hasOne(\App\Models\MstApproval::class, 'document_id', 'id')
+                    ->select(['id', 'document_id', 'note']); 
+    }
+
 }

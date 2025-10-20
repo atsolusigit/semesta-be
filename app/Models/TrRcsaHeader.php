@@ -62,8 +62,12 @@ class TrRcsaHeader extends Model
         'year',
         'submitted_at',
         'submitted_by',
+        'approval_notes',
     ];
 
+    protected $casts = [
+        'isMainRisk' => 'boolean',
+    ];
 
     public function rcsaResidual(): HasMany
     {

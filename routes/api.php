@@ -352,6 +352,8 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/rcsa-sasaran', [TrRcsaHeaderController::class, 'sasaran']);
     Route::put('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'update']);
     Route::post('/rcsa-header/{id}/submit', [TrRcsaHeaderController::class, 'submit']);
+    Route::patch('/rcsa-header/{id}/approve', [TrRcsaHeaderController::class, 'approve']);
+    Route::patch('/rcsa-header/{id}/reject', [TrRcsaHeaderController::class, 'reject']);
 });
 
 // ===================== RENCANA INVESTASI =====================

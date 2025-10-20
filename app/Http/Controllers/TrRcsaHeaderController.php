@@ -35,11 +35,23 @@ class TrRcsaHeaderController extends Controller
         ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
             $query->where('unit_kerja_id', $user->department_id);
         })
-        ->whereHas('department', function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%');
+        ->when($request->menu === 'risk', function ($q) {
+            $q->where('status', '!=', 'approved');
         })
-        ->orWhere('peristiwa_risiko', 'like', "%{$request->search}%")
-        ->orWhere('status', 'like', "%{$request->search}%")
+        ->when($request->menu === 'arsip', function ($q) {
+            $q->where('status', 'approved');
+        })
+
+        ->when($request->filled('search'), function ($q) use ($request) {
+            $s = $request->search;
+            $q->where(function ($qq) use ($s) {
+                $qq->whereHas('department', function ($d) use ($s) {
+                    $d->where('name', 'like', "%{$s}%");
+                })
+                ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
+                ->orWhere('status', 'like', "%{$s}%");
+            });
+        })
         ->orderBy('id', 'desc');
 
         // Pagination, ambil data per halaman

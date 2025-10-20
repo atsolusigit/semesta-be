@@ -30,6 +30,7 @@ class TrRcsaHeaderController extends Controller
             'createdBy:id,username,id',
             'updatedBy:id,username,id',
             'department:id,name',
+            'approvalSvp:id,document_id,note',
         ])
         ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
             $query->where('unit_kerja_id', $user->department_id);
@@ -97,6 +98,9 @@ class TrRcsaHeaderController extends Controller
                 'created_by_name' => get_decrypted_name($item->createdBy),
                 'updated_by' => $item->updated_by ?? null,
                 'updated_by_name' => get_decrypted_name($item->updatedBy),
+                'catatan_svp' => optional($item->approvalSvp)->note,
+                'approval_notes' => $item->approval_notes,
+                'isMainRisk' => (bool) $item->isMainRisk,
              ];    
         });
 
@@ -173,7 +177,8 @@ class TrRcsaHeaderController extends Controller
             'timeline_bulan_awal',
             'unit_satuan_kri',
             'unit_kerja_id',
-            'year'
+            'year',
+            'isMainRisk',
         ];
 
          $validator = Validator::make($request->all(), [
@@ -224,6 +229,7 @@ class TrRcsaHeaderController extends Controller
             // 'unit_satuan_kri' => 'required|string',
             'unit_kerja_id' => 'required|numeric',
             'year'=> 'required|numeric',
+            'isMainRisk' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -327,8 +333,9 @@ class TrRcsaHeaderController extends Controller
                 'year' => $rcsaHeader->year,
                 'updated_at' => $rcsaHeader->updated_at,
                 'created_at' => $rcsaHeader->created_at,
-                'created_by' => $rcsaHeader->created_by
+                'created_by' => $rcsaHeader->created_by,
                 // 'created_by_name' => $createdByName,
+                'isMainRisk' => (bool) $rcsaHeader->isMainRisk,
             ];
             
             $message = 'RCSA header berhasil disimpan dengan status draft dan menunggu persetujuan.';
@@ -439,7 +446,9 @@ class TrRcsaHeaderController extends Controller
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
                 'dataResidual' => $rcsaResidual,
-                'dataRisikoList' => $rcsaRencanaRisiko,       
+                'dataRisikoList' => $rcsaRencanaRisiko,     
+                'isMainRisk' => (bool) $item->isMainRisk,
+                'approval_notes' => $item->approval_notes,  
             ];
          $resData = clean_recursive($resData);
 
@@ -960,6 +969,203 @@ class TrRcsaHeaderController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return json(500, false, 'Gagal Submit', 'Terjadi kesalahan sistem.', $e->getMessage());
+        }
+    }
+
+
+    // Approve RCSA Header oleh SPV Unit (role 1 dan 2)
+    public function approve(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'approval_notes' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $rcsaHeader = TrRcsaHeader::with(['createdBy', 'department'])->find($id);
+
+            if (!$rcsaHeader) {
+                return json(404, false, 'Data Tidak Ditemukan', 'RCSA header tidak ditemukan.', null);
+            }
+
+            $currentUser = auth()->user();
+            $roleId = $currentUser->role_id ?? null;
+
+            if (!in_array($roleId, [1, 2])) {
+                return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
+            }
+
+            if ((int) $roleId === 2 && (int) $rcsaHeader->unit_kerja_id !== (int) ($currentUser->department_id ?? 0)) {
+                return json(403, false, 'Tidak Diizinkan', 'Anda hanya dapat menyetujui data dari departemen Anda sendiri.', null);
+            }
+
+            if ($rcsaHeader->status !== 'submit') {
+                return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat disetujui.', [
+                    'current_status' => $rcsaHeader->status
+                ]);
+            }
+
+            $rcsaHeader->status = 'approved';
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approval_notes')) {
+                $rcsaHeader->approval_notes = $request->approval_notes;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approved_by')) {
+                $rcsaHeader->approved_by = $currentUser->id;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approved_at')) {
+                $rcsaHeader->approved_at = now();
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'menrisk_by')) {
+                $rcsaHeader->menrisk_by = null;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'menrisk_at')) {
+                $rcsaHeader->menrisk_at = null;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'menrisk_note')) {
+                $rcsaHeader->menrisk_note = null;
+            }
+
+            $rcsaHeader->save();
+
+            $approvalQuery = \App\Models\MstApproval::where('document_id', $id);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('mst_approval', 'type_document')) {
+                $approvalQuery->where('type_document', 'RCSA');
+            }
+            $approvalQuery->update([
+                'status'  => 'approved',
+                'tanggal' => now(),
+                'note'    => $request->approval_notes ?? 'Approved by SPV Unit',
+            ]);
+
+            DB::commit();
+
+            $approvedByName = null;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approved_by') && $rcsaHeader->approved_by) {
+                $rcsaHeader->loadMissing('createdBy'); 
+                try {
+                    $userApproved = \App\Models\User::select('id','name','username')->find($rcsaHeader->approved_by);
+                    if ($userApproved) {
+                        $approvedByName = get_decrypted_name($userApproved);
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning("Error resolving approvedBy name: {$e->getMessage()}");
+                }
+            }
+
+            $resp = [
+                'id' => $rcsaHeader->id,
+                'status' => $rcsaHeader->status,
+                'approval_notes' => $rcsaHeader->approval_notes,
+            ];
+            if (isset($rcsaHeader->approval_notes)) $resp['approval_notes'] = clean_string($rcsaHeader->approval_notes);
+            if (isset($rcsaHeader->approved_by))    $resp['approved_by']    = $rcsaHeader->approved_by;
+            if (!is_null($approvedByName))          $resp['approved_by_name'] = $approvedByName;
+            if (isset($rcsaHeader->approved_at))    $resp['approved_at']     = $rcsaHeader->approved_at;
+
+            return json(200, true, 'Berhasil Disetujui', 'RCSA header telah disetujui oleh SPV Unit.', $resp);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return json(500, false, 'Gagal Menyetujui', 'Terjadi kesalahan sistem.', $e->getMessage());
+        }
+    }
+
+
+
+    // Tolak RCSA Header oleh SPV Unit (role 1 dan 2)
+    public function reject(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'approval_notes' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Catatan penolakan wajib diisi.', $validator->errors());
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $rcsaHeader = TrRcsaHeader::with(['createdBy', 'department'])->find($id);
+
+            if (!$rcsaHeader) {
+                return json(404, false, 'Data Tidak Ditemukan', 'RCSA header tidak ditemukan.', null);
+            }
+
+            $currentUser = auth()->user();
+            $roleId = $currentUser->role_id ?? null;
+
+            if (!in_array($roleId, [1, 2])) {
+                return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menolak data ini.', null);
+            }
+
+            if ((int) $roleId === 2 && (int) $rcsaHeader->unit_kerja_id !== (int) ($currentUser->department_id ?? 0)) {
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menolak data dari departemen Anda sendiri.', null);
+            }
+
+            if ($rcsaHeader->status !== 'submit') {
+                return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat ditolak.', [
+                    'current_status' => $rcsaHeader->status
+                ]);
+            }
+            $rcsaHeader->status = 'rejected';
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approval_notes')) {
+                $rcsaHeader->approval_notes = $request->approval_notes;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approved_by')) {
+                $rcsaHeader->approved_by = $currentUser->id;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approved_at')) {
+                $rcsaHeader->approved_at = now();
+            }
+
+            $rcsaHeader->save();
+
+            $approvalQuery = \App\Models\MstApproval::where('document_id', $id);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('mst_approval', 'type_document')) {
+                $approvalQuery->where('type_document', 'RCSA');
+            }
+            $approvalQuery->update([
+                'status'  => 'rejected',
+                'tanggal' => now(),
+                'note'    => $request->approval_notes
+            ]);
+
+            DB::commit();
+
+            $rejectedByName = null;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approved_by') && $rcsaHeader->approved_by) {
+                try {
+                    $userRejected = \App\Models\User::select('id','name','username')->find($rcsaHeader->approved_by);
+                    if ($userRejected) {
+                        $rejectedByName = get_decrypted_name($userRejected);
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning("Error resolving rejectedBy name: {$e->getMessage()}");
+                }
+            }
+
+            $resp = [
+                'id' => $rcsaHeader->id,
+                'status' => $rcsaHeader->status,
+                'rejection_notes' => isset($rcsaHeader->approval_notes) ? clean_string($rcsaHeader->approval_notes) : clean_string($request->approval_notes),
+            ];
+            if (isset($rcsaHeader->approved_by))    $resp['rejected_by']      = $rcsaHeader->approved_by;
+            if (!is_null($rejectedByName))          $resp['rejected_by_name'] = $rejectedByName;
+            if (isset($rcsaHeader->approved_at))    $resp['rejected_at']      = $rcsaHeader->approved_at;
+
+            return json(200, true, 'Berhasil Ditolak', 'RCSA header berhasil ditolak oleh SPV Unit.', $resp);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return json(500, false, 'Gagal Menolak', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
 

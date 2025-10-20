@@ -91,6 +91,7 @@ class TrRcsaHeaderController extends Controller
                 'nilai_limit_risiko' => $item->nilai_limit_risiko,
                 'data_residual' => $rcsaResidual,
                 'data_risiko_list' => $rcsaRencanaRisiko,
+                'isMainRisk' => (bool) $item->isMainRisk,
                 'year' => $item->year,
                 'created_at' => $item->created_at ? $item->created_at->toISOString() : null,
                 'updated_at' => $item->updated_at ? $item->updated_at->toISOString() : null,
@@ -527,9 +528,11 @@ class TrRcsaHeaderController extends Controller
             $currentUser = auth()->user();
             $currentUserRole = $currentUser->role_id;
 
+            $allowAllRolesToDelete = true;
+
             // VALIDASI HAK AKSES DELETE
             // Hanya Superadmin (role 1) yang bisa delete
-            if ($currentUserRole !== 1 ) {
+            if (!$allowAllRolesToDelete && $currentUserRole !== 1 ) {
                 return json(404, false, 'Akses Ditolak', 'Hanya Superadmin dan User biasa yang dapat menghapus data RCSA.', null);
             }
 
@@ -543,6 +546,8 @@ class TrRcsaHeaderController extends Controller
 
             /********* HAPUS RCSA Risiko List **********/
             TrRcsaRencanaRisikoList::where('rcsa_id', $rcsaHeader->id)->delete();
+
+            $rcsaHeader->delete();
 
              $deletedData = [
                 'id' => $rcsaHeader->id,
@@ -632,6 +637,7 @@ class TrRcsaHeaderController extends Controller
                 'deskripsi_dampak' => $item->deskripsi_dampak,
                 'pilihan_sasaran' => $item->pilihan_sasaran,
                 'year' => $item->year,
+                'isMainRisk' => (bool) $item->isMainRisk,
                 'created_at' => $item->created_at ? $item->created_at->toISOString() : null,
                 'updated_at' => $item->updated_at ? $item->updated_at->toISOString() : null,
                 'created_by' => $item->created_by ?? null,
@@ -699,7 +705,8 @@ class TrRcsaHeaderController extends Controller
             'timeline_bulan_awal',
             'unit_satuan_kri',
             'unit_kerja_id',
-            'year'
+            'year',
+            'isMainRisk'
         ];
 
          $validator = Validator::make($request->all(), [
@@ -749,6 +756,7 @@ class TrRcsaHeaderController extends Controller
             // 'unit_satuan_kri' => 'required|string',
             'unit_kerja_id' => 'required|numeric',
             'year'=> 'required|numeric',
+            'isMainRisk' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -860,6 +868,7 @@ class TrRcsaHeaderController extends Controller
                 'department_id' => $rcsaHeader->unit_kerja_id,
                 'status' => $rcsaHeader->status,
                 'year' => $rcsaHeader->year,
+                'isMainRisk' => (bool) $rcsaHeader->isMainRisk,
                 'updated_at' => $rcsaHeader->updated_at,
                 'created_at' => $rcsaHeader->created_at,
                 'created_by' => $rcsaHeader->created_by,
@@ -958,6 +967,7 @@ class TrRcsaHeaderController extends Controller
                 'department_id' => $rcsaHeader->unit_kerja_id,
                 'status' => $rcsaHeader->status,
                 'year' => $rcsaHeader->year,
+                'isMainRisk' => (bool) $rcsaHeader->isMainRisk,
                 'updated_at' => $rcsaHeader->updated_at,
                 'created_at' => $rcsaHeader->created_at,
                 'created_by' => $rcsaHeader->created_by

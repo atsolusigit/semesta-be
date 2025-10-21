@@ -101,6 +101,7 @@ class TrRcsaHeaderController extends Controller
                 'catatan_svp' => optional($item->approvalSvp)->note,
                 'approval_notes' => $item->approval_notes,
                 'jenis_risiko' => $item->kategori_risiko_bumn,
+                'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
              ];    
         });
 
@@ -452,6 +453,7 @@ class TrRcsaHeaderController extends Controller
                 'isMainRisk' => (bool) $item->isMainRisk,
                 'approval_notes' => $item->approval_notes,
                 'jenis_risiko' => $item->kategori_risiko_bumn,
+                'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
                 'dataRisikoList' => $rcsaRencanaRisiko,
 
             ];

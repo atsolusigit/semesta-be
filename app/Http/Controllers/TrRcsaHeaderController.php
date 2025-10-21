@@ -11,7 +11,7 @@ use App\Models\TrRcsaHeader;
 use App\Models\TrRcsaResidual;
 use App\Models\TrRcsaRencanaRisikoList;
 use PhpParser\Node\Stmt\TryCatch;
-use App\Models\MstJabatan; 
+use App\Models\MstJabatan;
 
 class TrRcsaHeaderController extends Controller
 {
@@ -48,7 +48,7 @@ class TrRcsaHeaderController extends Controller
         if (empty($data->items())) {
             return json(404, false, 'Data Tidak Ditemukan', 'Data rcsa header tidak ditemukan.', null);
         }
-        
+
         $resData = collect($data->items())->map(function ($item) {
 
             $rcsaResidual = $item->rcsaResidual->map(function ($residual) {
@@ -133,7 +133,7 @@ class TrRcsaHeaderController extends Controller
         if ($result !== true) {
             return $result;
         }
-        
+
         $allowedFields = [
             'asumsi_perhitungan_dampak',
             'deskripsi_dampak',
@@ -245,7 +245,7 @@ class TrRcsaHeaderController extends Controller
 
         $dataResidual = (array) $request->input('dataResidual');
         $dataRisikoList = (array) $request->input('dataRisikoList');
-        
+
         try {
             DB::beginTransaction();
 
@@ -276,12 +276,12 @@ class TrRcsaHeaderController extends Controller
             }
             /* END PIC */
             $data['status'] = 'draft';
-             
-        
+
+
            $rcsaHeader = TrRcsaHeader::create($data);
 
            DB::commit();
-           
+
             $rcsaHeader->load([
                 'department:id,name',
                 'createdBy:id,username',
@@ -337,7 +337,7 @@ class TrRcsaHeaderController extends Controller
                 // 'created_by_name' => $createdByName,
                 'isMainRisk' => (bool) $rcsaHeader->isMainRisk,
             ];
-            
+
             $message = 'RCSA header berhasil disimpan dengan status draft dan menunggu persetujuan.';
 
             return json(200, true, 'Berhasil Disimpan', $message, $responseData);
@@ -384,7 +384,7 @@ class TrRcsaHeaderController extends Controller
                 ];
             });
         }
-            
+
         if (!empty($item->rcsaResidual)) {
             $rcsaRencanaRisiko = $item->rcsaRisikoList->map(function ($rrList) {
                 return [
@@ -393,8 +393,8 @@ class TrRcsaHeaderController extends Controller
                 ];
             });
         }
-            
-        $resData = 
+
+        $resData =
              [
                 'id' => $item->id,
                 'unit_kerja_id' => $item->unit_kerja_id,
@@ -447,11 +447,13 @@ class TrRcsaHeaderController extends Controller
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
                 'dataResidual' => $rcsaResidual,
-                'dataRisikoList' => $rcsaRencanaRisiko,   
-                'catatan_svp' => optional($item->approvalSvp)->note,    
+                'dataRisikoList' => $rcsaRencanaRisiko,
+                'catatan_svp' => optional($item->approvalSvp)->note,
                 'isMainRisk' => (bool) $item->isMainRisk,
                 'approval_notes' => $item->approval_notes,
                 'jenis_risiko' => $item->kategori_risiko_bumn,
+                'dataRisikoList' => $rcsaRencanaRisiko,
+
             ];
          $resData = clean_recursive($resData);
 
@@ -499,7 +501,7 @@ class TrRcsaHeaderController extends Controller
         }
 
         $residual = TrRcsaResidual::where('rcsa_id', $id)->get();
-        
+
         if (empty($residual)) {
             return json(404, false, 'Data Tidak Ditemukan', 'Data Residual tidak ditemukan.', null);
         }
@@ -508,7 +510,7 @@ class TrRcsaHeaderController extends Controller
         if (!$RisikoList) {
             return json(404, false, 'Data Tidak Ditemukan', 'Data Rencana Risiko List tidak ditemukan.', null);
         }
-            
+
 
         return $this->RcsaUpdate($request, $RcsaHeader, $id);
     }
@@ -627,7 +629,7 @@ class TrRcsaHeaderController extends Controller
         if ($query->count() < 1) {
             return json(404, false, 'Data Tidak Ditemukan', 'Data rcsa sasaran tidak ditemukan.', null);
         }
-        
+
         $resData = collect($data->items())->map(function ($item) {
              return [
                 'id' => $item->id,
@@ -645,7 +647,7 @@ class TrRcsaHeaderController extends Controller
                 'created_by_name' => get_decrypted_name($item->createdBy),
                 'updated_by' => $item->updated_by ?? null,
                 'updated_by_name' => get_decrypted_name($item->updatedBy),
-             ];    
+             ];
         });
 
         $cleanData = clean_recursive([
@@ -662,7 +664,7 @@ class TrRcsaHeaderController extends Controller
 
     private function RcsaUpdate(Request $request, $rcsaHeader, $rcsa_id)
     {
-         
+
         $allowedFields = [
             'asumsi_perhitungan_dampak',
             'deskripsi_dampak',
@@ -833,9 +835,9 @@ class TrRcsaHeaderController extends Controller
                 $updateData['pic'] = $request->input('pic');
             }
             /* END PIC */
-        
+
            $rcsaHeader->update($updateData);
-           
+
            DB::commit();
            $rcsaHeader->refresh();
            $rcsaHeader->load([
@@ -849,7 +851,7 @@ class TrRcsaHeaderController extends Controller
             } catch (\Throwable $e) {
                 \Log::warning("Error handling createdBy: {$e->getMessage()}");
             }
-            
+
             $responseData = [
                 'id' => $rcsaHeader->id,
                 'pilihan_sasaran' => clean_string($rcsaHeader->pilihan_sasaran),
@@ -979,7 +981,6 @@ class TrRcsaHeaderController extends Controller
         }
     }
 
-
     // Approve RCSA Header oleh SPV Unit (role 1 dan 2)
     public function approve(Request $request, $id)
     {
@@ -1054,7 +1055,7 @@ class TrRcsaHeaderController extends Controller
 
             $approvedByName = null;
             if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'approved_by') && $rcsaHeader->approved_by) {
-                $rcsaHeader->loadMissing('createdBy'); 
+                $rcsaHeader->loadMissing('createdBy');
                 try {
                     $userApproved = \App\Models\User::select('id','name','username')->find($rcsaHeader->approved_by);
                     if ($userApproved) {
@@ -1176,5 +1177,4 @@ class TrRcsaHeaderController extends Controller
         }
     }
 
-    
 }

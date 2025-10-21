@@ -454,7 +454,6 @@ class TrRcsaHeaderController extends Controller
                 'approval_notes' => $item->approval_notes,
                 'jenis_risiko' => $item->kategori_risiko_bumn,
                 'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
-                'dataRisikoList' => $rcsaRencanaRisiko,
 
             ];
          $resData = clean_recursive($resData);

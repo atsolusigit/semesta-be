@@ -100,7 +100,9 @@ class TrRcsaHeaderController extends Controller
                 'updated_by_name' => get_decrypted_name($item->updatedBy),
                 'catatan_svp' => optional($item->approvalSvp)->note,
                 'approval_notes' => $item->approval_notes,
-             ];
+                'jenis_risiko' => $item->kategori_risiko_bumn,
+                'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
+             ];    
         });
 
         $cleanData = clean_recursive([
@@ -450,7 +452,8 @@ class TrRcsaHeaderController extends Controller
                 'catatan_svp' => optional($item->approvalSvp)->note,
                 'isMainRisk' => (bool) $item->isMainRisk,
                 'approval_notes' => $item->approval_notes,
-                'dataRisikoList' => $rcsaRencanaRisiko,
+                'jenis_risiko' => $item->kategori_risiko_bumn,
+                'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
 
             ];
          $resData = clean_recursive($resData);

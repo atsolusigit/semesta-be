@@ -26,7 +26,13 @@ class RencanaInvestasi extends Model
         'updated_at',
         'created_at',
         'created_by',
-        'updated_by'
+        'updated_by',
+        'approved_by',      
+        'approved_at', 
+    ];
+
+    protected $casts = [
+        'approved_at' => 'datetime', 
     ];
 
     public function createdBy()
@@ -43,6 +49,11 @@ class RencanaInvestasi extends Model
     public function detail()
     {
         return $this->hasOne(RencanaInvestasiDetail::class, 'rencana_investasi_id');
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by')->select(['id', 'name', 'username']);
     }
 
 }

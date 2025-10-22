@@ -355,6 +355,8 @@ Route::middleware(['auth:api'])->group(function () {
     Route::post('/investasi', [RencanaInvestasiController::class, 'store']);
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
     Route::get('/investasi/{id}', [RencanaInvestasiController::class, 'show']); 
+    Route::patch('/investasi/{id}/approve', [RencanaInvestasiController::class, 'approve']);
+    Route::patch('/investasi/{id}/reject',  [RencanaInvestasiController::class, 'reject']);
     // Route::delete('/rcsa-header/{id}', [RencanaInvestasiController::class, 'destroy']);
 });
 

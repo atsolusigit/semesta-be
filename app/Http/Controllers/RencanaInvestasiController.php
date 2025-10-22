@@ -433,37 +433,73 @@ class RencanaInvestasiController extends Controller
             }
 
             $currentUser = auth()->user();
-            $roleId = $currentUser->role_id ?? null;
+            $roleId = (int) ($currentUser->role_id ?? 0);
 
-            if (!in_array($roleId, [1, 2])) {
+            // Hanya role 1 & 2 yang boleh approve
+            if (!in_array($roleId, [1, 2], true)) {
                 return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
             }
 
-
-            if ($roleId === 2 && isset($currentUser->department_id) && $item->unit_kerja_id !== $currentUser->department_id) {
+            // Role 2 hanya boleh approve data departemen sendiri
+            if ($roleId === 2 && (int) $item->unit_kerja_id !== (int) ($currentUser->department_id ?? 0)) {
                 return json(403, false, 'Tidak Diizinkan', 'Anda hanya dapat menyetujui data dari departemen Anda sendiri.', null);
             }
 
+            // Hanya bisa approve ketika status submit (sesuaikan jika flow Anda berbeda)
             if ($item->status !== 'submit') {
-                return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat disetujui.', null);
+                return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat disetujui.', [
+                    'current_status' => $item->status
+                ]);
             }
 
-            $item->update([
-                'status' => 'approved',
-                'catatan_svp_unit' => $request->approval_notes, 
-                'approved_by' => auth()->id(),
-    'approved_at' => now(),
-            ]);
+            $notes = (string) ($request->approval_notes ?? '');
+            try {
+                $notes = clean_string($notes); 
+            } catch (\Throwable $e) {
+                $notes = mb_convert_encoding($notes, 'UTF-8', 'UTF-8');
+            }
+
+            $updatePayload = ['status' => 'approved'];
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('rencana_investasi', 'catatan_svp_unit')) {
+                $updatePayload['catatan_svp_unit'] = $notes;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('rencana_investasi', 'approved_by')) {
+                $updatePayload['approved_by'] = $currentUser->id;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('rencana_investasi', 'approved_at')) {
+                $updatePayload['approved_at'] = now();
+            }
+
+            $item->update($updatePayload);
 
             DB::commit();
 
-            return json(200, true, 'Berhasil Disetujui', 'Rencana investasi telah disetujui.', [
-                'id' => $item->id,
-                'status' => $item->status,
-                'approval_notes' => clean_string($item->catatan_svp_unit),
-                'approved_by' => $item->approvedBy->name ?? null,
-                'approved_at' => $item->approved_at,
-            ]);
+            $item->loadMissing('approvedBy:id,username,name');
+
+            $approvedByName = null;
+            try {
+                if (!empty($item->approved_by) && $item->approvedBy) {
+                    $approvedByName = get_decrypted_name($item->approvedBy);
+                    if (empty($approvedByName)) {
+                        $approvedByName = $item->approvedBy->name ?? $item->approvedBy->username ?? null;
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("Error resolving approvedBy name: {$e->getMessage()}");
+            }
+
+            $resp = [
+                'id'             => $item->id,
+                'status'         => $item->status,
+                'approval_notes' => isset($item->catatan_svp_unit) ? clean_string($item->catatan_svp_unit) : null,
+                'approved_by'    => $item->approved_by ?? null,
+                'approved_by_name' => $approvedByName,
+                'approved_at'    => isset($item->approved_at) ? optional($item->approved_at)->toISOString() : null,
+            ];
+
+            return json(200, true, 'Berhasil Disetujui', 'Rencana investasi telah disetujui.', clean_recursive($resp));
+
         } catch (\Throwable $e) {
             DB::rollBack();
             \Log::error('RencanaInvestasi@approve error', [
@@ -474,6 +510,7 @@ class RencanaInvestasiController extends Controller
             return json(500, false, 'Gagal Menyetujui', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
+
 
 
     public function reject(Request $request, $id)
@@ -495,37 +532,62 @@ class RencanaInvestasiController extends Controller
             }
 
             $currentUser = auth()->user();
-            $roleId = $currentUser->role_id ?? null;
+            $roleId = (int) ($currentUser->role_id ?? 0);
 
-            // Only role 1 & 2 can reject
-            if (!in_array($roleId, [1, 2])) {
+            if (!in_array($roleId, [1, 2], true)) {
                 return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menolak data ini.', null);
             }
 
-            // Role 2: only own department
-            if ($roleId === 2 && isset($currentUser->department_id) && $item->unit_kerja_id !== $currentUser->department_id) {
+            if ($roleId === 2 && (int) $item->unit_kerja_id !== (int) ($currentUser->department_id ?? 0)) {
                 return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menolak data dari departemen Anda sendiri.', null);
             }
 
-            // Only reject when status submit
             if ($item->status !== 'submit') {
-                return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat ditolak.', null);
+                return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat ditolak.', [
+                    'current_status' => $item->status
+                ]);
             }
 
-            $item->update([
-                'status' => 'rejected',
-                'catatan_svp_unit' => $request->approval_notes, 
-                'approved_by' => auth()->id(),
-                'approved_at' => now(),
-            ]);
+            $notes = (string) ($request->approval_notes ?? '');
+            try { $notes = clean_string($notes); } catch (\Throwable $e) { $notes = mb_convert_encoding($notes, 'UTF-8', 'UTF-8'); }
+
+            $payload = ['status' => 'rejected'];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('rencana_investasi', 'catatan_svp_unit')) {
+                $payload['catatan_svp_unit'] = $notes;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('rencana_investasi', 'approved_by')) {
+                $payload['approved_by'] = $currentUser->id;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('rencana_investasi', 'approved_at')) {
+                $payload['approved_at'] = now();
+            }
+
+            $item->update($payload);
 
             DB::commit();
 
-            return json(200, true, 'Berhasil Ditolak', 'Rencana investasi berhasil ditolak.', [
+            $item->loadMissing('approvedBy:id,username,name');
+
+            $approvedByName = null;
+            try {
+                if (!empty($item->approved_by) && $item->approvedBy) {
+                    $approvedByName = get_decrypted_name($item->approvedBy) ?: ($item->approvedBy->name ?? $item->approvedBy->username ?? null);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("Error resolving approvedBy name: {$e->getMessage()}");
+            }
+
+            $resp = [
                 'id' => $item->id,
                 'status' => $item->status,
-                'rejection_notes' => clean_string($item->catatan_svp_unit),
-            ]);
+                'rejection_notes' => isset($item->catatan_svp_unit) ? clean_string($item->catatan_svp_unit) : null,
+                'rejected_by' => $item->approved_by ?? null,
+                'rejected_by_name' => $approvedByName,
+                'rejected_at' => isset($item->approved_at) ? optional($item->approved_at)->toISOString() : null,
+            ];
+
+            return json(200, true, 'Berhasil Ditolak', 'Rencana investasi berhasil ditolak.', clean_recursive($resp));
+
         } catch (\Throwable $e) {
             DB::rollBack();
             \Log::error('RencanaInvestasi@reject error', [
@@ -536,4 +598,10 @@ class RencanaInvestasiController extends Controller
             return json(500, false, 'Gagal Menolak', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
+
+
+
+
+
+
 }

@@ -413,4 +413,127 @@ class RencanaInvestasiController extends Controller
     {
        
     }
+
+    public function approve(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'approval_notes' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $item = RencanaInvestasi::find($id);
+            if (!$item) {
+                return json(404, false, 'Data Tidak Ditemukan', 'Rencana investasi tidak ditemukan.', null);
+            }
+
+            $currentUser = auth()->user();
+            $roleId = $currentUser->role_id ?? null;
+
+            if (!in_array($roleId, [1, 2])) {
+                return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
+            }
+
+
+            if ($roleId === 2 && isset($currentUser->department_id) && $item->unit_kerja_id !== $currentUser->department_id) {
+                return json(403, false, 'Tidak Diizinkan', 'Anda hanya dapat menyetujui data dari departemen Anda sendiri.', null);
+            }
+
+            if ($item->status !== 'submit') {
+                return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat disetujui.', null);
+            }
+
+            $item->update([
+                'status' => 'approved',
+                'catatan_svp_unit' => $request->approval_notes, 
+                'approved_by' => auth()->id(),
+    'approved_at' => now(),
+            ]);
+
+            DB::commit();
+
+            return json(200, true, 'Berhasil Disetujui', 'Rencana investasi telah disetujui.', [
+                'id' => $item->id,
+                'status' => $item->status,
+                'approval_notes' => clean_string($item->catatan_svp_unit),
+                'approved_by' => $item->approvedBy->name ?? null,
+                'approved_at' => $item->approved_at,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('RencanaInvestasi@approve error', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+            return json(500, false, 'Gagal Menyetujui', 'Terjadi kesalahan sistem.', $e->getMessage());
+        }
+    }
+
+
+    public function reject(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'approval_notes' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Catatan penolakan wajib diisi.', $validator->errors());
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $item = RencanaInvestasi::find($id);
+            if (!$item) {
+                return json(404, false, 'Data Tidak Ditemukan', 'Rencana investasi tidak ditemukan.', null);
+            }
+
+            $currentUser = auth()->user();
+            $roleId = $currentUser->role_id ?? null;
+
+            // Only role 1 & 2 can reject
+            if (!in_array($roleId, [1, 2])) {
+                return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menolak data ini.', null);
+            }
+
+            // Role 2: only own department
+            if ($roleId === 2 && isset($currentUser->department_id) && $item->unit_kerja_id !== $currentUser->department_id) {
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menolak data dari departemen Anda sendiri.', null);
+            }
+
+            // Only reject when status submit
+            if ($item->status !== 'submit') {
+                return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status submit yang dapat ditolak.', null);
+            }
+
+            $item->update([
+                'status' => 'rejected',
+                'catatan_svp_unit' => $request->approval_notes, 
+                'approved_by' => auth()->id(),
+                'approved_at' => now(),
+            ]);
+
+            DB::commit();
+
+            return json(200, true, 'Berhasil Ditolak', 'Rencana investasi berhasil ditolak.', [
+                'id' => $item->id,
+                'status' => $item->status,
+                'rejection_notes' => clean_string($item->catatan_svp_unit),
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('RencanaInvestasi@reject error', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+            return json(500, false, 'Gagal Menolak', 'Terjadi kesalahan sistem.', $e->getMessage());
+        }
+    }
 }

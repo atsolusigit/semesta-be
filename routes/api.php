@@ -354,6 +354,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/investasi', [RencanaInvestasiController::class, 'index']);
     Route::post('/investasi', [RencanaInvestasiController::class, 'store']);
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
+    Route::get('/investasi/{id}', [RencanaInvestasiController::class, 'show']); 
     // Route::delete('/rcsa-header/{id}', [RencanaInvestasiController::class, 'destroy']);
 });
 

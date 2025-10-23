@@ -41,4 +41,5 @@ class RencanaInvestasi extends Model
     {
         return $this->hasOne(\App\Models\TrRiskInvestasi::class, 'erkap_id', 'id');
     }
+
 }

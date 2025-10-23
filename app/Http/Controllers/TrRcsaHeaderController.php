@@ -915,9 +915,10 @@ class TrRcsaHeaderController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
         }
 
-        if ($rcsaHeader->status !== 'draft') {
-            return json(403, false, 'Akses Ditolak', 'Hanya data dengan status draft yang dapat disubmit.', null);
+        if (!in_array($rcsaHeader->status, ['draft', 'rejected'])) {
+            return json(403, false, 'Akses Ditolak', 'Hanya data dengan status draft atau rejected yang dapat disubmit.', null);
         }
+
 
         try {
             DB::beginTransaction();

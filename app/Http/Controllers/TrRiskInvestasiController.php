@@ -127,7 +127,7 @@ class TrRiskInvestasiController extends Controller
             'data' => $res,
         ]);
 
-        return json(200, true, 'Berhasil', 'List Risk Profile Investasi', $payload);
+        return json(200, true, 'Data Ditemukan', 'Data risk profile investasi berhasil diambil.', $payload);
     }
 
     public function show($id)
@@ -181,7 +181,7 @@ class TrRiskInvestasiController extends Controller
             ],
         ];
 
-        return json(200, true, 'Berhasil', 'Detail Risk Profile Investasi', $resp);
+        return json(200, true, 'Data Ditemukan', 'Data risk profile investasi berhasil diambil.', $resp);
     }
 
     public function store(Request $request)

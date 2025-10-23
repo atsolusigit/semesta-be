@@ -82,7 +82,7 @@ class RencanaInvestasiController extends Controller
             'data' => $resData,
         ]);
 
-        return json(200, true, 'Berhasil', 'List rencana investasi', $cleanData);
+        return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
     }
 
     public function store(Request $request)

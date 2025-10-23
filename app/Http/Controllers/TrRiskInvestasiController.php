@@ -100,7 +100,7 @@ class TrRiskInvestasiController extends Controller
         $resp = [
             'id' => $it->id,
             'erkap_id' => $it->erkap_id,
-            'header' => $it->investasi,
+            'rencana_investasi' => $it->investasi,
             'kategori_risiko' => $it->kategori_risiko,
             'sub_kategori_risiko' => $it->sub_kategori_risiko,
             'sasaran' => $it->sasaran,

@@ -598,32 +598,44 @@ public function show($id)
     }
 
     // *** TAMBAHAN BARU: CEK KELENGKAPAN DATA ***
-    // Cek kelengkapan data header (sesuaikan field yang wajib diisi)
-    $isHeaderComplete = !empty($data->peristiwa_risiko) &&
-                       !empty($data->penyebab_risiko) &&
-                       !empty($data->dampak_risiko) &&
-                       !empty($data->mitigasi) &&
-                       !empty($data->internal_control);
+    // Tentukan risk status berdasarkan kondisi (disamakan dengan index)
+$overrideStatus = $data->status;
 
-    // Cek apakah semua 12 bulan sudah finalisasi
-    $allMonthsFinalized = true;
-    for ($i = 1; $i <= 12; $i++) {
-        $dataBulanan = $data->monthlyData->firstWhere('month', $i);
-        if (!$dataBulanan || !$dataBulanan->is_finalize) {
-            $allMonthsFinalized = false;
-            break;
-        }
-    }
+// Jika sudah disetujui oleh Menrisk dan status = approved, maka override jadi final
+if ($data->menrisk_at !== null && $data->status === 'approved') {
+    $overrideStatus = 'final';
+} elseif ($data->status === 'rejected') {
+    $overrideStatus = 'rejected';
+}
 
-    // Tentukan risk status berdasarkan kondisi
-    $riskStatus = $data->status;
-    if ($isHeaderComplete && $allMonthsFinalized) {
-        $riskStatus = 'close'; // Otomatis close jika semua data lengkap dan finalisasi
-    } elseif ($data->status === 'approved' && !$isHeaderComplete) {
-        $riskStatus = 'pending'; // Approved tapi data header belum lengkap
-    } elseif ($data->status === 'approved' && $isHeaderComplete && !$allMonthsFinalized) {
-        $riskStatus = 'open'; // Approved, header lengkap, tapi belum semua bulan finalisasi
+$riskStatus = $overrideStatus;
+
+// Hitung kelengkapan header (sudah ada di atas)
+$isHeaderComplete = !empty($data->peristiwa_risiko)
+    && !empty($data->penyebab_risiko)
+    && !empty($data->dampak_risiko)
+    && !empty($data->mitigasi)
+    && !empty($data->internal_control);
+
+// Hitung apakah semua bulan sudah final
+$allMonthsFinalized = true;
+for ($i = 1; $i <= 12; $i++) {
+    $dataBulanan = $data->monthlyData->firstWhere('month', $i);
+    if (!$dataBulanan || !$dataBulanan->is_finalize) {
+        $allMonthsFinalized = false;
+        break;
     }
+}
+
+// Terapkan logika status akhir (identik dengan index)
+if ($isHeaderComplete && $allMonthsFinalized) {
+    $riskStatus = 'close';
+} elseif ($overrideStatus === 'approved' && !$isHeaderComplete) {
+    $riskStatus = 'pending';
+} elseif ($overrideStatus === 'approved' && $isHeaderComplete && !$allMonthsFinalized) {
+    $riskStatus = 'open';
+}
+
     // *** AKHIR TAMBAHAN BARU ***
 
     // Logika untuk menentukan is_edit pada data header
@@ -1047,6 +1059,11 @@ public function update(Request $request, $id)
 
 private function handleApprovedPartialUpdate(Request $request, $riskHeader)
 {
+    // CEK DULU STATUS APPROVAL — hanya bisa isi 4 field kalau SPV Unit dan SPV Menrisk sudah approve
+    if ($riskHeader->status !== 'approved' || empty($riskHeader->menrisk_at)) {
+        return json(403, false, 'Akses Ditolak', '4 field tambahan hanya dapat diisi setelah semua data di approve.', null);
+    }
+
     // 14 field sudah approved, HANYA BOLEH ISI 4 FIELD TAMBAHAN
     $allowedFields = [
         'internal_control',
@@ -1066,8 +1083,6 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
     $violations = [];
     foreach ($forbiddenFields as $field) {
         $value = $request->input($field);
-
-        // Jika ada value apapun (selain null), langsung tolak
         if ($value !== null) {
             $violations[] = [
                 'field' => $field,

@@ -32,6 +32,7 @@ use App\Http\Controllers\MstMonthRecommendationController;
 use App\Http\Controllers\TrRcsaHeaderController;
 use App\Http\Controllers\LostEventController;
 use App\Http\Controllers\RencanaInvestasiController;
+use App\Http\Controllers\TrRiskInvestasiController;
 
 // ============================
 //  Auth Routes (tanpa token)

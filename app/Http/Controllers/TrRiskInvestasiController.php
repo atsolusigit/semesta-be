@@ -6,72 +6,114 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Models\TrRiskInvestasi;
-use App\Models\RencanaInvestasi;
-use App\Models\User;
 
 class TrRiskInvestasiController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = (int) $request->input('per_page', 10);
-        $sortBy = $request->input('sortBy');
+        $perPage   = (int) $request->input('per_page', 10);
+        $sortBy    = $request->input('sortBy');
         $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
-
-        $sortMap = [
-            'tahun' => 'rencana_investasi.year',
-            'nilai' => 'rencana_investasi.nilai_rkap',
-            'nilai_erkap' => 'rencana_investasi.nilai_rkap',
-            'nilai_revisi' => 'rencana_investasi.nilai_revisi',
-        ];
-        $sortColumn = $sortMap[$sortBy] ?? 'tr_risk_investasi.id';
 
         $query = TrRiskInvestasi::query()
             ->with([
                 'investasi:id,erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
                 'approvedByUser:id,username,name'
-            ])
-            ->join('rencana_investasi','rencana_investasi.id','=','tr_risk_investasi.erkap_id')
-            ->select('tr_risk_investasi.*');
+            ]);
 
-        if ($request->filled('tahun')) $query->where('rencana_investasi.year', (int) $request->tahun);
-        if ($request->filled('jenis_investasi')) $query->where('rencana_investasi.jenis_investasi', 'like', '%'.$request->jenis_investasi.'%');
-        if ($request->filled('department_name')) $query->where('rencana_investasi.department_name', 'like', '%'.$request->department_name.'%');
+        if ($request->filled('tahun')) {
+            $query->whereHas('investasi', fn($q) => $q->where('year', (int) $request->tahun));
+        }
+        if ($request->filled('jenis_investasi')) {
+            $ji = $request->jenis_investasi;
+            $query->whereHas('investasi', fn($q) => $q->where('jenis_investasi', 'like', "%{$ji}%"));
+        }
+        if ($request->filled('department_name')) {
+            $dn = $request->department_name;
+            $query->whereHas('investasi', fn($q) => $q->where('department_name', 'like', "%{$dn}%"));
+        }
         if ($request->filled('search')) {
             $s = $request->search;
-            $query->where(function($q) use ($s){
-                $q->where('rencana_investasi.nama_investasi','like',"%$s%")
-                  ->orWhere('rencana_investasi.department_name','like',"%$s%")
-                  ->orWhere('tr_risk_investasi.kategori_risiko','like',"%$s%")
-                  ->orWhere('tr_risk_investasi.sub_kategori_risiko','like',"%$s%");
+            $query->where(function ($qq) use ($s) {
+                $qq->where('kategori_risiko', 'like', "%{$s}%")
+                   ->orWhere('sub_kategori_risiko', 'like', "%{$s}%")
+                   ->orWhere('sasaran', 'like', "%{$s}%")
+                   ->orWhereHas('investasi', function ($qh) use ($s) {
+                       $qh->where('nama_investasi', 'like', "%{$s}%")
+                          ->orWhere('department_name', 'like', "%{$s}%");
+                   });
             });
         }
 
-        $query->orderBy($sortColumn, $sortOrder);
+        $sortMap = [
+            'tahun'        => 'ri.year',
+            'nilai'        => 'ri.nilai_rkap',
+            'nilai_erkap'  => 'ri.nilai_rkap',
+            'nilai_revisi' => 'ri.nilai_revisi',
+        ];
+        if (isset($sortMap[$sortBy])) {
+            $query->leftJoin('rencana_investasi as ri', 'ri.id', '=', 'tr_risk_investasi.erkap_id')
+                  ->select('tr_risk_investasi.*')
+                  ->orderBy($sortMap[$sortBy], $sortOrder);
+        } else {
+            $query->orderBy('tr_risk_investasi.id', $sortOrder);
+        }
 
         $data = $query->paginate($perPage);
 
         if (empty($data->items())) {
-            return json(404,false,'Tidak Ada Data','Risk Profile Investasi tidak ditemukan.',null);
+            return json(404, false, 'Tidak Ada Data', 'Risk Profile Investasi tidak ditemukan.', null);
         }
 
-        $res = collect($data->items())->map(function($it){
+        $res = collect($data->items())->map(function ($it) {
             return [
                 'id' => $it->id,
                 'erkap_id' => $it->erkap_id,
-                'nama_investasi' => optional($it->investasi)->nama_investasi,
-                'department_name' => optional($it->investasi)->department_name,
-                'jenis_investasi' => optional($it->investasi)->jenis_investasi,
-                'kategori_investasi' => optional($it->investasi)->kategori_investasi,
-                'year' => optional($it->investasi)->year,
-                'nilai_rkap' => optional($it->investasi)->nilai_rkap,
-                'nilai_revisi' => optional($it->investasi)->nilai_revisi,
                 'kategori_risiko' => $it->kategori_risiko,
                 'sub_kategori_risiko' => $it->sub_kategori_risiko,
-                'status' => $it->status,
-                'approved_at' => optional($it->approved_at)->toISOString(),
+                'sasaran' => $it->sasaran,
+                'peristiwa_risiko' => $it->peristiwa_risiko,
+                'penyebab_risiko' => $it->penyebab_risiko,
+                'dampak_inherent' => $it->dampak_inherent,
+                'dampak_risiko_awal' => $it->dampak_risiko_awal,
+                'kemungkinan_awal' => $it->kemungkinan_awal,
+                'eksposure_level_awal' => $it->eksposure_level_awal,
+                'eksposure_ltmh_awal' => $it->eksposure_ltmh_awal,
+                'internal_external' => $it->internal_external,
+                'mitigasi_risiko' => $it->mitigasi_risiko,
+                'dampak_residual' => $it->dampak_residual,
+                'dampak_risiko_akhir' => $it->dampak_risiko_akhir,
+                'kemungkinan_akhir' => $it->kemungkinan_akhir,
+                'eksposure_level_akhir' => $it->eksposure_level_akhir,
+                'eksposure_ltmh_akhir' => $it->eksposure_ltmh_akhir,
+                'biaya_mitigasi_risiko' => $it->biaya_mitigasi_risiko,
+                'status' => $it->status ?? 'draft',
+                'approval_notes' => $it->approval_notes,
                 'approved_by' => $it->approved_by,
                 'approved_by_name' => $it->approvedByUser ? get_decrypted_name($it->approvedByUser) : null,
+                'approved_at' => optional($it->approved_at)->toISOString(),
+                'vp_menrisk_note' => $it->vp_menrisk_note,
+                'vp_menrisk_by' => $it->vp_menrisk_by,
+                'vp_menrisk_at' => optional($it->vp_menrisk_at)->toISOString(),
+                'menrisk_note' => $it->menrisk_note,
+                'menrisk_by' => $it->menrisk_by,
+                'menrisk_at' => optional($it->menrisk_at)->toISOString(),
+                'created_by' => $it->created_by,
+                'updated_by' => $it->updated_by,
                 'created_at' => optional($it->created_at)->toISOString(),
+                'updated_at' => optional($it->updated_at)->toISOString(),
+                'rencana_investasi' => [
+                    'id' => optional($it->investasi)->id,
+                    'erkap_id' => optional($it->investasi)->erkap_id,
+                    'nama_investasi' => optional($it->investasi)->nama_investasi,
+                    'department_name' => optional($it->investasi)->department_name,
+                    'jenis_investasi' => optional($it->investasi)->jenis_investasi,
+                    'kategori_investasi' => optional($it->investasi)->kategori_investasi,
+                    'year' => optional($it->investasi)->year,
+                    'nilai_rkap' => optional($it->investasi)->nilai_rkap,
+                    'nilai_revisi' => optional($it->investasi)->nilai_revisi,
+                    'unit_kerja_id' => optional($it->investasi)->unit_kerja_id,
+                ],
             ];
         });
 
@@ -85,22 +127,23 @@ class TrRiskInvestasiController extends Controller
             'data' => $res,
         ]);
 
-        return json(200,true,'Berhasil','List Risk Profile Investasi',$payload);
+        return json(200, true, 'Berhasil', 'List Risk Profile Investasi', $payload);
     }
 
     public function show($id)
     {
         $it = TrRiskInvestasi::with([
-            'investasi:id,erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi',
+            'investasi:id,erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
             'approvedByUser:id,username,name'
         ])->find($id);
 
-        if (!$it) return json(404,false,'Tidak Ditemukan','Risk Profile Investasi tidak ditemukan.',null);
+        if (!$it) {
+            return json(404, false, 'Tidak Ditemukan', 'Risk Profile Investasi tidak ditemukan.', null);
+        }
 
         $resp = [
             'id' => $it->id,
             'erkap_id' => $it->erkap_id,
-            'rencana_investasi' => $it->investasi,
             'kategori_risiko' => $it->kategori_risiko,
             'sub_kategori_risiko' => $it->sub_kategori_risiko,
             'sasaran' => $it->sasaran,
@@ -119,14 +162,26 @@ class TrRiskInvestasiController extends Controller
             'eksposure_level_akhir' => $it->eksposure_level_akhir,
             'eksposure_ltmh_akhir' => $it->eksposure_ltmh_akhir,
             'biaya_mitigasi_risiko' => $it->biaya_mitigasi_risiko,
-            'status' => $it->status,
+            'status' => $it->status ?? 'draft',
             'approval_notes' => $it->approval_notes,
             'approved_by' => $it->approved_by,
             'approved_by_name' => $it->approvedByUser ? get_decrypted_name($it->approvedByUser) : null,
             'approved_at' => optional($it->approved_at)->toISOString(),
+            'rencana_investasi' => [
+                'id' => optional($it->investasi)->id,
+                'erkap_id' => optional($it->investasi)->erkap_id,
+                'nama_investasi' => optional($it->investasi)->nama_investasi,
+                'department_name' => optional($it->investasi)->department_name,
+                'jenis_investasi' => optional($it->investasi)->jenis_investasi,
+                'kategori_investasi' => optional($it->investasi)->kategori_investasi,
+                'year' => optional($it->investasi)->year,
+                'nilai_rkap' => optional($it->investasi)->nilai_rkap,
+                'nilai_revisi' => optional($it->investasi)->nilai_revisi,
+                'unit_kerja_id' => optional($it->investasi)->unit_kerja_id,
+            ],
         ];
 
-        return json(200,true,'Berhasil','Detail Risk Profile Investasi',$resp);
+        return json(200, true, 'Berhasil', 'Detail Risk Profile Investasi', $resp);
     }
 
     public function store(Request $request)
@@ -156,10 +211,10 @@ class TrRiskInvestasiController extends Controller
             'biaya_mitigasi_risiko' => 'nullable|numeric',
             'status' => 'nullable|string',
         ]);
-        if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
+        if ($validator->fails()) return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
 
         $exists = TrRiskInvestasi::where('erkap_id', $request->erkap_id)->exists();
-        if ($exists) return json(409,false,'Sudah Ada','Risk Profile untuk Rencana Investasi ini sudah dibuat.',null);
+        if ($exists) return json(409, false, 'Sudah Ada', 'Risk Profile untuk Rencana Investasi ini sudah dibuat.', null);
 
         try {
             DB::beginTransaction();
@@ -184,11 +239,11 @@ class TrRiskInvestasiController extends Controller
 
             DB::commit();
 
-            return json(201,true,'Berhasil Disimpan','Risk Profile Investasi berhasil dibuat.',$it->only(['id','erkap_id','status']));
+            return json(201, true, 'Berhasil Disimpan', 'Risk Profile Investasi berhasil dibuat.', $it->only(['id','erkap_id','status']));
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(500,false,'Gagal Disimpan','Terjadi kesalahan sistem.',$th->getMessage());
+            return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $th->getMessage());
         }
     }
 
@@ -198,7 +253,7 @@ class TrRiskInvestasiController extends Controller
         if ($result !== true) return $result;
 
         $it = TrRiskInvestasi::find($id);
-        if (!$it) return json(404,false,'Tidak Ditemukan','Risk Profile Investasi tidak ditemukan.',null);
+        if (!$it) return json(404, false, 'Tidak Ditemukan', 'Risk Profile Investasi tidak ditemukan.', null);
 
         $validator = Validator::make($request->all(), [
             'kategori_risiko' => 'nullable|string',
@@ -221,7 +276,7 @@ class TrRiskInvestasiController extends Controller
             'biaya_mitigasi_risiko' => 'nullable|numeric',
             'status' => 'nullable|string',
         ]);
-        if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
+        if ($validator->fails()) return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
 
         try {
             DB::beginTransaction();
@@ -247,11 +302,11 @@ class TrRiskInvestasiController extends Controller
 
             DB::commit();
 
-            return json(200,true,'Berhasil Diperbarui','Risk Profile Investasi berhasil diupdate.',$it->only(['id','erkap_id','status']));
+            return json(200, true, 'Berhasil Diperbarui', 'Risk Profile Investasi berhasil diupdate.', $it->only(['id','erkap_id','status']));
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(500,false,'Gagal Update','Terjadi kesalahan sistem.',$th->getMessage());
+            return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $th->getMessage());
         }
     }
 
@@ -261,7 +316,7 @@ class TrRiskInvestasiController extends Controller
         if ($result !== true) return $result;
 
         $it = TrRiskInvestasi::find($id);
-        if (!$it) return json(404,false,'Tidak Ditemukan','Risk Profile Investasi tidak ditemukan.',null);
+        if (!$it) return json(404, false, 'Tidak Ditemukan', 'Risk Profile Investasi tidak ditemukan.', null);
 
         try {
             DB::beginTransaction();
@@ -270,35 +325,35 @@ class TrRiskInvestasiController extends Controller
 
             DB::commit();
 
-            return json(200,true,'Berhasil Dihapus','Risk Profile Investasi berhasil dihapus.',['deleted_id'=>$id]);
+            return json(200, true, 'Berhasil Dihapus', 'Risk Profile Investasi berhasil dihapus.', ['deleted_id' => $id]);
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(500,false,'Gagal Hapus','Terjadi kesalahan sistem.',$th->getMessage());
+            return json(500, false, 'Gagal Hapus', 'Terjadi kesalahan sistem.', $th->getMessage());
         }
     }
 
     public function approve(Request $request, $id)
     {
         $validator = Validator::make($request->all(), ['approval_notes' => 'nullable|string']);
-        if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
+        if ($validator->fails()) return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
 
         try {
             DB::beginTransaction();
 
             $it = TrRiskInvestasi::find($id);
-            if (!$it) return json(404,false,'Tidak Ditemukan','Risk Profile Investasi tidak ditemukan.',null);
+            if (!$it) return json(404, false, 'Tidak Ditemukan', 'Risk Profile Investasi tidak ditemukan.', null);
 
             $user = auth()->user();
             $roleId = (int) ($user->role_id ?? 0);
-            if (!in_array($roleId,[1,2],true)) return json(403,false,'Tidak Diizinkan','Anda tidak memiliki hak untuk menyetujui.',null);
+            if (!in_array($roleId, [1,2], true)) return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk menyetujui.', null);
 
             if ($it->status !== 'submit') {
-                return json(400,false,'Status Tidak Valid','Hanya data submit yang dapat disetujui.',['current_status'=>$it->status]);
+                return json(400, false, 'Status Tidak Valid', 'Hanya data submit yang dapat disetujui.', ['current_status' => $it->status]);
             }
 
             $notes = (string) ($request->approval_notes ?? '');
-            try { $notes = clean_string($notes); } catch (\Throwable $e) { $notes = mb_convert_encoding($notes,'UTF-8','UTF-8'); }
+            try { $notes = clean_string($notes); } catch (\Throwable $e) { $notes = mb_convert_encoding($notes, 'UTF-8', 'UTF-8'); }
 
             $it->update([
                 'status' => 'approved',
@@ -321,35 +376,35 @@ class TrRiskInvestasiController extends Controller
                 'approved_at' => optional($it->approved_at)->toISOString(),
             ];
 
-            return json(200,true,'Berhasil Disetujui','Risk Profile Investasi disetujui.',$resp);
+            return json(200, true, 'Berhasil Disetujui', 'Risk Profile Investasi disetujui.', $resp);
 
         } catch (\Throwable $e) {
             DB::rollBack();
-            return json(500,false,'Gagal Menyetujui','Terjadi kesalahan sistem.',$e->getMessage());
+            return json(500, false, 'Gagal Menyetujui', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
 
     public function reject(Request $request, $id)
     {
         $validator = Validator::make($request->all(), ['approval_notes' => 'required|string']);
-        if ($validator->fails()) return json(400,false,'Validasi Gagal','Catatan penolakan wajib diisi.',$validator->errors());
+        if ($validator->fails()) return json(400, false, 'Validasi Gagal', 'Catatan penolakan wajib diisi.', $validator->errors());
 
         try {
             DB::beginTransaction();
 
             $it = TrRiskInvestasi::find($id);
-            if (!$it) return json(404,false,'Tidak Ditemukan','Risk Profile Investasi tidak ditemukan.',null);
+            if (!$it) return json(404, false, 'Tidak Ditemukan', 'Risk Profile Investasi tidak ditemukan.', null);
 
             $user = auth()->user();
             $roleId = (int) ($user->role_id ?? 0);
-            if (!in_array($roleId,[1,2],true)) return json(403,false,'Akses Ditolak','Anda tidak memiliki hak untuk menolak.',null);
+            if (!in_array($roleId, [1,2], true)) return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk menolak.', null);
 
             if ($it->status !== 'submit') {
-                return json(400,false,'Status Tidak Valid','Hanya data submit yang dapat ditolak.',['current_status'=>$it->status]);
+                return json(400, false, 'Status Tidak Valid', 'Hanya data submit yang dapat ditolak.', ['current_status' => $it->status]);
             }
 
             $notes = (string) $request->approval_notes;
-            try { $notes = clean_string($notes); } catch (\Throwable $e) { $notes = mb_convert_encoding($notes,'UTF-8','UTF-8'); }
+            try { $notes = clean_string($notes); } catch (\Throwable $e) { $notes = mb_convert_encoding($notes, 'UTF-8', 'UTF-8'); }
 
             $it->update([
                 'status' => 'rejected',
@@ -372,11 +427,11 @@ class TrRiskInvestasiController extends Controller
                 'rejected_at' => optional($it->approved_at)->toISOString(),
             ];
 
-            return json(200,true,'Berhasil Ditolak','Risk Profile Investasi ditolak.',$resp);
+            return json(200, true, 'Berhasil Ditolak', 'Risk Profile Investasi ditolak.', $resp);
 
         } catch (\Throwable $e) {
             DB::rollBack();
-            return json(500,false,'Gagal Menolak','Terjadi kesalahan sistem.',$e->getMessage());
+            return json(500, false, 'Gagal Menolak', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
     }
 }

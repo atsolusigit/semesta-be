@@ -556,8 +556,8 @@ if (!function_exists('validate_bulk_quantitative_data')) {
             if (array_key_exists('target_quantitative', $monthData) && is_null($monthData['target_quantitative'])) {
                 return [
                     'valid' => false,
-                    'title' => 'Target Quantitative Tidak Boleh Kosong',
-                    'message' => "Data pada index {$index} memiliki kuantitatif target yang kosong. Mohon isi dengan nilai yang valid.",
+                    'title' => 'Data Tidak Boleh Kosong',
+                    'message' => "Ada data yang masih kosong. Mohon mengisi data dengan benar.",
                     'data' => [
                         'header_id' => $headerId,
                         'invalid_index' => $index,

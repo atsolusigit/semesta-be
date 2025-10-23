@@ -775,23 +775,51 @@ public function store(Request $request)
     // ============================================
 
     $validator = Validator::make($request->all(), [
-        // 14 field wajib untuk penyimpanan awal
-        'risk_code' => 'required|array',
-        'risk_code.*' => 'exists:mst_risk_code,id',
-        'jenis_risiko' => 'required|exists:mst_jenis_risiko,id', // harus ada di tabel mst_jenis_risiko
-        'year' => 'required|integer',
-        'sasaran' => 'required|string',
-        'peristiwa_risiko' => 'required|string',
-        'penyebab_risiko' => 'required|string',
-        'dampak_risiko' => 'required|string',
-        'inherent_risk_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
-        'inherent_risk_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
-        'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
-        'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
-        'department_id' => 'required|exists:mst_department,id',
-        'mitigasi' => 'nullable|string',
-        'biaya_perlakuan_risiko' => 'nullable|numeric',
-    ]);
+    // 14 field wajib untuk penyimpanan awal
+    'risk_code' => 'required|array',
+    'risk_code.*' => 'exists:mst_risk_code,id',
+    'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',
+    'year' => 'required|integer',
+    'sasaran' => 'required|string',
+    'peristiwa_risiko' => 'required|string',
+    'penyebab_risiko' => 'required|string',
+    'dampak_risiko' => 'required|string',
+    'inherent_risk_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+    'inherent_risk_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+    'residual_target_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
+    'residual_target_level_kemungkinan' => 'required|exists:mst_heatmap_kemungkinan,id',
+    'department_id' => 'required|exists:mst_department,id',
+    'mitigasi' => 'nullable|string',
+    'biaya_perlakuan_risiko' => 'nullable|numeric',
+], [
+    'risk_code.required' => 'risk code field is required.',
+    'risk_code.array' => 'risk code must be an array.',
+    'risk_code.*.exists' => 'selected risk code is invalid.',
+    'jenis_risiko.required' => 'jenis risiko field is required.',
+    'jenis_risiko.exists' => 'selected jenis risiko is invalid.',
+    'year.required' => 'year field is required.',
+    'year.integer' => 'year must be an integer.',
+    'sasaran.required' => 'sasaran field is required.',
+    'sasaran.string' => 'sasaran must be a string.',
+    'peristiwa_risiko.required' => 'peristiwa risiko field is required.',
+    'peristiwa_risiko.string' => 'peristiwa risiko must be a string.',
+    'penyebab_risiko.required' => 'penyebab risiko field is required.',
+    'penyebab_risiko.string' => 'penyebab risiko must be a string.',
+    'dampak_risiko.required' => 'dampak risiko field is required.',
+    'dampak_risiko.string' => 'dampak risiko must be a string.',
+    'inherent_risk_level_dampak.required' => 'inherent risk level dampak field is required.',
+    'inherent_risk_level_dampak.exists' => 'selected inherent risk level dampak is invalid.',
+    'inherent_risk_level_kemungkinan.required' => 'inherent risk level kemungkinan field is required.',
+    'inherent_risk_level_kemungkinan.exists' => 'selected inherent risk level kemungkinan is invalid.',
+    'residual_target_level_dampak.required' => 'residual target level dampak field is required.',
+    'residual_target_level_dampak.exists' => 'selected residual target level dampak is invalid.',
+    'residual_target_level_kemungkinan.required' => 'residual target level kemungkinan field is required.',
+    'residual_target_level_kemungkinan.exists' => 'selected residual target level kemungkinan is invalid.',
+    'department_id.required' => 'department id field is required.',
+    'department_id.exists' => 'selected department id is invalid.',
+    'mitigasi.string' => 'mitigasi must be a string.',
+    'biaya_perlakuan_risiko.numeric' => 'biaya perlakuan risiko must be a number.',
+]);
 
     if ($validator->fails()) {
         return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
@@ -1071,6 +1099,16 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
         'target_satu_tahun_option' => 'required|exists:mst_option,id',
         'target_satu_tahun_notes' => 'required|string',
         'target_quantitative_satu_tahun' => 'required|string|max:500'
+    ], [
+        'internal_control.required' => 'internal control field is required.',
+        'internal_control.string' => 'internal control must be a string.',
+        'target_satu_tahun_option.required' => 'target satu tahun option field is required.',
+        'target_satu_tahun_option.exists' => 'selected target satu tahun option is invalid.',
+        'target_satu_tahun_notes.required' => 'target satu tahun notes field is required.',
+        'target_satu_tahun_notes.string' => 'target satu tahun notes must be a string.',
+        'target_quantitative_satu_tahun.required' => 'target quantitative satu tahun field is required.',
+        'target_quantitative_satu_tahun.string' => 'target quantitative satu tahun must be a string.',
+        'target_quantitative_satu_tahun.max' => 'target quantitative satu tahun may not be greater than 500 characters.',
     ]);
 
     if ($validator->fails()) {
@@ -1188,7 +1226,7 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
     $validator = Validator::make($request->all(), [
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
-        'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',// jenis risiko harus ada di tabel mst_jenis_risiko
+        'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',
         'sasaran' => 'required|string',
         'year' => 'required|integer',
         'peristiwa_risiko' => 'required|string',
@@ -1201,6 +1239,34 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
         'department_id' => 'required|exists:mst_department,id',
         'mitigasi' => 'nullable|string',
         'biaya_perlakuan_risiko' => 'nullable|numeric',
+    ], [
+        'risk_code.required' => 'risk code field is required.',
+        'risk_code.array' => 'risk code must be an array.',
+        'risk_code.*.exists' => 'selected risk code is invalid.',
+        'jenis_risiko.required' => 'jenis risiko field is required.',
+        'jenis_risiko.exists' => 'selected jenis risiko is invalid.',
+        'sasaran.required' => 'sasaran field is required.',
+        'sasaran.string' => 'sasaran must be a string.',
+        'year.required' => 'year field is required.',
+        'year.integer' => 'year must be an integer.',
+        'peristiwa_risiko.required' => 'peristiwa risiko field is required.',
+        'peristiwa_risiko.string' => 'peristiwa risiko must be a string.',
+        'penyebab_risiko.required' => 'penyebab risiko field is required.',
+        'penyebab_risiko.string' => 'penyebab risiko must be a string.',
+        'dampak_risiko.required' => 'dampak risiko field is required.',
+        'dampak_risiko.string' => 'dampak risiko must be a string.',
+        'inherent_risk_level_dampak.required' => 'inherent risk level dampak field is required.',
+        'inherent_risk_level_dampak.exists' => 'selected inherent risk level dampak is invalid.',
+        'inherent_risk_level_kemungkinan.required' => 'inherent risk level kemungkinan field is required.',
+        'inherent_risk_level_kemungkinan.exists' => 'selected inherent risk level kemungkinan is invalid.',
+        'residual_target_level_dampak.required' => 'residual target level dampak field is required.',
+        'residual_target_level_dampak.exists' => 'selected residual target level dampak is invalid.',
+        'residual_target_level_kemungkinan.required' => 'residual target level kemungkinan field is required.',
+        'residual_target_level_kemungkinan.exists' => 'selected residual target level kemungkinan is invalid.',
+        'department_id.required' => 'department id field is required.',
+        'department_id.exists' => 'selected department id is invalid.',
+        'mitigasi.string' => 'mitigasi must be a string.',
+        'biaya_perlakuan_risiko.numeric' => 'biaya perlakuan risiko must be a number.',
     ]);
 
     if ($validator->fails()) {
@@ -1371,7 +1437,7 @@ private function handleDraftUpdate(Request $request, $riskHeader)
     $validator = Validator::make($request->all(), [
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
-        'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',// jenis risiko harus ada di tabel mst_jenis_risiko
+        'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',
         'sasaran' => 'required|string',
         'year' => 'required|integer',
         'peristiwa_risiko' => 'required|string',
@@ -1384,6 +1450,34 @@ private function handleDraftUpdate(Request $request, $riskHeader)
         'department_id' => 'required|exists:mst_department,id',
         'mitigasi' => 'nullable|string',
         'biaya_perlakuan_risiko' => 'nullable|numeric',
+    ], [
+        'risk_code.required' => 'risk code field is required.',
+        'risk_code.array' => 'risk code must be an array.',
+        'risk_code.*.exists' => 'selected risk code is invalid.',
+        'jenis_risiko.required' => 'jenis risiko field is required.',
+        'jenis_risiko.exists' => 'selected jenis risiko is invalid.',
+        'sasaran.required' => 'sasaran field is required.',
+        'sasaran.string' => 'sasaran must be a string.',
+        'year.required' => 'year field is required.',
+        'year.integer' => 'year must be an integer.',
+        'peristiwa_risiko.required' => 'peristiwa risiko field is required.',
+        'peristiwa_risiko.string' => 'peristiwa risiko must be a string.',
+        'penyebab_risiko.required' => 'penyebab risiko field is required.',
+        'penyebab_risiko.string' => 'penyebab risiko must be a string.',
+        'dampak_risiko.required' => 'dampak risiko field is required.',
+        'dampak_risiko.string' => 'dampak risiko must be a string.',
+        'inherent_risk_level_dampak.required' => 'inherent risk level dampak field is required.',
+        'inherent_risk_level_dampak.exists' => 'selected inherent risk level dampak is invalid.',
+        'inherent_risk_level_kemungkinan.required' => 'inherent risk level kemungkinan field is required.',
+        'inherent_risk_level_kemungkinan.exists' => 'selected inherent risk level kemungkinan is invalid.',
+        'residual_target_level_dampak.required' => 'residual target level dampak field is required.',
+        'residual_target_level_dampak.exists' => 'selected residual target level dampak is invalid.',
+        'residual_target_level_kemungkinan.required' => 'residual target level kemungkinan field is required.',
+        'residual_target_level_kemungkinan.exists' => 'selected residual target level kemungkinan is invalid.',
+        'department_id.required' => 'department id field is required.',
+        'department_id.exists' => 'selected department id is invalid.',
+        'mitigasi.string' => 'mitigasi must be a string.',
+        'biaya_perlakuan_risiko.numeric' => 'biaya perlakuan risiko must be a number.',
     ]);
 
     if ($validator->fails()) {

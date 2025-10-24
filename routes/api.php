@@ -33,6 +33,7 @@ use App\Http\Controllers\TrRcsaHeaderController;
 use App\Http\Controllers\LostEventController;
 use App\Http\Controllers\RencanaInvestasiController;
 use App\Http\Controllers\MstJenisRisikoController;
+use App\Http\Controllers\TrRiskInvestasiController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -361,5 +362,12 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/investasi', [RencanaInvestasiController::class, 'index']);
     Route::post('/investasi', [RencanaInvestasiController::class, 'store']);
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
-    // Route::delete('/rcsa-header/{id}', [RencanaInvestasiController::class, 'destroy']);
+    
+    Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
+    Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);
+    Route::post('/risk-investasi', [TrRiskInvestasiController::class, 'store']);
+    Route::put('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'update']);
+    Route::delete('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'destroy']);
+    Route::patch('/risk-investasi/{id}/approve', [TrRiskInvestasiController::class, 'approve']);
+    Route::patch('/risk-investasi/{id}/reject', [TrRiskInvestasiController::class, 'reject']);
 });

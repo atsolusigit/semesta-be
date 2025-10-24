@@ -37,4 +37,9 @@ class RencanaInvestasi extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    public function riskInvestasi()
+    {
+        return $this->hasOne(\App\Models\TrRiskInvestasi::class, 'erkap_id', 'id');
+    }
+
 }

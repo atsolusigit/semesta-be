@@ -254,11 +254,17 @@ public function index(Request $request)
 
         // Cek apakah semua 12 bulan sudah finalisasi
         $allMonthsFinalized = true;
-        for ($i = 1; $i <= 12; $i++) {
-            $dataBulanan = $item->monthlyData->firstWhere('month', $i);
-            if (!$dataBulanan || !$dataBulanan->is_finalize) {
-                $allMonthsFinalized = false;
-                break;
+        $totalMonths = $item->monthlyData->count();
+
+        if ($totalMonths < 12) {
+            $allMonthsFinalized = false;
+        } else {
+            for ($i = 1; $i <= 12; $i++) {
+                $dataBulanan = $item->monthlyData->firstWhere('month', $i);
+                if (!$dataBulanan || !$dataBulanan->is_finalize) {
+                    $allMonthsFinalized = false;
+                    break;
+                }
             }
         }
 
@@ -275,12 +281,21 @@ public function index(Request $request)
 
         // Tentukan risk status berdasarkan kondisi
         $riskStatus = $overrideStatus;
-        if ($isHeaderComplete && $allMonthsFinalized) {
-            $riskStatus = 'close'; // Otomatis close jika semua data lengkap dan finalisasi
-        } elseif ($overrideStatus === 'approved' && !$isHeaderComplete) {
-            $riskStatus = 'pending'; // Approved tapi data header belum lengkap
-        } elseif ($overrideStatus === 'approved' && $isHeaderComplete && !$allMonthsFinalized) {
-            $riskStatus = 'open'; // Approved, header lengkap, tapi belum semua bulan finalisasi
+
+        // Tambahkan logika open/close sesuai kelengkapan bulan
+        // ================================
+        // Perbaikan utama di bawah ini
+        // ================================
+        if (in_array($overrideStatus, ['approved', 'final'])) {
+            if ($isHeaderComplete) {
+                if ($allMonthsFinalized) {
+                    $riskStatus = 'close'; // semua bulan sudah finalisasi
+                } else {
+                    $riskStatus = 'open'; // belum semua bulan finalisasi
+                }
+            } else {
+                $riskStatus = 'pending'; // header belum lengkap
+            }
         }
         // *** AKHIR TAMBAHAN BARU ***
 
@@ -599,46 +614,56 @@ public function show($id)
 
     // *** TAMBAHAN BARU: CEK KELENGKAPAN DATA ***
     // Tentukan risk status berdasarkan kondisi (disamakan dengan index)
-$overrideStatus = $data->status;
+    $overrideStatus = $data->status;
 
-// Jika sudah disetujui oleh Menrisk dan status = approved, maka override jadi final
-if ($data->menrisk_at !== null && $data->status === 'approved') {
-    $overrideStatus = 'final';
-} elseif ($data->status === 'rejected') {
-    $overrideStatus = 'rejected';
-}
-
-$riskStatus = $overrideStatus;
-
-// Hitung kelengkapan header (sudah ada di atas)
-$isHeaderComplete = !empty($data->peristiwa_risiko)
-    && !empty($data->penyebab_risiko)
-    && !empty($data->dampak_risiko)
-    && !empty($data->mitigasi)
-    && !empty($data->internal_control);
-
-// Hitung apakah semua bulan sudah final
-$allMonthsFinalized = true;
-for ($i = 1; $i <= 12; $i++) {
-    $dataBulanan = $data->monthlyData->firstWhere('month', $i);
-    if (!$dataBulanan || !$dataBulanan->is_finalize) {
-        $allMonthsFinalized = false;
-        break;
+    // Jika sudah disetujui oleh Menrisk dan status = approved, maka override jadi final
+    if ($data->menrisk_at !== null && $data->status === 'approved') {
+        $overrideStatus = 'final';
+    } elseif ($data->status === 'rejected') {
+        $overrideStatus = 'rejected';
     }
-}
 
-// Terapkan logika status akhir (identik dengan index)
-if ($isHeaderComplete && $allMonthsFinalized) {
-    $riskStatus = 'close';
-} elseif ($overrideStatus === 'approved' && !$isHeaderComplete) {
-    $riskStatus = 'pending';
-} elseif ($overrideStatus === 'approved' && $isHeaderComplete && !$allMonthsFinalized) {
-    $riskStatus = 'open';
-}
+    $riskStatus = $overrideStatus;
+
+    // Hitung kelengkapan header (sudah ada di atas)
+    $isHeaderComplete = !empty($data->peristiwa_risiko)
+        && !empty($data->penyebab_risiko)
+        && !empty($data->dampak_risiko)
+        && !empty($data->mitigasi)
+        && !empty($data->internal_control);
+
+    // Hitung apakah semua bulan sudah final
+    $allMonthsFinalized = true;
+    $totalMonths = $data->monthlyData->count();
+
+    if ($totalMonths < 12) {
+        $allMonthsFinalized = false;
+    } else {
+        for ($i = 1; $i <= 12; $i++) {
+            $dataBulanan = $data->monthlyData->firstWhere('month', $i);
+            if (!$dataBulanan || !$dataBulanan->is_finalize) {
+                $allMonthsFinalized = false;
+                break;
+            }
+        }
+    }
+
+    // Terapkan logika status akhir (identik dengan index)
+    if (in_array($overrideStatus, ['approved', 'final'])) {
+        if ($isHeaderComplete) {
+            if ($allMonthsFinalized) {
+                $riskStatus = 'close'; // semua bulan sudah finalisasi
+            } else {
+                $riskStatus = 'open'; // belum semua bulan finalisasi
+            }
+        } else {
+            $riskStatus = 'pending'; // approved tapi header belum lengkap
+        }
+    } elseif ($overrideStatus === 'rejected') {
+        $riskStatus = 'rejected';
+    }
 
     // *** AKHIR TAMBAHAN BARU ***
-
-    // Logika untuk menentukan is_edit pada data header
     // Perbaiki: Sesuaikan logika is_edit berdasarkan semua kemungkinan status
     $isEditHeader = !in_array($data->status, ['approved', 'close']);
 

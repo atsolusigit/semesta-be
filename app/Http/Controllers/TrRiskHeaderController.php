@@ -282,21 +282,27 @@ public function index(Request $request)
         // Tentukan risk status berdasarkan kondisi
         $riskStatus = $overrideStatus;
 
+        // ================================
         // Tambahkan logika open/close sesuai kelengkapan bulan
         // ================================
-        // Perbaikan utama di bawah ini
-        // ================================
-        if (in_array($overrideStatus, ['approved', 'final'])) {
-            if ($isHeaderComplete) {
-                if ($allMonthsFinalized) {
-                    $riskStatus = 'close'; // semua bulan sudah finalisasi
-                } else {
-                    $riskStatus = 'open'; // belum semua bulan finalisasi
-                }
-            } else {
+        switch (true) {
+            case (in_array($overrideStatus, ['approved', 'final']) && !$isHeaderComplete):
                 $riskStatus = 'pending'; // header belum lengkap
-            }
+                break;
+
+            case (in_array($overrideStatus, ['approved', 'final']) && $isHeaderComplete && !$allMonthsFinalized):
+                $riskStatus = 'open'; // belum semua bulan finalisasi
+                break;
+
+            case (in_array($overrideStatus, ['approved', 'final']) && $isHeaderComplete && $allMonthsFinalized):
+                $riskStatus = 'close'; // semua bulan sudah finalisasi
+                break;
+
+            default:
+                $riskStatus = $overrideStatus; // fallback, status tetap seperti aslinya
+                break;
         }
+
         // *** AKHIR TAMBAHAN BARU ***
 
         return [
@@ -625,7 +631,7 @@ public function show($id)
 
     $riskStatus = $overrideStatus;
 
-    // Hitung kelengkapan header (sudah ada di atas)
+    // Hitung kelengkapan header
     $isHeaderComplete = !empty($data->peristiwa_risiko)
         && !empty($data->penyebab_risiko)
         && !empty($data->dampak_risiko)
@@ -648,19 +654,29 @@ public function show($id)
         }
     }
 
-    // Terapkan logika status akhir (identik dengan index)
-    if (in_array($overrideStatus, ['approved', 'final'])) {
-        if ($isHeaderComplete) {
-            if ($allMonthsFinalized) {
-                $riskStatus = 'close'; // semua bulan sudah finalisasi
-            } else {
-                $riskStatus = 'open'; // belum semua bulan finalisasi
-            }
-        } else {
-            $riskStatus = 'pending'; // approved tapi header belum lengkap
-        }
-    } elseif ($overrideStatus === 'rejected') {
-        $riskStatus = 'rejected';
+    // ================================
+    // Terapkan logika status akhir (pakai switch-case)
+    // ================================
+    switch (true) {
+        case ($overrideStatus === 'rejected'):
+            $riskStatus = 'rejected';
+            break;
+
+        case (in_array($overrideStatus, ['approved', 'final']) && !$isHeaderComplete):
+            $riskStatus = 'pending'; // header belum lengkap
+            break;
+
+        case (in_array($overrideStatus, ['approved', 'final']) && $isHeaderComplete && !$allMonthsFinalized):
+            $riskStatus = 'open'; // belum semua bulan finalisasi
+            break;
+
+        case (in_array($overrideStatus, ['approved', 'final']) && $isHeaderComplete && $allMonthsFinalized):
+            $riskStatus = 'close'; // semua bulan sudah finalisasi
+            break;
+
+        default:
+            $riskStatus = $overrideStatus; // fallback
+            break;
     }
 
     // *** AKHIR TAMBAHAN BARU ***
@@ -671,6 +687,7 @@ public function show($id)
     $orderedData = [
         'id' => $data->id,
         'risk_status' => $riskStatus, // *** DIUBAH: sekarang menggunakan $riskStatus ***
+        'override_status' => $overrideStatus, // penambahan untuk override status
         'type_document' => $data->approval->type_document ?? null,
         'department_id' => $data->department_id,
         'department_name' => $data->department->name ?? '',

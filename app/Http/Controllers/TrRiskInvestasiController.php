@@ -193,7 +193,7 @@ class TrRiskInvestasiController extends Controller
         if ($result !== true) return $result;
 
         $validator = Validator::make($request->all(), [
-            'erkap_id' => 'required|string|exists:rencana_investasi,erkap_id',
+            'erkap_id' => 'required|integer|exists:rencana_investasi,erkap_id',
             'kategori_risiko' => 'nullable|string',
             'sub_kategori_risiko' => 'nullable|string',
             'sasaran' => 'nullable|string',

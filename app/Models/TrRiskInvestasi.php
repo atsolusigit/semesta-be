@@ -54,7 +54,7 @@ class TrRiskInvestasi extends Model
 
     public function investasi()
     {
-        return $this->hasOne(\App\Models\TrRiskInvestasi::class, 'erkap_id', 'erkap_id');
+        return $this->belongsTo(\App\Models\RencanaInvestasi::class, 'erkap_id', 'erkap_id');
     }
 
 

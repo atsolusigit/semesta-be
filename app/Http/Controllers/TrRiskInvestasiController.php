@@ -439,12 +439,27 @@ class TrRiskInvestasiController extends Controller
     }
 
 
-    public function getByErkapID($erkap_id)
+   public function getByErkapID($erkap_id)
     {
         $it = TrRiskInvestasi::with([
-            'investasi:erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
+            'investasi' => function ($q) {
+                $q->select(
+                    'id',            
+                    'erkap_id',       
+                    'department_name',
+                    'nama_investasi',
+                    'jenis_investasi',
+                    'kategori_investasi',
+                    'year',
+                    'nilai_rkap',
+                    'nilai_revisi',
+                    'unit_kerja_id'
+                );
+            },
             'approvedByUser:id,username,name'
-        ])->where('erkap_id', $erkap_id)->first();
+        ])
+        ->where('erkap_id', $erkap_id)
+        ->first();
 
         if (!$it) {
             return json(404, false, 'Tidak Ditemukan', 'Risk Profile Investasi tidak ditemukan berdasarkan ERKAP ID.', null);
@@ -477,6 +492,7 @@ class TrRiskInvestasiController extends Controller
             'approved_by_name' => $it->approvedByUser ? get_decrypted_name($it->approvedByUser) : null,
             'approved_at' => optional($it->approved_at)->toISOString(),
             'rencana_investasi' => [
+                'id' => optional($it->investasi)->id,
                 'erkap_id' => optional($it->investasi)->erkap_id,
                 'nama_investasi' => optional($it->investasi)->nama_investasi,
                 'department_name' => optional($it->investasi)->department_name,
@@ -491,4 +507,5 @@ class TrRiskInvestasiController extends Controller
 
         return json(200, true, 'Data Ditemukan', 'Data risk profile investasi berdasarkan ERKAP ID berhasil diambil.', $resp);
     }
+
 }

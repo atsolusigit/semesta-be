@@ -91,7 +91,7 @@ class RencanaInvestasiController extends Controller
         if ($result !== true) return $result;
 
         $validator = Validator::make($request->all(), [
-            'erkap_id' =>'required|string',
+            'erkap_id' =>'required|integer',
             'department_name' => 'required|string',
             'nama_investasi' => 'required|string',
             'kategori_investasi' => 'required|string',
@@ -157,7 +157,7 @@ class RencanaInvestasiController extends Controller
         $item = RencanaInvestasi::find($id);
         if (!$item) return json(404,false,'Tidak Ditemukan','Rencana investasi tidak ditemukan.',null);
 
-        $locked = TrRiskInvestasi::where('erkap_id', $item->id)->exists();
+        $locked = TrRiskInvestasi::where('erkap_id', $item->erkap_id)->exists();
         if ($locked) return json(403,false,'Terkunci','Risk Profile Investasi sudah dibuat. Rencana Investasi tidak dapat diupdate.',null);
 
         $validator = Validator::make($request->all(), [
@@ -196,4 +196,5 @@ class RencanaInvestasiController extends Controller
             return json(500,false,'Gagal Update','Terjadi kesalahan sistem.',$th->getMessage());
         }
     }
+
 }

@@ -16,10 +16,11 @@ class TrRiskInvestasiController extends Controller
         $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $query = TrRiskInvestasi::query()
-            ->with([
-                'investasi:id,erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
-                'approvedByUser:id,username,name'
-            ]);
+        ->with([
+            'investasi:erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
+            'approvedByUser:id,username,name'
+        ]);
+
 
         if ($request->filled('tahun')) {
             $query->whereHas('investasi', fn($q) => $q->where('year', (int) $request->tahun));
@@ -51,13 +52,15 @@ class TrRiskInvestasiController extends Controller
             'nilai_erkap'  => 'ri.nilai_rkap',
             'nilai_revisi' => 'ri.nilai_revisi',
         ];
+
         if (isset($sortMap[$sortBy])) {
-            $query->leftJoin('rencana_investasi as ri', 'ri.id', '=', 'tr_risk_investasi.erkap_id')
-                  ->select('tr_risk_investasi.*')
-                  ->orderBy($sortMap[$sortBy], $sortOrder);
+            $query->leftJoin('rencana_investasi as ri', 'ri.erkap_id', '=', 'tr_risk_investasi.erkap_id')
+                ->select('tr_risk_investasi.*')
+                ->orderBy($sortMap[$sortBy], $sortOrder);
         } else {
             $query->orderBy('tr_risk_investasi.id', $sortOrder);
         }
+
 
         $data = $query->paginate($perPage);
 
@@ -133,7 +136,7 @@ class TrRiskInvestasiController extends Controller
     public function show($id)
     {
         $it = TrRiskInvestasi::with([
-            'investasi:id,erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
+            'investasi:erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
             'approvedByUser:id,username,name'
         ])->find($id);
 
@@ -190,7 +193,7 @@ class TrRiskInvestasiController extends Controller
         if ($result !== true) return $result;
 
         $validator = Validator::make($request->all(), [
-            'erkap_id' => 'required|integer|exists:rencana_investasi,id',
+            'erkap_id' => 'required|string|exists:rencana_investasi,erkap_id',
             'kategori_risiko' => 'nullable|string',
             'sub_kategori_risiko' => 'nullable|string',
             'sasaran' => 'nullable|string',
@@ -433,5 +436,59 @@ class TrRiskInvestasiController extends Controller
             DB::rollBack();
             return json(500, false, 'Gagal Menolak', 'Terjadi kesalahan sistem.', $e->getMessage());
         }
+    }
+
+
+    public function getByErkapID($erkap_id)
+    {
+        $it = TrRiskInvestasi::with([
+            'investasi:erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
+            'approvedByUser:id,username,name'
+        ])->where('erkap_id', $erkap_id)->first();
+
+        if (!$it) {
+            return json(404, false, 'Tidak Ditemukan', 'Risk Profile Investasi tidak ditemukan berdasarkan ERKAP ID.', null);
+        }
+
+        $resp = [
+            'id' => $it->id,
+            'erkap_id' => $it->erkap_id,
+            'kategori_risiko' => $it->kategori_risiko,
+            'sub_kategori_risiko' => $it->sub_kategori_risiko,
+            'sasaran' => $it->sasaran,
+            'peristiwa_risiko' => $it->peristiwa_risiko,
+            'penyebab_risiko' => $it->penyebab_risiko,
+            'dampak_inherent' => $it->dampak_inherent,
+            'dampak_risiko_awal' => $it->dampak_risiko_awal,
+            'kemungkinan_awal' => $it->kemungkinan_awal,
+            'eksposure_level_awal' => $it->eksposure_level_awal,
+            'eksposure_ltmh_awal' => $it->eksposure_ltmh_awal,
+            'internal_external' => $it->internal_external,
+            'mitigasi_risiko' => $it->mitigasi_risiko,
+            'dampak_residual' => $it->dampak_residual,
+            'dampak_risiko_akhir' => $it->dampak_risiko_akhir,
+            'kemungkinan_akhir' => $it->kemungkinan_akhir,
+            'eksposure_level_akhir' => $it->eksposure_level_akhir,
+            'eksposure_ltmh_akhir' => $it->eksposure_ltmh_akhir,
+            'biaya_mitigasi_risiko' => $it->biaya_mitigasi_risiko,
+            'status' => $it->status ?? 'draft',
+            'approval_notes' => $it->approval_notes,
+            'approved_by' => $it->approved_by,
+            'approved_by_name' => $it->approvedByUser ? get_decrypted_name($it->approvedByUser) : null,
+            'approved_at' => optional($it->approved_at)->toISOString(),
+            'rencana_investasi' => [
+                'erkap_id' => optional($it->investasi)->erkap_id,
+                'nama_investasi' => optional($it->investasi)->nama_investasi,
+                'department_name' => optional($it->investasi)->department_name,
+                'jenis_investasi' => optional($it->investasi)->jenis_investasi,
+                'kategori_investasi' => optional($it->investasi)->kategori_investasi,
+                'year' => optional($it->investasi)->year,
+                'nilai_rkap' => optional($it->investasi)->nilai_rkap,
+                'nilai_revisi' => optional($it->investasi)->nilai_revisi,
+                'unit_kerja_id' => optional($it->investasi)->unit_kerja_id,
+            ],
+        ];
+
+        return json(200, true, 'Data Ditemukan', 'Data risk profile investasi berdasarkan ERKAP ID berhasil diambil.', $resp);
     }
 }

@@ -359,4 +359,5 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'destroy']);
     Route::patch('/risk-investasi/{id}/approve', [TrRiskInvestasiController::class, 'approve']);
     Route::patch('/risk-investasi/{id}/reject', [TrRiskInvestasiController::class, 'reject']);
+    Route::get('/risk-investasi/erkap/{erkap_id}', [TrRiskInvestasiController::class, 'getByErkapID']);
 });

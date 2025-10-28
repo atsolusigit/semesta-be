@@ -24,6 +24,9 @@ class TrRcsaHeaderController extends Controller
 
         $perPage = $request->input('per_page', 10);
 
+        $sortBy = $request->input('sortBy', 'id');       
+        $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
+
         $query = TrRcsaHeader::with([
             'rcsaResidual',
             'rcsaRisikoList',
@@ -41,7 +44,6 @@ class TrRcsaHeaderController extends Controller
         ->when($request->menu === 'arsip', function ($q) {
             $q->where('status', 'approved');
         })
-
         ->when($request->filled('search'), function ($q) use ($request) {
             $s = $request->search;
             $q->where(function ($qq) use ($s) {
@@ -51,10 +53,17 @@ class TrRcsaHeaderController extends Controller
                 ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
                 ->orWhere('status', 'like', "%{$s}%");
             });
-        })
-        ->orderBy('id', 'desc');
+        });
 
-        // Pagination, ambil data per halaman
+        $sortMap = [
+            'tahun' => 'year',
+            'id' => 'id',
+            'status' => 'status',
+        ];
+
+        $sortColumn = $sortMap[$sortBy] ?? 'id';
+        $query->orderBy($sortColumn, $sortOrder);
+        
         $data = $query->paginate($perPage);
 
         if (empty($data->items())) {
@@ -114,6 +123,11 @@ class TrRcsaHeaderController extends Controller
                 'approval_notes' => $item->approval_notes,
                 'jenis_risiko' => $item->kategori_risiko_bumn,
                 'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
+                'kategori_dampak' => $item->kategori_dampak,
+                'kategori_threshold_kri_bahaya' => $item->kategori_threshold_kri_bahaya,
+                'kategori_threshold_kri_hati_hati' => $item->kategori_threshold_kri_hati_hati,
+                'kategori_threshold_kri_aman' => $item->kategori_threshold_kri_aman,
+                'kategori_risiko_bumn' => $item->kategori_risiko_bumn,
              ];    
         });
 

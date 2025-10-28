@@ -14,34 +14,57 @@ use Illuminate\Support\Arr;
 class MstDepartmentController extends Controller
 {
     public function index(Request $request)
-    {
-        $query = MstDepartment::select('id', 'name', 'abbreviation');
+{
+    $perPage = $request->input('per_page', 10);
 
-        $user = auth()->user();
+    $query = MstDepartment::select('id', 'name', 'abbreviation');
 
-        if ($user) {
-            // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
-            if (!in_array($user->role->id, [1, 2])) {
-                $query->where('id', $user->department_id);
-            }
+    $user = auth()->user();
+
+    if ($user) {
+        // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
+        if (!in_array($user->role->id, [1, 2])) {
+            $query->where('id', $user->department_id);
         }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('abbreviation', 'like', "%{$search}%");
-            });
-        }
-
-        $departments = $query->orderBy('id')->get();
-
-        if ($departments->isEmpty()) {
-            return json(404, false, 'Not Found', 'Data departemen tidak ditemukan.', []);
-        }
-
-        return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $departments);
     }
+
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('abbreviation', 'like', "%{$search}%");
+        });
+    }
+
+    // Pagination
+    $data = $query->orderBy('id')->paginate($perPage);
+
+    // Mapping data
+    $mappedData = $data->getCollection()->map(function ($item) {
+        return [
+            'id' => $item->id,
+            'name' => $item->name,
+            'abbreviation' => $item->abbreviation,
+        ];
+    });
+
+    // Prepare response dengan pagination
+    $responseData = [
+        'current_page' => $data->currentPage(),
+        'per_page' => $data->perPage(),
+        'total' => $data->total(),
+        'last_page' => $data->lastPage(),
+        'from' => $data->firstItem(),
+        'to' => $data->lastItem(),
+        'data' => $mappedData,
+    ];
+
+    if ($mappedData->isEmpty()) {
+        return json(404, false, 'Not Found', 'Data departemen tidak ditemukan.', []);
+    }
+
+    return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $responseData);
+}
 
     public function show($id)
     {

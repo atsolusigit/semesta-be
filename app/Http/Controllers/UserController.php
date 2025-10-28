@@ -18,9 +18,10 @@ use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
-   public function index(Request $request)
+  public function index(Request $request)
 {
     $search = $request->input('search');
+    $perPage = $request->input('per_page', 10);
     $authUser = auth()->user();
 
     // Cek apakah user yang login ada
@@ -93,10 +94,28 @@ class UserController extends Controller
         ];
     }
 
+    // Manual pagination untuk array result
+    $total = count($result);
+    $currentPage = $request->input('page', 1);
+    $offset = ($currentPage - 1) * $perPage;
+    $paginatedResult = array_slice($result, $offset, $perPage);
+    $lastPage = (int) ceil($total / $perPage);
+
+    // Prepare response dengan pagination
+    $responseData = [
+        'current_page' => (int) $currentPage,
+        'per_page' => (int) $perPage,
+        'total' => $total,
+        'last_page' => $lastPage,
+        'from' => $total > 0 ? $offset + 1 : null,
+        'to' => $total > 0 ? min($offset + $perPage, $total) : null,
+        'data' => $paginatedResult,
+    ];
+
     return response()->json([
         'status' => true,
         'message' => 'List data user.',
-        'data' => $result
+        'data' => $responseData
     ]);
 }
 

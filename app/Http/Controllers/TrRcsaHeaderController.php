@@ -44,6 +44,12 @@ class TrRcsaHeaderController extends Controller
         ->when($request->menu === 'arsip', function ($q) {
             $q->where('status', 'approved');
         })
+        ->when($request->filled('kategori_risiko_bumn'), function ($q) use ($request) {
+        $q->where('kategori_risiko_bumn', 'like', '%'.$request->kategori_risiko_bumn.'%');
+        })
+        ->when($request->filled('kategori_risiko_t2_t3_kbumn'), function ($q) use ($request) {
+            $q->where('kategori_risiko_t2_t3_kbumn', 'like', '%'.$request->kategori_risiko_t2_t3_kbumn.'%');
+        })
         ->when($request->filled('search'), function ($q) use ($request) {
             $s = $request->search;
             $q->where(function ($qq) use ($s) {
@@ -51,7 +57,9 @@ class TrRcsaHeaderController extends Controller
                     $d->where('name', 'like', "%{$s}%");
                 })
                 ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
-                ->orWhere('status', 'like', "%{$s}%");
+                ->orWhere('status', 'like', "%{$s}%")
+                ->orWhere('kategori_risiko_bumn', 'like', "%{$s}%")
+                ->orWhere('kategori_risiko_t2_t3_kbumn', 'like', "%{$s}%");
             });
         });
 
@@ -112,6 +120,7 @@ class TrRcsaHeaderController extends Controller
                 'nilai_limit_risiko' => $item->nilai_limit_risiko,
                 'data_residual' => $rcsaResidual,
                 'data_risiko_list' => $rcsaRencanaRisiko,
+                'isMainRisk' => (bool) $item->isMainRisk,
                 'year' => $item->year,
                 'created_at' => $item->created_at ? $item->created_at->toISOString() : null,
                 'updated_at' => $item->updated_at ? $item->updated_at->toISOString() : null,

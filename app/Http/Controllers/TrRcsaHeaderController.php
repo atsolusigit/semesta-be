@@ -120,6 +120,7 @@ class TrRcsaHeaderController extends Controller
                 'nilai_limit_risiko' => $item->nilai_limit_risiko,
                 'data_residual' => $rcsaResidual,
                 'data_risiko_list' => $rcsaRencanaRisiko,
+                'isMainRisk' => (bool) $item->isMainRisk,
                 'year' => $item->year,
                 'created_at' => $item->created_at ? $item->created_at->toISOString() : null,
                 'updated_at' => $item->updated_at ? $item->updated_at->toISOString() : null,

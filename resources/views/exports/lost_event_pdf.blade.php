@@ -6,6 +6,7 @@
     <style>
         @page {
             margin: 15mm 10mm;
+            size: A4 landscape;
         }
 
         body {
@@ -35,12 +36,14 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
+            table-layout: fixed;
         }
 
         th, td {
             border: 1px solid #000;
             padding: 4px;
             vertical-align: top;
+            overflow: hidden;
         }
 
         th {
@@ -66,10 +69,20 @@
         .wrap-text {
             word-wrap: break-word;
             white-space: normal;
+            word-break: break-word;
         }
 
         .no-wrap {
             white-space: nowrap;
+        }
+
+        /* Khusus untuk kolom nilai agar turun ke bawah */
+        .nilai-column {
+            max-width: 80px;
+            word-wrap: break-word;
+            word-break: break-all;
+            white-space: normal;
+            text-align: right;
         }
     </style>
 </head>
@@ -86,29 +99,29 @@
             <tr>
                 <th style="width: 2%;">No</th>
                 <th style="width: 3%;">Tahun</th>
-                <th style="width: 8%;">Risk Owner</th>
-                <th style="width: 6%;">Jenis Risiko</th>
-                <th style="width: 8%;">Nama Kejadian</th>
-                <th style="width: 10%;">Identifikasi Kejadian</th>
-                <th style="width: 6%;">Kategori Kejadian</th>
-                <th style="width: 8%;">Sumber Penyebab</th>
-                <th style="width: 8%;">Penyebab</th>
-                <th style="width: 8%;">Penanganan</th>
-                <th style="width: 10%;">Deskripsi</th>
-                <th style="width: 6%;">Pihak Terkait</th>
-                <th style="width: 5%;">Status Asuransi</th>
-                <th style="width: 6%;">Penjelasan Kerugian</th>
-                <th style="width: 6%;">Nilai Kerugian</th>
+                <th style="width: 6%;">Risk Owner</th>
+                <th style="width: 5%;">Jenis Risiko</th>
+                <th style="width: 6%;">Nama Kejadian</th>
+                <th style="width: 7%;">Identifikasi Kejadian</th>
+                <th style="width: 5%;">Kategori Kejadian</th>
+                <th style="width: 6%;">Sumber Penyebab</th>
+                <th style="width: 6%;">Penyebab</th>
+                <th style="width: 6%;">Penanganan</th>
+                <th style="width: 7%;">Deskripsi</th>
+                <th style="width: 5%;">Pihak Terkait</th>
+                <th style="width: 4%;">Status Asuransi</th>
+                <th style="width: 5%;">Penjelasan Kerugian</th>
+                <th style="width: 4.5%;">Nilai Kerugian</th>
 
-                <!-- Kolom tambahan (ditambahkan tanpa mengubah tampilan utama) -->
-                <th style="width: 6%;">Kejadian Berulang</th>
-                <th style="width: 6%;">Frekuensi Kejadian</th>
-                <th style="width: 10%;">Mitigasi Yang Direncanakan</th>
-                <th style="width: 8%;">Realisasi Mitigasi</th>
-                <th style="width: 8%;">Perbaikan Mendatang</th>
-                <th style="width: 6%;">Nilai Premi</th>
-                <th style="width: 6%;">Nilai Klaim</th>
-                <th style="width: 5%;">Realisasi (%)</th>
+                <!-- Kolom tambahan -->
+                <th style="width: 4%;">Kejadian Berulang</th>
+                <th style="width: 4%;">Frekuensi Kejadian</th>
+                <th style="width: 6%;">Mitigasi Yang Direncanakan</th>
+                <th style="width: 6%;">Realisasi Mitigasi</th>
+                <th style="width: 6%;">Perbaikan Mendatang</th>
+                <th style="width: 4.5%;">Nilai Premi</th>
+                <th style="width: 4.5%;">Nilai Klaim</th>
+                <th style="width: 4%;">Realisasi (%)</th>
                 {{-- <th style="width: 5%;">Tipe Risiko</th> --}}
             </tr>
         </thead>
@@ -129,7 +142,7 @@
                 <td class="wrap-text">{{ $item['pihak_terkait'] }}</td>
                 <td class="text-center">{{ $item['status_asuransi'] }}</td>
                 <td class="wrap-text">{{ $item['penjelasan_kerugian'] }}</td>
-                <td class="text-right">{{ $item['nilai_kerugian_formatted'] }}</td>
+                <td class="nilai-column">{{ $item['nilai_kerugian_formatted'] }}</td>
 
                 <!-- Data kolom tambahan -->
                 <td class="text-center">{{ $item['kejadian_berulang'] ?? '' }}</td>
@@ -137,8 +150,8 @@
                 <td class="wrap-text">{{ $item['mitigasi_yang_direncanakan'] ?? '' }}</td>
                 <td class="wrap-text">{{ $item['realisasi_mitigasi'] ?? '' }}</td>
                 <td class="wrap-text">{{ $item['perbaikan_mendatang'] ?? '' }}</td>
-                <td class="text-right">{{ $item['nilai_premi_formatted'] ?? '' }}</td>
-                <td class="text-right">{{ $item['nilai_klaim_formatted'] ?? '' }}</td>
+                <td class="nilai-column">{{ $item['nilai_premi_formatted'] ?? '' }}</td>
+                <td class="nilai-column">{{ $item['nilai_klaim_formatted'] ?? '' }}</td>
                 <td class="text-center">{{ $item['realization_percentage'] ?? '' }}</td>
                 {{-- <td class="text-center">{{ strtoupper($item['type'] ?? '') }}</td> --}}
             </tr>

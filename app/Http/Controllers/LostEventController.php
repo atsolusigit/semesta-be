@@ -76,7 +76,11 @@ class LostEventController extends Controller
         });
     })
     ->orderBy('id', 'desc')
-    ->get();
+    ->get()
+    ->filter(function ($header) {
+        // Hanya ambil header yang memiliki tepat 12 bulan yang sudah difinalisasi
+        return $header->monthlyData->count() === 12;
+    });
 
     $filteredData = collect();
 
@@ -120,16 +124,27 @@ class LostEventController extends Controller
             }
 
         } elseif (in_array($normalizedType, ['kualitatif', 'qualitative'])) {
-            $targetValue = 100;
-            $desemberData = $item->monthlyData->firstWhere('month', 12);
+        $totalTarget = 0;
+        $totalRealisasi = 0;
 
-            if ($desemberData && !empty($desemberData->realization_kualitatif)) {
-                $realText = trim(str_replace(['%', ','], ['', '.'], $desemberData->realization_kualitatif));
-                $realizationValue = (float) $realText;
-                $percentage = round($realizationValue, 2);
-                $shouldInclude = $percentage <= 50;
-            }
+        foreach ($item->monthlyData as $monthly) {
+            $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+            $targetNum = (float) $targetText;
+
+            $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+            $realNum = (float) $realText;
+
+            $totalTarget += $targetNum;
+            $totalRealisasi += $realNum;
         }
+
+        if ($totalTarget > 0) {
+            $targetValue = $totalTarget;
+            $realizationValue = $totalRealisasi;
+            $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+            $shouldInclude = $percentage <= 50;
+        }
+    }
 
         if ($shouldInclude) {
             $item->calculated_percentage = $percentage;
@@ -242,6 +257,11 @@ class LostEventController extends Controller
         return json(404, false, 'Tidak Ditemukan', 'Header tidak ditemukan.', null);
     }
 
+    // Cek apakah header memiliki 12 bulan yang sudah difinalisasi
+    if ($header->monthlyData->count() !== 12) {
+        return json(400, false, 'Data Tidak Lengkap', 'Data risiko belum memiliki 12 bulan yang difinalisasi.', null);
+    }
+
     // Hitung realization percentage dan type
     $targetType = $header->optionTargetSatuTahun->type ?? null;
 
@@ -286,14 +306,24 @@ class LostEventController extends Controller
         }
 
     } elseif ($normalizedType === 'kualitatif' || $normalizedType === 'qualitative') {
-        // Ambil hanya bulan Desember
-        $targetValue = 100;
-        $desemberData = $header->monthlyData->firstWhere('month', 12);
+        $totalTarget = 0;
+        $totalRealisasi = 0;
 
-        if ($desemberData && !empty($desemberData->realization_kualitatif)) {
-            $realText = $desemberData->realization_kualitatif;
-            $realizationValue = (float)str_replace(['%', ' ', ','], ['', '', '.'], trim($realText));
-            $percentage = round($realizationValue, 2);
+        foreach ($header->monthlyData as $monthly) {
+            $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+            $targetNum = (float) $targetText;
+
+            $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+            $realNum = (float) $realText;
+
+            $totalTarget += $targetNum;
+            $totalRealisasi += $realNum;
+        }
+
+        if ($totalTarget > 0) {
+            $targetValue = $totalTarget;
+            $realizationValue = $totalRealisasi;
+            $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
         }
     }
 
@@ -422,9 +452,19 @@ public function detail($id)
         return json(404, false, 'Tidak Ditemukan', 'Lost event tidak ditemukan.', null);
     }
 
-    // Hitung realization percentage dan type dari header
+   // Hitung realization percentage dan type dari header
     $header = $lostEvent->header;
-    $targetType = optional($header->optionTargetSatuTahun)->type ?? null;
+
+    if (!$header) {
+        return json(404, false, 'Tidak Ditemukan', 'Header risiko tidak ditemukan.', null);
+    }
+
+    // Cek apakah header memiliki 12 bulan yang sudah difinalisasi
+    if ($header->monthlyData->count() !== 12) {
+        return json(400, false, 'Data Tidak Lengkap', 'Data risiko belum memiliki 12 bulan yang difinalisasi.', null);
+    }
+
+$targetType = optional($header->optionTargetSatuTahun)->type ?? null;
 
     // Deteksi manual kalau type kosong
     if (!$targetType && $header) {
@@ -467,16 +507,26 @@ public function detail($id)
         }
 
     } elseif ($header && ($normalizedType === 'kualitatif' || $normalizedType === 'qualitative')) {
-        // Ambil hanya bulan Desember
-        $targetValue = 100;
-        $desemberData = $header->monthlyData->firstWhere('month', 12);
+    $totalTarget = 0;
+    $totalRealisasi = 0;
 
-        if ($desemberData && !empty($desemberData->realization_kualitatif)) {
-            $realText = $desemberData->realization_kualitatif;
-            $realizationValue = (float)str_replace(['%', ' ', ','], ['', '', '.'], trim($realText));
-            $percentage = round($realizationValue, 2);
-        }
+    foreach ($header->monthlyData as $monthly) {
+        $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+        $targetNum = (float) $targetText;
+
+        $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+        $realNum = (float) $realText;
+
+        $totalTarget += $targetNum;
+        $totalRealisasi += $realNum;
     }
+
+    if ($totalTarget > 0) {
+        $targetValue = $totalTarget;
+        $realizationValue = $totalRealisasi;
+        $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+    }
+}
 
     // Siapkan data respons
     $data = [

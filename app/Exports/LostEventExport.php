@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -156,6 +157,26 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
         $sheet->getStyle("B5:B{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle("Y5:Y{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
+        // Auto-size khusus untuk kolom nilai (Q, W, X)
+        // Kolom Q = Nilai Kerugian, W = Nilai Premi, X = Nilai Klaim
+        $nilaiColumns = ['Q', 'W', 'X'];
+        foreach ($nilaiColumns as $col) {
+            // Cari lebar maksimal dari data di kolom ini
+            $maxLength = 15; // minimum width
+            $columnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($col);
+
+            for ($row = 5; $row <= $lastRow; $row++) {
+                $cellValue = $sheet->getCell("{$col}{$row}")->getValue();
+                $cellLength = strlen((string)$cellValue);
+                if ($cellLength > $maxLength) {
+                    $maxLength = $cellLength;
+                }
+            }
+
+            // Set width dengan buffer sedikit
+            $sheet->getColumnDimension($col)->setWidth(min($maxLength + 2, 35));
+        }
+
         return [];
     }
 
@@ -165,8 +186,8 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
             'A' => 5,   'B' => 8,   'C' => 30,  'D' => 20,  'E' => 25,
             'F' => 30,  'G' => 20,  'H' => 30,  'I' => 30,  'J' => 30,
             'K' => 35,  'L' => 20,  'M' => 15,  'N' => 25,  'O' => 35,
-            'P' => 30,  'Q' => 18,  'R' => 20,  'S' => 25,  'T' => 35,
-            'U' => 30,  'V' => 30,  'W' => 18,  'X' => 18,  'Y' => 12,
+            'P' => 30,  'Q' => -1,  'R' => 20,  'S' => 25,  'T' => 35,
+            'U' => 30,  'V' => 30,  'W' => -1,  'X' => -1,  'Y' => 12,
         ];
     }
 

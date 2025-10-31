@@ -17,7 +17,8 @@ class MstDepartmentController extends Controller
 {
     $perPage = $request->input('per_page', 10);
 
-    $query = MstDepartment::select('id', 'name', 'abbreviation');
+    $query = MstDepartment::select('id', 'name', 'abbreviation', 'created_at', 'created_by')
+        ->with('createdBy:id,name,email');
 
     $user = auth()->user();
 
@@ -45,6 +46,10 @@ class MstDepartmentController extends Controller
             'id' => $item->id,
             'name' => $item->name,
             'abbreviation' => $item->abbreviation,
+            'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+            'created_by' => $item->created_by,
+            'created_by_name' => $item->createdBy ? get_decrypted_name($item->createdBy) : null,
+            'created_by_email' => $item->createdBy ? get_decrypted_email($item->createdBy) : null,
         ];
     });
 
@@ -66,29 +71,37 @@ class MstDepartmentController extends Controller
     return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $responseData);
 }
 
-    public function show($id)
-    {
-        $user = auth()->user();
+public function show($id)
+{
+    $user = auth()->user();
 
-        if ($user) {
-            // Hanya role selain 1 & 2 yang dibatasi
-            if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
-                return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
-            }
+    if ($user) {
+        // Hanya role selain 1 & 2 yang dibatasi
+        if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
+            return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
         }
-
-        $department = MstDepartment::select('id', 'name', 'abbreviation')->find($id);
-
-        if (!$department) {
-            return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
-        }
-
-        $safeData = collect($department)->map(function ($value) {
-            return is_string($value) ? mb_convert_encoding($value, 'UTF-8', 'UTF-8') : $value;
-        });
-
-        return json(200, 'success', 'Success', 'Data department berhasil ditemukan.', $safeData);
     }
+
+    $department = MstDepartment::select('id', 'name', 'abbreviation', 'created_at', 'created_by')
+        ->with('createdBy:id,name,email')
+        ->find($id);
+
+    if (!$department) {
+        return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
+    }
+
+    $safeData = [
+        'id' => $department->id,
+        'name' => is_string($department->name) ? mb_convert_encoding($department->name, 'UTF-8', 'UTF-8') : $department->name,
+        'abbreviation' => is_string($department->abbreviation) ? mb_convert_encoding($department->abbreviation, 'UTF-8', 'UTF-8') : $department->abbreviation,
+        'created_at' => $department->created_at ? $department->created_at->format('Y-m-d') : null,
+        'created_by' => $department->created_by,
+        'created_by_name' => $department->createdBy ? get_decrypted_name($department->createdBy) : null,
+        'created_by_email' => $department->createdBy ? get_decrypted_email($department->createdBy) : null,
+    ];
+
+    return json(200, 'success', 'Success', 'Data department berhasil ditemukan.', $safeData);
+}
 
     public function store(Request $request)
     {

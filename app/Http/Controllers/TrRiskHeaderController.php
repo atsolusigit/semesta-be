@@ -309,6 +309,9 @@ public function index(Request $request)
             'id' => $item->id,
             'risk_status' => $riskStatus,
             'override_status' => $overrideStatus,
+            'reviewed' => (bool) $item->reviewed, // ← TAMBAHAN BARU
+            'reviewed_by' => $item->reviewed_by,
+            'reviewed_at' => $item->reviewed_at,
             'type_document' => $item->approval->type_document ?? null,
             'department_id' => $item->department_id,
             'department_name' => $item->department->name ?? '',
@@ -688,6 +691,9 @@ public function show($id)
         'id' => $data->id,
         'risk_status' => $riskStatus, // *** DIUBAH: sekarang menggunakan $riskStatus ***
         'override_status' => $overrideStatus, // penambahan untuk override status
+        'reviewed' => (bool) $data->reviewed, // reviewed sebagai boolean
+        'reviewed_by' => $data->reviewed_by, // siapa yang mereview
+        'reviewed_at' => $data->reviewed_at, // kapan direview
         'type_document' => $data->approval->type_document ?? null,
         'department_id' => $data->department_id,
         'department_name' => $data->department->name ?? '',
@@ -2263,6 +2269,9 @@ public function getPendingApproval(Request $request)
                 ] : null,
                 'risk_status' => $riskStatus,              // status asli dari DB
                 'override_status' => $overrideStatus,      // status hasil kalkulasi MenRisk
+                'reviewed' => (bool) $riskHeader->reviewed, // reviewed sebagai boolean
+                'reviewed_by' => $riskHeader->reviewed_by, //  ID user yang mereview
+                'reviewed_at' => $riskHeader->reviewed_at, // timestamp review
                 'desc' => clean_string($riskHeader->desc),
                 'created_at' => $riskHeader->created_at,
                 'created_by_name' => $createdByName,
@@ -2392,6 +2401,7 @@ public function approveRiskHeader(Request $request, $id)
     }
 }
 
+// Reject risk header oleh SPV Unit (role 1 dan 2)
 public function rejectRiskHeader(Request $request, $id)
 {
     $validator = Validator::make($request->all(), [
@@ -2590,6 +2600,11 @@ public function getRejectedData(Request $request)
                     'name' => clean_string($riskHeader->department->name)
                 ] : null,
                 'risk_status' => $riskHeader->status,
+                'override_status' => $riskHeader->status,
+                'reviewed' => (bool) $riskHeader->reviewed,// reviewed sebagai boolean
+                'reviewed_by' => $riskHeader->reviewed_by, // ID user yang mereview
+                'reviewed_at' => $riskHeader->reviewed_at, // timestamp review
+                'desc' => clean_string($riskHeader->desc),
                 'notes' => clean_string($riskHeader->approval_notes),
                 'rejected_by' => $riskHeader->approved_by,
                 'rejected_by_name' => $approvedByName,
@@ -2605,6 +2620,79 @@ public function getRejectedData(Request $request)
 
     } catch (\Exception $e) {
         return json(500, false, 'Gagal Mengambil Data', 'Terjadi kesalahan sistem.', $e->getMessage());
+    }
+}
+
+// Review by Staf MenRisk (role 1 dan 7)
+public function reviewRiskHeader(Request $request, $id)
+{
+    try {
+        $user = Auth::user();
+
+        // Hanya role 1 (superadmin) dan 7 (staf menrisk) yang boleh review
+        if (!in_array($user->role_id, [1, 7])) {
+            return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk mereview data ini.', null);
+        }
+
+        $header = TrRiskHeader::with(['reviewedBy:id,username'])->find($id);
+        if (!$header) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Risk header tidak ditemukan.', null);
+        }
+
+        // Hanya data dengan status approved yang bisa direview
+        if ($header->status !== 'approved') {
+            return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status approved yang dapat direview oleh Staf MenRisk.', null);
+        }
+
+        // Cek apakah sudah pernah direview - perbaiki pengecekan
+        if ($header->reviewed === 1 || $header->reviewed === true) {
+            $reviewedByNameExisting = 'Unknown User';
+            try {
+                if ($header->reviewedBy) {
+                    $reviewedByNameExisting = get_decrypted_name($header->reviewedBy);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("Error handling reviewedBy: {$e->getMessage()}");
+            }
+
+            return json(400, false, 'Sudah Direview', 'Data ini sudah pernah direview oleh Staf MenRisk.', [
+                'reviewed_by' => $header->reviewed_by,
+                'reviewed_by_name' => $reviewedByNameExisting,
+                'reviewed_at' => $header->reviewed_at
+            ]);
+        }
+
+        // Update status review
+        $header->reviewed = true;
+        $header->reviewed_by = $user->id;
+        $header->reviewed_at = now();
+        $header->save();
+
+        // Reload relasi setelah save
+        $header->load(['reviewedBy:id,username']);
+
+        $reviewedByName = 'Unknown User';
+        try {
+            if ($header->reviewedBy) {
+                $reviewedByName = get_decrypted_name($header->reviewedBy);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Error handling reviewedBy: {$e->getMessage()}");
+        }
+
+        return json(200, true, 'Berhasil Direview', 'Data berhasil direview oleh Staf MenRisk. Manajemen Risiko sekarang dapat melakukan approve atau reject.', [
+            'id' => $header->id,
+            'status' => $header->status,
+            'reviewed' => $header->reviewed,
+            'reviewed_by' => $header->reviewed_by,
+            'reviewed_by_name' => $reviewedByName,
+            'reviewed_at' => $header->reviewed_at,
+            'next_step' => 'Menunggu approval atau reject dari Manajemen Risiko'
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error reviewRiskHeader: ' . $e->getMessage());
+        return json(500, false, 'Gagal Review', 'Terjadi kesalahan sistem saat review data.', $e->getMessage());
     }
 }
 
@@ -2629,6 +2717,14 @@ public function approveMenrisk(Request $request, $id)
 
         if ($header->status !== 'approved') {
             return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status approved yang dapat di-approve MenRisk.', null);
+        }
+
+        // Pengecekan review - WAJIB sudah direview oleh Staf MenRisk
+        // Perbaiki: cek dengan == 1 atau === true
+        if ($header->reviewed != 1 && $header->reviewed !== true) {
+            return json(400, false, 'Belum Direview', 'Data ini belum direview oleh Staf MenRisk. Staf MenRisk harus mereview terlebih dahulu sebelum dapat di-approve.', [
+                'next_step' => 'Tunggu Staf MenRisk melakukan review terlebih dahulu'
+            ]);
         }
 
         if ($header->menrisk_by !== null) {
@@ -2665,6 +2761,7 @@ public function approveMenrisk(Request $request, $id)
     }
 }
 
+// Reject by MenRisk
 public function rejectMenrisk(Request $request, $id)
 {
     try {
@@ -2691,6 +2788,14 @@ public function rejectMenrisk(Request $request, $id)
             return json(400, false, 'Status Tidak Valid', 'Hanya data dengan status approved yang dapat di-reject MenRisk.', null);
         }
 
+        // Pengecekan review - WAJIB sudah direview oleh Staf MenRisk
+        // Perbaiki: cek dengan == 1 atau === true
+        if ($header->reviewed != 1 && $header->reviewed !== true) {
+            return json(400, false, 'Belum Direview', 'Data ini belum direview oleh Staf MenRisk. Staf MenRisk harus mereview terlebih dahulu sebelum dapat di-reject.', [
+                'next_step' => 'Tunggu Staf MenRisk melakukan review terlebih dahulu'
+            ]);
+        }
+
         // Cek apakah sudah pernah di-approve MenRisk
         if ($header->menrisk_by !== null && $header->is_complete) {
             return json(400, false, 'Tidak Dapat Direject', 'Data yang sudah fully approved tidak dapat direject. Gunakan fitur revisi jika perlu perubahan.', null);
@@ -2709,6 +2814,11 @@ public function rejectMenrisk(Request $request, $id)
         $header->approved_at = null;
         $header->approval_notes = null;
 
+        // Reset review agar harus direview ulang setelah diperbaiki
+        $header->reviewed = false;
+        $header->reviewed_by = null;
+        $header->reviewed_at = null;
+
         // Reset approval VP MenRisk agar bisa approve ulang setelah revisi
         $header->vp_menrisk_by = null;
         $header->vp_menrisk_at = null;
@@ -2723,7 +2833,7 @@ public function rejectMenrisk(Request $request, $id)
             'menrisk_note' => $header->menrisk_note,
             'menrisk_by' => $header->menrisk_by,
             'menrisk_at' => $header->menrisk_at,
-            'next_step' => 'User perbaiki data → Submit → SPV Unit approve → VP MenRisk approve → SPV MenRisk approve'
+            'next_step' => 'User perbaiki data → Submit → SPV Unit approve → Staf MenRisk review → MenRisk approve/reject'
         ]);
 
     } catch (\Exception $e) {
@@ -2732,7 +2842,7 @@ public function rejectMenrisk(Request $request, $id)
     }
 }
 
-
+// Approve by VP MenRisk
 public function approveVpMenrisk(Request $request, $id)
 {
     try {
@@ -2775,6 +2885,7 @@ public function approveVpMenrisk(Request $request, $id)
     }
 }
 
+// Reject by VP MenRisk
 public function rejectVpMenrisk(Request $request, $id)
 {
     try {

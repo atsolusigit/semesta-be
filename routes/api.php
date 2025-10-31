@@ -32,7 +32,9 @@ use App\Http\Controllers\MstMonthRecommendationController;
 use App\Http\Controllers\TrRcsaHeaderController;
 use App\Http\Controllers\LostEventController;
 use App\Http\Controllers\RencanaInvestasiController;
+use App\Http\Controllers\MstJenisRisikoController;
 use App\Http\Controllers\TrRiskInvestasiController;
+use App\Http\Controllers\MstRcsaController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -314,8 +316,16 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
 });
 
+// ===================== JENIS RISIKO =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/jenis-risiko', [MstJenisRisikoController::class, 'index']);                    // List all jenis risiko (semua role)
+    Route::post('/jenis-risiko', [MstJenisRisikoController::class, 'store']);                   // Tambah jenis risiko (role 1,2)
+    Route::put('/jenis-risiko/{id}', [MstJenisRisikoController::class, 'update']);              // Update jenis risiko (role 1,2)
+    Route::delete('/jenis-risiko/{id}', [MstJenisRisikoController::class, 'destroy']);          // Hapus jenis risiko (role 1)
+});
+
 // Export Lost Event
-Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])->name('export.lost-event');
+// Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])->name('export.lost-event');
 // Route untuk debug data
 Route::get('/debug-risk-data', [ExportRiskController::class, 'debugRiskData']);
 
@@ -346,8 +356,6 @@ Route::middleware(['auth:api'])->group(function () {
     Route::post('/rcsa-header/{id}/submit', [TrRcsaHeaderController::class, 'submit']);
     Route::patch('/rcsa-header/{id}/approve', [TrRcsaHeaderController::class, 'approve']);
     Route::patch('/rcsa-header/{id}/reject', [TrRcsaHeaderController::class, 'reject']);
-    Route::patch('/rcsa-header/{id}/is-main-risk', [TrRcsaHeaderController::class, 'updateIsMainRisk']);
-
 });
 
 // ===================== RENCANA INVESTASI =====================
@@ -366,11 +374,11 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/risk-investasi/erkap/{erkap_id}', [TrRiskInvestasiController::class, 'getByErkapID']);
 });
 
-
-// check api
-Route::get('/health-v8', function () {
-    return response()->json([
-        'status' => 'ok',
-        'time' => now()->toDateTimeString(),
-    ]);
+// ===================== MASTER UNTUK KEPERLUAN DATA RCSA =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/rcsa-mst', [MstRcsaController::class, 'index']);             
+    Route::get('/rcsa-mst/{id}', [MstRcsaController::class, 'show']);         
+    Route::post('/rcsa-mst', [MstRcsaController::class, 'store']);             
+    Route::put('/rcsa-mst/{id}', [MstRcsaController::class, 'update']);      
+    Route::delete('/rcsa-mst/{id}', [MstRcsaController::class, 'destroy']);   
 });

@@ -23,7 +23,7 @@ class MstDepartment extends Model
         );
     }
 
-      public function jabatans()
+    public function jabatans()
     {
         return $this->hasMany(MstJabatan::class, 'department_id');
     }
@@ -34,4 +34,9 @@ class MstDepartment extends Model
         return $this->hasMany(TrRiskHeader::class, 'department_id');
     }
 
+    // Relasi ke User yang membuat department
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
+    }
 }

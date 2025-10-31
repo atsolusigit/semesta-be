@@ -195,6 +195,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/risk-headers/{id}/reject-menrisk', [TrRiskHeaderController::class, 'rejectMenrisk']);   // Reject menrisk (role 4)
     Route::patch('/risk-headers/{id}/approve-vpmenrisk', [TrRiskHeaderController::class, 'approveVpMenrisk']); // Approve VP MenRisk (role 6)
     Route::patch('/risk-headers/{id}/reject-vpmenrisk', [TrRiskHeaderController::class, 'rejectVpMenrisk']);   // Reject VP MenRisk (role 6)
+    Route::patch('/risk-headers/{id}/review', [TrRiskHeaderController::class, 'reviewRiskHeader']);  // Review risk header (role 1,7)
 });
 
 // ===================== MITIGATION MONTHLY =====================
@@ -362,7 +363,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/investasi', [RencanaInvestasiController::class, 'index']);
     Route::post('/investasi', [RencanaInvestasiController::class, 'store']);
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
-    
+
     Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
     Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);
     Route::post('/risk-investasi', [TrRiskInvestasiController::class, 'store']);

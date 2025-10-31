@@ -977,6 +977,30 @@ if (!function_exists('get_decrypted_name')) {
     }
 }
 
+if (!function_exists('get_decrypted_email')) {
+    function get_decrypted_email($userObject)
+    {
+        if (!$userObject || empty($userObject->id)) {
+            return 'Email Tidak diketahui';
+        }
+
+        try {
+            $row = \DB::select("
+                SELECT CAST(AES_DECRYPT(email, CONCAT('SM', ?)) AS CHAR) as result
+                FROM users WHERE id = ? LIMIT 1
+            ", [$userObject->id, $userObject->id]);
+
+            if ($row && !empty($row[0]->result)) {
+                return clean_string($row[0]->result);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Error decrypt email for user ID {$userObject->id}: " . $e->getMessage());
+        }
+
+        return 'Email Tidak diketahui';
+    }
+}
+
 if (!function_exists('get_month_name')) {
     /**
      * Ambil nama bulan dalam bahasa Indonesia berdasarkan nomor bulan.

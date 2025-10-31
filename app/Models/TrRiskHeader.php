@@ -47,6 +47,9 @@ class TrRiskHeader extends Model
         'menrisk_note',
         'menrisk_by',
         'menrisk_at',
+        'reviewed',
+        'reviewed_by',
+        'reviewed_at',
         'vp_menrisk_by',
         'vp_menrisk_at',
         'vp_menrisk_note',
@@ -122,6 +125,11 @@ class TrRiskHeader extends Model
     // =====================================
     // RELATIONS
     // =====================================
+
+    public function reviewedBy()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
 
        public function creatorRole()
     {

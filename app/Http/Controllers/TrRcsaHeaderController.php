@@ -48,6 +48,13 @@ class TrRcsaHeaderController extends Controller
             $val = filter_var($request->input('isSubmit'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
             if (!is_null($val)) {
                 $q->where('isSubmit', $val);
+                if ($val === true) {
+                    $q->whereNotExists(function ($sub) {
+                        $sub->select(DB::raw(1))
+                            ->from('tr_risk_header as trh')
+                            ->whereColumn('trh.rcsa_id', 'tr_rcsa_header.id');
+                    });
+                }
             }
         })
         ->when($request->filled('kategori_risiko_bumn'), function ($q) use ($request) {
@@ -952,7 +959,6 @@ class TrRcsaHeaderController extends Controller
 
             $rcsaHeader->update([
                 'status' => 'submit',
-                'isSubmit'     => true,
                 'submitted_at' => now(),
                 'submitted_by' => auth()->id()
             ]);
@@ -1008,7 +1014,6 @@ class TrRcsaHeaderController extends Controller
                 'jenis_existing_control' => clean_string($rcsaHeader->jenis_existing_control),
                 'department_id' => $rcsaHeader->unit_kerja_id,
                 'status' => $rcsaHeader->status,
-                'isSubmit' => (bool) $rcsaHeader->isSubmit,
                 'year' => $rcsaHeader->year,
                 'isMainRisk' => (bool) $rcsaHeader->isMainRisk,
                 'updated_at' => $rcsaHeader->updated_at,

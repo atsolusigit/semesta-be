@@ -13,6 +13,7 @@ class TrRiskHeader extends Model
     protected $table = 'tr_risk_header';
 
     protected $fillable = [
+        'rcsa_id',
         'risk_code',
         'process_code',
         'jenis_risiko',
@@ -53,6 +54,7 @@ class TrRiskHeader extends Model
     ];
 
     protected $casts = [
+        'rcsa_id' => 'integer',
         'biaya_perlakuan_risiko' => 'decimal:2',
         'process_code' => 'integer',
     ];

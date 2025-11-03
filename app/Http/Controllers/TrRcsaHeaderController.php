@@ -952,7 +952,6 @@ class TrRcsaHeaderController extends Controller
 
             $rcsaHeader->update([
                 'status' => 'submit',
-                'isSubmit'     => true,
                 'submitted_at' => now(),
                 'submitted_by' => auth()->id()
             ]);
@@ -1008,7 +1007,6 @@ class TrRcsaHeaderController extends Controller
                 'jenis_existing_control' => clean_string($rcsaHeader->jenis_existing_control),
                 'department_id' => $rcsaHeader->unit_kerja_id,
                 'status' => $rcsaHeader->status,
-                'isSubmit' => (bool) $rcsaHeader->isSubmit,
                 'year' => $rcsaHeader->year,
                 'isMainRisk' => (bool) $rcsaHeader->isMainRisk,
                 'updated_at' => $rcsaHeader->updated_at,

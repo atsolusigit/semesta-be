@@ -46,15 +46,18 @@ class TrRcsaHeaderController extends Controller
         })
         ->when($request->has('isSubmit'), function ($q) use ($request) {
             $val = filter_var($request->input('isSubmit'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-            if (!is_null($val)) {
-                $q->where('isSubmit', $val);
-                if ($val === true) {
-                    $q->whereNotExists(function ($sub) {
-                        $sub->select(DB::raw(1))
-                            ->from('tr_risk_header as trh')
-                            ->whereColumn('trh.rcsa_id', 'tr_rcsa_header.id');
-                    });
-                }
+            if ($val === true) {
+                $q->whereExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('tr_risk_header as trh')
+                        ->whereColumn('trh.rcsa_id', 'tr_rcsa_header.id');
+                });
+            } elseif ($val === false) {
+                $q->whereNotExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('tr_risk_header as trh')
+                        ->whereColumn('trh.rcsa_id', 'tr_rcsa_header.id');
+                });
             }
         })
         ->when($request->filled('kategori_risiko_bumn'), function ($q) use ($request) {

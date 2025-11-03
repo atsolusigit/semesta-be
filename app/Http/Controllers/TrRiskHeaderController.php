@@ -776,6 +776,7 @@ public function store(Request $request)
     // ============================================
 
     $allowedFields = [
+        'rcsa_id',
         'department_id',
         'risk_code',
         'jenis_risiko',
@@ -836,6 +837,7 @@ public function store(Request $request)
 
     $validator = Validator::make($request->all(), [
     // 14 field wajib untuk penyimpanan awal
+    'rcsa_id' => 'nullable|integer',
     'risk_code' => 'required|array',
     'risk_code.*' => 'exists:mst_risk_code,id',
     'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',
@@ -989,6 +991,7 @@ public function store(Request $request)
 
         $responseData = [
             'id' => $riskHeader->id,
+            'rcsa_id' => $riskHeader->rcsa_id,
             'risk_code' => $riskHeader->risk_code ? explode(',', $riskHeader->risk_code) : [],
             'jenis_risiko' => $riskHeader->jenis_risiko,// id jenis risiko
             'jenis_risiko_name' => $riskHeader->jenisRisiko->nama_jenis_risiko ?? null, // nama jenis risiko dari relasi
@@ -1121,6 +1124,7 @@ private function handleApprovedPartialUpdate(Request $request, $riskHeader)
     ];
 
     $forbiddenFields = [
+        'rcsa_id',
         'risk_code', 'jenis_risiko', 'year', 'sasaran', 'peristiwa_risiko', 'penyebab_risiko',
         'dampak_risiko', 'inherent_risk_level_dampak', 'inherent_risk_level_kemungkinan',
         'residual_target_level_dampak', 'residual_target_level_kemungkinan', 'department_id',
@@ -1231,6 +1235,7 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
 {
     // Data di-reject, HANYA BOLEH UPDATE 14 FIELD, 4 FIELD HARUS KOSONG
     $allowedFields = [
+        'rcsa_id',
         'department_id',
         'risk_code',
         'jenis_risiko',
@@ -1287,6 +1292,7 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
 
     // Validasi 14 field dasar
     $validator = Validator::make($request->all(), [
+        'rcsa_id' => 'nullable|integer',
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
         'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',
@@ -1443,6 +1449,7 @@ private function handleDraftUpdate(Request $request, $riskHeader)
 {
     // Status draft, HANYA BOLEH UPDATE 14 FIELD, 4 FIELD HARUS KOSONG
     $allowedFields = [
+        'rcsa_id',
         'department_id',
         'risk_code',
         'jenis_risiko',
@@ -1498,6 +1505,7 @@ private function handleDraftUpdate(Request $request, $riskHeader)
 
     // Validasi 14 field dasar
     $validator = Validator::make($request->all(), [
+        'rcsa_id' => 'nullable|integer',
         'risk_code' => 'required|array',
         'risk_code.*' => 'exists:mst_risk_code,id',
         'jenis_risiko' => 'required|exists:mst_jenis_risiko,id',

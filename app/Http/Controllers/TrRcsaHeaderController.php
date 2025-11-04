@@ -44,6 +44,15 @@ class TrRcsaHeaderController extends Controller
         ->when($request->menu === 'arsip', function ($q) {
             $q->where('status', 'approved');
         })
+        ->when($request->filled('tahun'), function ($q) use ($request) {
+            $q->where('year', (int) $request->input('tahun'));
+        })
+        ->when($request->has('isMainRisk'), function ($q) use ($request) {
+            $val = filter_var($request->input('isMainRisk'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if (!is_null($val)) {
+                $q->where('isMainRisk', $val);
+            }
+        })
         ->when($request->has('isSubmit'), function ($q) use ($request) {
             $val = filter_var($request->input('isSubmit'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
             if ($val === true) {
@@ -234,54 +243,55 @@ class TrRcsaHeaderController extends Controller
         ];
 
          $validator = Validator::make($request->all(), [
-            'asumsi_perhitungan_dampak' =>'required|string',
-            'deskripsi_dampak' => 'required|string',
-            'biaya_perlakuan_risiko' => 'required|numeric',
-            'deskripsi_peristiwa_risiko' => 'required|string',
-            'existing_control' => 'nullable|string',
-            'hasil_yang_diharapkan_perusahaan' => 'required|string',
-            'kategori_dampak'=> 'required|numeric',
-            'inherent_eksposur_risiko_kualitatif' => 'required_if:kategori_dampak,1',
-            'inherent_eksposur_risiko_kuantitatif' => 'required|numeric',
-            'inherent_level_risiko' => 'required|string',
-            'inherent_nilai_dampak' => 'required|numeric',
-            'inherent_nilai_probabilitas' => 'required|numeric',
-            'inherent_skala_dampak' => 'required|numeric',
-            'inherent_skala_probabilitas' => 'required|numeric',
-            'inherent_skala_risiko' => 'required|numeric',
-            'jenis_existing_control'=> 'required|string',
-            'jenis_program_dalam_rkap' => 'required|string',
-            'kategori_risiko_bumn' => 'required|string',
-            'kategori_risiko_t2_t3_kbumn' => 'required|string',
-            'kategori_threshold_kri_aman' => 'required|string',
-            'kategori_threshold_kri_bahaya' => 'required|string',
-            'kategori_threshold_kri_hati_hati' => 'required|string',
+            'asumsi_perhitungan_dampak' => 'sometimes|nullable|string',
+            'deskripsi_dampak' => 'sometimes|nullable|string',
+            'biaya_perlakuan_risiko' => 'sometimes|nullable|numeric',
+            'deskripsi_peristiwa_risiko' => 'sometimes|nullable|string',
+            'existing_control' => 'sometimes|nullable|string',
+            'hasil_yang_diharapkan_perusahaan' => 'sometimes|nullable|string',
 
-            'keputusan_penetapan' => 'required|numeric',
-            'key_risk_indicators' => 'required|string',
-            'kode_bumn' => 'required|string',
-            'nama_bumn' => 'required|string',
-            'nilai_limit_risiko' => 'required|string',
-            'nilai_risiko_yang_akan_timbul' => 'required|string',
+            'kategori_dampak'=> 'sometimes|nullable|numeric',
+            'inherent_eksposur_risiko_kualitatif' => 'sometimes|nullable',
+            'inherent_eksposur_risiko_kuantitatif' => 'sometimes|nullable|numeric',
+            'inherent_level_risiko' => 'sometimes|nullable|string',
+            'inherent_nilai_dampak' => 'sometimes|nullable|numeric',
+            'inherent_nilai_probabilitas' => 'sometimes|nullable|numeric',
+            'inherent_skala_dampak' => 'sometimes|nullable|numeric',
+            'inherent_skala_probabilitas' => 'times|nullable|numeric',
+            'inherent_skala_risiko' => 'sometimes|nullable|numeric',
+            'jenis_existing_control'=> 'sometimes|nullable|string',
+            'jenis_program_dalam_rkap' => 'sometimes|nullable|string',
+            'kategori_risiko_bumn' => 'sometimes|nullable|string',
+            'kategori_risiko_t2_t3_kbumn' => 'sometimes|nullable|string',
+            'kategori_threshold_kri_aman' => 'sometimes|nullable|string',
+            'kategori_threshold_kri_bahaya' => 'sometimes|nullable|string',
+            'kategori_threshold_kri_hati_hati' => 'sometimes|nullable|string',
 
+            'keputusan_penetapan' => 'sometimes|nullable|numeric',
+            'key_risk_indicators' => 'sometimes|nullable|string',
+            'kode_bumn' => 'sometimes|nullable|string',
+            'nama_bumn' => 'sometimes|nullable|string',
+            'nilai_limit_risiko' => 'sometimes|nullable|string',
+            'nilai_risiko_yang_akan_timbul' => 'sometimes|nullable|string',
 
-            'opsi_perlakuan_risiko' => 'required|string',
-            'output_perlakuan_risiko' => 'required|string',
-            'penilaian_efektivitas_kontrol' => 'required|string',
-            'penyebab_risiko' => 'required|string',
-            'peristiwa_risiko' => 'required|string',
-            'perkiraan_waktu_terpapar_risiko' => 'required|string',
-            'pic' => 'nullable|string',
-            'pilihan_sasaran' => 'required|string',
-            'pilihan_strategi'=> 'required|string',
-            'rencana_perlakuan_risiko' => 'required|string',
-            'sasaran_kbumn' => 'required|string',
-            'timeline_bulan_akhir' => 'required|date',
-            // 'timeline_bulan_awal' => 'required|date',
-            // 'unit_satuan_kri' => 'required|string',
-            'unit_kerja_id' => 'required|numeric',
-            'year'=> 'required|numeric',
-            'isMainRisk' => 'nullable|boolean',
+            'opsi_perlakuan_risiko' => 'sometimes|nullable|string',
+            'output_perlakuan_risiko' => 'sometimes|nullable|string',
+            'penilaian_efektivitas_kontrol' => 'sometimes|nullable|string',
+            'penyebab_risiko' => 'sometimes|nullable|string',
+            'peristiwa_risiko' => 'sometimes|nullable|string',
+            'perkiraan_waktu_terpapar_risiko' => 'sometimes|nullable|string',
+            'pic' => 'sometimes|nullable|string',
+            'pilihan_sasaran' => 'sometimes|nullable|string',
+            'pilihan_strategi'=> 'sometimes|nullable|string',
+            'rencana_perlakuan_risiko' => 'sometimes|nullable|string',
+            'sasaran_kbumn' => 'sometimes|nullable|string',
+
+            'timeline_bulan_akhir' => 'sometimes|nullable|date',
+            'timeline_bulan_awal'  => 'sometimes|nullable|date',
+            'unit_satuan_kri' => 'sometimes|nullable|string',
+            'unit_kerja_id' => 'sometimes|nullable|numeric',
+            'year'=> 'sometimes|nullable|numeric',
+            'isMainRisk' => 'sometimes|nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -760,55 +770,58 @@ class TrRcsaHeaderController extends Controller
             'isMainRisk'
         ];
 
-         $validator = Validator::make($request->all(), [
-            'asumsi_perhitungan_dampak' =>'required|string',
-            'deskripsi_dampak' => 'required|string',
-            'biaya_perlakuan_risiko' => 'required|numeric',
-            'deskripsi_peristiwa_risiko' => 'required|string',
-            'existing_control' => 'nullable|string',
-            'hasil_yang_diharapkan_perusahaan' => 'required|string',
-            'kategori_dampak'=> 'required|numeric',
-            'inherent_eksposur_risiko_kualitatif' => 'required_if:kategori_dampak,1',
-            'inherent_eksposur_risiko_kuantitatif' => 'required|numeric',
-            'inherent_level_risiko' => 'required|string',
-            'inherent_nilai_dampak' => 'required|numeric',
-            'inherent_nilai_probabilitas' => 'required|numeric',
-            'inherent_skala_dampak' => 'required|numeric',
-            'inherent_skala_probabilitas' => 'required|numeric',
-            'inherent_skala_risiko' => 'required|numeric',
-            'jenis_existing_control'=> 'required|string',
-            'jenis_program_dalam_rkap' => 'required|string',
-            'kategori_risiko_bumn' => 'required|string',
-            'kategori_risiko_t2_t3_kbumn' => 'required|string',
-            'kategori_threshold_kri_aman' => 'required|string',
-            'kategori_threshold_kri_bahaya' => 'required|string',
-            'kategori_threshold_kri_hati_hati' => 'required|string',
+        $validator = Validator::make($request->all(), [
+            'asumsi_perhitungan_dampak' => 'sometimes|nullable|string',
+            'deskripsi_dampak' => 'sometimes|nullable|string',
+            'biaya_perlakuan_risiko' => 'sometimes|nullable|numeric',
+            'deskripsi_peristiwa_risiko' => 'sometimes|nullable|string',
+            'existing_control' => 'sometimes|nullable|string',
+            'hasil_yang_diharapkan_perusahaan' => 'sometimes|nullable|string',
 
-            'keputusan_penetapan' => 'required|numeric',
-            'key_risk_indicators' => 'required|string',
-            'kode_bumn' => 'required|string',
-            'nama_bumn' => 'required|string',
-            'nilai_limit_risiko' => 'required|string',
-            'nilai_risiko_yang_akan_timbul' => 'required|string',
+            'kategori_dampak'=> 'sometimes|nullable|numeric',
+            'inherent_eksposur_risiko_kualitatif' => 'sometimes|nullable',
+            'inherent_eksposur_risiko_kuantitatif' => 'sometimes|nullable|numeric',
+            'inherent_level_risiko' => 'sometimes|nullable|string',
+            'inherent_nilai_dampak' => 'sometimes|nullable|numeric',
+            'inherent_nilai_probabilitas' => 'sometimes|nullable|numeric',
+            'inherent_skala_dampak' => 'sometimes|nullable|numeric',
+            'inherent_skala_probabilitas' => 'sometimes|nullable|numeric',
+            'inherent_skala_risiko' => 'sometimes|nullable|numeric',
+            'jenis_existing_control'=> 'sometimes|nullable|string',
+            'jenis_program_dalam_rkap' => 'sometimes|nullable|string',
+            'kategori_risiko_bumn' => 'sometimes|nullable|string',
+            'kategori_risiko_t2_t3_kbumn' => 'sometimes|nullable|string',
+            'kategori_threshold_kri_aman' => 'sometimes|nullable|string',
+            'kategori_threshold_kri_bahaya' => 'sometimes|nullable|string',
+            'kategori_threshold_kri_hati_hati' => 'sometimes|nullable|string',
 
-            'opsi_perlakuan_risiko' => 'required|string',
-            'output_perlakuan_risiko' => 'required|string',
-            'penilaian_efektivitas_kontrol' => 'required|string',
-            'penyebab_risiko' => 'required|string',
-            'peristiwa_risiko' => 'required|string',
-            'perkiraan_waktu_terpapar_risiko' => 'required|string',
-            'pic' => 'nullable|string',
-            'pilihan_sasaran' => 'required|string',
-            'pilihan_strategi'=> 'required|string',
-            'rencana_perlakuan_risiko' => 'required|string',
-            'sasaran_kbumn' => 'required|string',
-            'timeline_bulan_akhir' => 'required|date',
-            // 'timeline_bulan_awal' => 'required|date',
-            // 'unit_satuan_kri' => 'required|string',
-            'unit_kerja_id' => 'required|numeric',
-            'year'=> 'required|numeric',
-            'isMainRisk' => 'nullable|boolean',
+            'keputusan_penetapan' => 'sometimes|nullable|numeric',
+            'key_risk_indicators' => 'sometimes|nullable|string',
+            'kode_bumn' => 'sometimes|nullable|string',
+            'nama_bumn' => 'sometimes|nullable|string',
+            'nilai_limit_risiko' => 'sometimes|nullable|string',
+            'nilai_risiko_yang_akan_timbul' => 'sometimes|nullable|string',
+
+            'opsi_perlakuan_risiko' => 'sometimes|nullable|string',
+            'output_perlakuan_risiko' => 'sometimes|nullable|string',
+            'penilaian_efektivitas_kontrol' => 'sometimes|nullable|string',
+            'penyebab_risiko' => 'sometimes|nullable|string',
+            'peristiwa_risiko' => 'sometimes|nullable|string',
+            'perkiraan_waktu_terpapar_risiko' => 'sometimes|nullable|string',
+            'pic' => 'sometimes|nullable|string',
+            'pilihan_sasaran' => 'sometimes|nullable|string',
+            'pilihan_strategi'=> 'sometimes|nullable|string',
+            'rencana_perlakuan_risiko' => 'sometimes|nullable|string',
+            'sasaran_kbumn' => 'sometimes|nullable|string',
+
+            'timeline_bulan_akhir' => 'sometimes|nullable|date',
+            'timeline_bulan_awal'  => 'sometimes|nullable|date',
+            'unit_satuan_kri' => 'sometimes|nullable|string',
+            'unit_kerja_id' => 'sometimes|nullable|numeric',
+            'year'=> 'sometimes|nullable|numeric',
+            'isMainRisk' => 'sometimes|nullable|boolean',
         ]);
+
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
@@ -1041,11 +1054,12 @@ class TrRcsaHeaderController extends Controller
     public function approve(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'approval_notes' => 'nullable|string'
+            'approval_notes' => 'required|string'
         ]);
 
+
         if ($validator->fails()) {
-            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+            return json(400, false, 'Validasi Gagal', 'Catatan wajib diisi.', $validator->errors());
         }
 
         try {

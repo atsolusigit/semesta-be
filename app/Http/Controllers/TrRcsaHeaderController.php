@@ -44,6 +44,15 @@ class TrRcsaHeaderController extends Controller
         ->when($request->menu === 'arsip', function ($q) {
             $q->where('status', 'approved');
         })
+        ->when($request->filled('tahun'), function ($q) use ($request) {
+            $q->where('year', (int) $request->input('tahun'));
+        })
+        ->when($request->has('isMainRisk'), function ($q) use ($request) {
+            $val = filter_var($request->input('isMainRisk'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if (!is_null($val)) {
+                $q->where('isMainRisk', $val);
+            }
+        })
         ->when($request->has('isSubmit'), function ($q) use ($request) {
             $val = filter_var($request->input('isSubmit'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
             if ($val === true) {

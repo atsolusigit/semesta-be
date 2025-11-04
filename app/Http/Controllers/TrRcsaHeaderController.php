@@ -1230,4 +1230,58 @@ class TrRcsaHeaderController extends Controller
         }
     }
 
+    public function updateIsMainRisk(Request $request, $id)
+    {
+        $result = check_role(auth()->user(), [1, 2, 3]);
+        if ($result !== true) {
+            return $result;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'isMainRisk' => 'required|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Field isMainRisk wajib boolean.', $validator->errors());
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $rcsa = TrRcsaHeader::find($id);
+            if (!$rcsa) {
+                return json(404, false, 'Data Tidak Ditemukan', 'RCSA header tidak ditemukan.', null);
+            }
+
+            $user = auth()->user();
+            if (in_array((int)$user->role_id, [2, 3]) && (int)$rcsa->unit_kerja_id !== (int)($user->department_id ?? 0)) {
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat mengubah data departemen Anda sendiri.', null);
+            }
+
+            $rcsa->isMainRisk = (bool)$request->input('isMainRisk');
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'updated_by')) {
+                $rcsa->updated_by = $user->id;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tr_rcsa_header', 'updated_at')) {
+                $rcsa->updated_at = now();
+            }
+            $rcsa->save();
+
+            DB::commit();
+
+            return json(200, true, 'Berhasil', 'isMainRisk berhasil diperbarui.', [
+                'id' => $rcsa->id,
+                'isMainRisk' => (bool)$rcsa->isMainRisk,
+            ]);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('updateIsMainRisk failed', [
+                'rcsa_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            return json(500, false, 'Gagal', 'Terjadi kesalahan sistem.', $e->getMessage());
+        }
+    }
+
 }

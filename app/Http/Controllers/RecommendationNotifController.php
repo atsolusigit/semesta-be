@@ -52,7 +52,7 @@ class RecommendationNotifController extends Controller
                 'rekomendasi' => $data->rekomendasi,
             ];
 
-            if(Mail::to('deo.mirabian@gmail.com')
+            if(Mail::to('deo.mirabian@gmail.com', 'ramdhaniteddy21@gmail.com')
             ->send(new RecommendationNotif(
                     $data->erkap_id,
                     $data->nama_investasi,

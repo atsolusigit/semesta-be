@@ -32,34 +32,41 @@ class RecommendationNotifController extends Controller
             ]);
 
         $data = (object) $myRequest;
-    
+        
         try {
 
             DB::beginTransaction();
 
             $currentUser = auth()->user();
-
+            
             $myRequest['created_by'] = auth()->id();
             $myRequest['kirim_ke'] = 'deo.mirabian@gmail.com';
-            $myRequest['dikirim_oleh'] = get_decrypted_name($data->created_by);
+            $myRequest['dikirim_oleh'] = get_decrypted_name(auth()->id());
 
             $item = RecommendationInvestasiNotif::create($myRequest);
 
-            DB::commit();
-
             Mail::to('deo.mirabian@gmail.com')
-            // ->cc(['cc1@mail.com', 'cc2@mail.com'])
-            // ->bcc(['bcc1@mail.com', 'bcc2@mail.com']) 
             ->send(new RecommendationNotif(
                     $data->erkap_id,
                     $data->nama_investasi,
                     $data->tahun,
                     $data->rekomendasi,
-                ));
+            ));  
+
+            DB::commit();
+            
+            $responseData = [
+            'Erkap_id' => $data->erkap_id,
+            'nama_investasi' => $data->nama_investasi,
+            'total' => $data->tahun,
+            'rekomendasi' => $data->rekomendasi,
+            ];
+
+            return json(200, true, 'Email Terkirim', 'Email berhasil dikirim.', $responseData);
         } catch (\Exception $e) {
             // Log the error or handle it as needed
-            \Log::error('Mail sending failed for order ' . $data->erkapID . ': ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to send email for order ' . $data->erkapID], 500);
+            \Log::error('Mail sending failed for order ' . $data->erkap_id . ': ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to send email for order ' . $data->erkap_id], 500);
         }
 
     }

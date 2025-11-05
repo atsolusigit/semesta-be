@@ -9,8 +9,8 @@
     
     <h2>Informasi Investasi:</h2>
     <ul>
-        <li>Erkap ID: {{ $erkapID }}</li>
-        <li>Nama Investasi: {{ $namaInvestasi }}</li>
+        <li>Erkap ID: {{ $erkap_id }}</li>
+        <li>Nama Investasi: {{ $nama_investasi }}</li>
         <li>Tahun: {{ $tahun }}</li>
     </ul>
 

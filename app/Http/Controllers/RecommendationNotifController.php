@@ -13,7 +13,7 @@ class RecommendationNotifController extends Controller
 {
     public function sendRecommendationEmails(Request $request) {
 
-        $result = check_role(auth()->user(), [2]);
+        $result = check_role(auth()->user(), [1,2]);
         if ($result !== true) return $result;
 
         $validator = Validator::make($request->all(), [

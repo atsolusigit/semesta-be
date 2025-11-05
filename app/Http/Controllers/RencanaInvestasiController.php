@@ -21,6 +21,7 @@ class RencanaInvestasiController extends Controller
             'nilai'         => 'nilai_rkap',
             'nilai_erkap'   => 'nilai_rkap',
             'nilai_revisi'  => 'nilai_revisi',
+            'nilai_budget_transfer'=> 'nilai_budget_transfer',
         ];
         $sortColumn = $sortMap[$sortBy] ?? 'id';
 

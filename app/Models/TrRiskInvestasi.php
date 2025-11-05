@@ -60,6 +60,6 @@ class TrRiskInvestasi extends Model
 
     public function approvedByUser()
     {
-        return $this->belongsTo(User::class, 'approved_by')->select(['id','name','username']);
+        return $this->belongsTo(User::class, 'approved_by', 'id');
     }
 }

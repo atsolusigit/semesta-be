@@ -30,6 +30,7 @@ class RecommendationNotifController extends Controller
                 'tahun',
                 'rekomendasi'
             ]);
+
         $data = (object) $myRequest;
     
         try {
@@ -38,11 +39,11 @@ class RecommendationNotifController extends Controller
 
             $currentUser = auth()->user();
 
-            $data->created_by = auth()->id();
-            $data->kirim_ke = 'deo.mirabian@gmail.com';
-            $data->dikirim_oleh = get_decrypted_name($data->created_by);
+            $myRequest['created_by'] = auth()->id();
+            $myRequest['kirim_ke'] = 'deo.mirabian@gmail.com';
+            $myRequest['dikirim_oleh'] = get_decrypted_name($data->created_by);
 
-            $item = RecommendationInvestasiNotif::create($data);
+            $item = RecommendationInvestasiNotif::create($myRequest);
 
             DB::commit();
 

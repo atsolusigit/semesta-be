@@ -14,9 +14,10 @@
         <li>Tahun: {{ $tahun }}</li>
     </ul>
 
-    <h2>Rekomendasi:</h2>
-    <p>{{ $rekomendasi }}</p>
+    <h2>Rekomendasi:</h2> {{ $rekomendasi }}
+    
 
+    <p>&nbsp;</p>
     <p>Best regards</p>
     <p>ManRisk Team</p>
     <p>PT. Kawasan Berikat Nusantara</p>

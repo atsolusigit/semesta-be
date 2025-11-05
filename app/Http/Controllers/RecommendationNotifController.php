@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Mail\SentMessage;
 use App\Mail\RecommendationNotif;
 use App\Models\RecommendationInvestasiNotif;
 
@@ -44,25 +45,32 @@ class RecommendationNotifController extends Controller
             $myRequest['dikirim_oleh'] = get_decrypted_name(auth()->id());
 
             $item = RecommendationInvestasiNotif::create($myRequest);
+            $responseData = [
+                'Erkap_id' => $data->erkap_id,
+                'nama_investasi' => $data->nama_investasi,
+                'total' => $data->tahun,
+                'rekomendasi' => $data->rekomendasi,
+            ];
 
-            Mail::to('deo.mirabian@gmail.com')
+            if(Mail::to('deo.mirabian@gmail.com')
             ->send(new RecommendationNotif(
                     $data->erkap_id,
                     $data->nama_investasi,
                     $data->tahun,
                     $data->rekomendasi,
-            ));  
+            )) instanceof SentMessage){
 
-            DB::commit();
+                DB::commit();
+                return json(200, true, 'Email Terkirim', 'Email berhasil dikirim.', $responseData);
+
+            } else {
+                foreach(Mail::failures as $email_address) {
+                    echo " - $email_address <br />";
+                }
+                return json(500, true, 'Email Gagal Terkirim', 'Email gagal dikirim.', $responseData);
+            }
+
             
-            $responseData = [
-            'Erkap_id' => $data->erkap_id,
-            'nama_investasi' => $data->nama_investasi,
-            'total' => $data->tahun,
-            'rekomendasi' => $data->rekomendasi,
-            ];
-
-            return json(200, true, 'Email Terkirim', 'Email berhasil dikirim.', $responseData);
         } catch (\Exception $e) {
             // Log the error or handle it as needed
             \Log::error('Mail sending failed for order ' . $data->erkap_id . ': ' . $e->getMessage());

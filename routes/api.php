@@ -35,6 +35,7 @@ use App\Http\Controllers\RencanaInvestasiController;
 use App\Http\Controllers\MstJenisRisikoController;
 use App\Http\Controllers\TrRiskInvestasiController;
 use App\Http\Controllers\MstRcsaController;
+use App\Http\Controllers\RecommendationNotifController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -196,6 +197,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/risk-headers/{id}/reject-menrisk', [TrRiskHeaderController::class, 'rejectMenrisk']);   // Reject menrisk (role 4)
     Route::patch('/risk-headers/{id}/approve-vpmenrisk', [TrRiskHeaderController::class, 'approveVpMenrisk']); // Approve VP MenRisk (role 6)
     Route::patch('/risk-headers/{id}/reject-vpmenrisk', [TrRiskHeaderController::class, 'rejectVpMenrisk']);   // Reject VP MenRisk (role 6)
+    Route::patch('/risk-headers/{id}/review', [TrRiskHeaderController::class, 'reviewRiskHeader']);  // Review risk header (role 1,7)
 });
 
 // ===================== MITIGATION MONTHLY =====================
@@ -363,7 +365,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/investasi', [RencanaInvestasiController::class, 'index']);
     Route::post('/investasi', [RencanaInvestasiController::class, 'store']);
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
-    
+
     Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
     Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);
     Route::post('/risk-investasi', [TrRiskInvestasiController::class, 'store']);
@@ -374,11 +376,16 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/risk-investasi/erkap/{erkap_id}', [TrRiskInvestasiController::class, 'getByErkapID']);
 });
 
-// ===================== MASTER UNTUK KEPERLUAN DATA RCSA =====================
+// ===================== MASTER UNTUK KEPERLUAN OPSI RCSA =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/rcsa-mst', [MstRcsaController::class, 'index']);             
     Route::get('/rcsa-mst/{id}', [MstRcsaController::class, 'show']);         
     Route::post('/rcsa-mst', [MstRcsaController::class, 'store']);             
     Route::put('/rcsa-mst/{id}', [MstRcsaController::class, 'update']);      
     Route::delete('/rcsa-mst/{id}', [MstRcsaController::class, 'destroy']);   
+});
+
+// ===================== EMAIL RECOMMENDATION RENCANA INVESTASI =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::post('/send-rekomendasi-investasi', [RecommendationNotifController::class, 'sendRecommendationEmails']);
 });

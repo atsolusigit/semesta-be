@@ -406,8 +406,9 @@ class TrRcsaHeaderController extends Controller
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $e->getMessage());
+            return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $th->getMessage());
         }
+
     }
 
     /**
@@ -834,23 +835,24 @@ class TrRcsaHeaderController extends Controller
         try {
             DB::beginTransaction();
 
-            //Residual
             foreach ($dataResidual as $itemRes) {
-                // dd($itemRes['residual_eksposur_risiko_kualitatif']);
-                TrRcsaResidual::where('id',$itemRes['id'])
-                ->where('rcsa_id', $itemRes['rcsa_id'])
-                ->update([
-                    'kuartal' => $itemRes['kuartal'],
-                    'residual_skala_dampak' => $itemRes['residual_skala_dampak'],
-                    'residual_nilai_dampak' => $itemRes['residual_nilai_dampak'],
-                    'residual_skala_probabilitas' => $itemRes['residual_skala_probabilitas'],
-                    'residual_nilai_probabilitas' => $itemRes['residual_nilai_probabilitas'],
-                    'residual_eksposur_risiko_kuantitatif' => $itemRes['residual_eksposur_risiko_kuantitatif'],
-                    'residual_eksposur_risiko_kualitatif' => $itemRes['residual_eksposur_risiko_kualitatif'],
-                    'residual_skala_risiko' => $itemRes['residual_skala_risiko'],
-                    'residual_level_risiko' => $itemRes['residual_level_risiko']
-                ]);
+                $kuartal = (int)($itemRes['kuartal'] ?? 0);
+
+                TrRcsaResidual::updateOrCreate(
+                    ['rcsa_id' => (int)$rcsa_id, 'kuartal' => $kuartal],
+                    [
+                        'residual_skala_dampak'                 => $itemRes['residual_skala_dampak'] ?? null,
+                        'residual_nilai_dampak'                 => $itemRes['residual_nilai_dampak'] ?? null,
+                        'residual_skala_probabilitas'           => $itemRes['residual_skala_probabilitas'] ?? null,
+                        'residual_nilai_probabilitas'           => $itemRes['residual_nilai_probabilitas'] ?? null,
+                        'residual_eksposur_risiko_kuantitatif'  => $itemRes['residual_eksposur_risiko_kuantitatif'] ?? null,
+                        'residual_eksposur_risiko_kualitatif'   => $itemRes['residual_eksposur_risiko_kualitatif'] ?? null,
+                        'residual_skala_risiko'                 => $itemRes['residual_skala_risiko'] ?? null,
+                        'residual_level_risiko'                 => $itemRes['residual_level_risiko'] ?? null,
+                    ]
+                );
             }
+
 
              /********* HAPUS RCSA Risiko List **********/
             TrRcsaRencanaRisikoList::where('rcsa_id', $rcsa_id)->delete();
@@ -943,8 +945,9 @@ class TrRcsaHeaderController extends Controller
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $e->getMessage());
+            return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $th->getMessage());
         }
+
     }
 
     public function submit(Request $request, $id)

@@ -128,6 +128,11 @@ class TrRiskHeader extends Model
     // RELATIONS
     // =====================================
 
+    public function rcsa()
+    {
+        return $this->belongsTo(TrRcsaHeader::class, 'rcsa_id', 'id');
+    }
+
     public function reviewedBy()
     {
         return $this->belongsTo(User::class, 'reviewed_by');

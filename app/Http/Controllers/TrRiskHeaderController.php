@@ -307,6 +307,7 @@ public function index(Request $request)
 
         return [
             'id' => $item->id,
+            'rcsa_id' => $item->rcsa_id, // id rcsa jika ada
             'risk_status' => $riskStatus,
             'override_status' => $overrideStatus,
             'reviewed' => (bool) $item->reviewed, // ← TAMBAHAN BARU
@@ -689,6 +690,7 @@ public function show($id)
     // Siapkan data utama
     $orderedData = [
         'id' => $data->id,
+        'rcsa_id' => $data->rcsa_id, // id rcsa jika ada
         'risk_status' => $riskStatus, // *** DIUBAH: sekarang menggunakan $riskStatus ***
         'override_status' => $overrideStatus, // penambahan untuk override status
         'reviewed' => (bool) $data->reviewed, // reviewed sebagai boolean
@@ -829,6 +831,25 @@ public function store(Request $request)
                 'instruction' => 'Hapus semua field yang tidak diizinkan dari request Anda.'
             ]
         ], 404);
+    }
+
+    // ============================================
+    // VALIDASI DUPLIKASI RCSA_ID
+    // ============================================
+
+    $rcsaId = $request->input('rcsa_id');
+
+    // Cek apakah rcsa_id sudah digunakan oleh header lain
+    if ($rcsaId !== null) {
+        $existingHeader = TrRiskHeader::where('rcsa_id', $rcsaId)->first();
+
+        if ($existingHeader) {
+            return json(400, false, 'RCSA ID Sudah Digunakan', 'RCSA ID ini sudah digunakan oleh risk profile lain. Silakan gunakan RCSA ID yang berbeda.', [
+                'rcsa_id' => $rcsaId,
+                'existing_header_id' => $existingHeader->id,
+                'message' => 'RCSA ID harus unik untuk setiap risk header.'
+            ]);
+        }
     }
 
     // ============================================
@@ -2033,6 +2054,7 @@ public function monitoring(Request $request)
 
         return [
             'id' => $item->id,
+            'rcsa_id' => $item->rcsa_id,
             'risk_code' => $riskCodes, // PERBAIKAN: Gunakan array yang sudah diproses
             'process_code' => $item->process_code ?? '',
             'jenis_risiko_id' => $item->jenis_risiko ?? null, // DIUBAH: ID

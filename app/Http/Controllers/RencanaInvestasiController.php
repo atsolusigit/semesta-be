@@ -21,16 +21,14 @@ class RencanaInvestasiController extends Controller
             'nilai'         => 'nilai_rkap',
             'nilai_erkap'   => 'nilai_rkap',
             'nilai_revisi'  => 'nilai_revisi',
-            // opsional: aktifkan sorting kolom baru jika dibutuhkan
-            // 'nilai_realisasi'       => 'nilai_realisasi',
-            // 'nilai_budget_transfer' => 'nilai_budget_transfer',
         ];
         $sortColumn = $sortMap[$sortBy] ?? 'id';
 
         $query = RencanaInvestasi::with([
             'createdBy:id,username',
             'updatedBy:id,username',
-            'riskInvestasi:id,erkap_id,status',
+            'riskInvestasi:erkap_id,status,approved_by,approved_at,dampak_risiko_awal,kemungkinan_awal,eksposure_level_awal,eksposure_ltmh_awal,dampak_risiko_akhir,kemungkinan_akhir,eksposure_level_akhir,eksposure_ltmh_akhir,biaya_mitigasi_risiko',
+            'riskInvestasi.approvedByUser:id,username,name',
         ])
         ->when($request->filled('tahun'), fn($q) => $q->where('year', (int)$request->tahun))
         ->when($request->filled('jenis_investasi'), fn($q) => $q->where('jenis_investasi','like','%'.$request->jenis_investasi.'%'))
@@ -76,9 +74,31 @@ class RencanaInvestasiController extends Controller
                 'dampak_current'        => $it->dampak_current,
                 'level_residual'        => $it->level_residual,
                 'dampak_residual'       => $it->dampak_residual,
-                // —
                 'keterangan'         => $it->keterangan,
                 'status'             => $it->status,
+
+                'has_risk_profile'     => (bool) $it->riskInvestasi,
+
+                'risk_investasi' => $it->riskInvestasi ? [
+                    'erkap_id'               => $it->riskInvestasi->erkap_id,
+                    'status'                 => $it->riskInvestasi->status,
+                    'approved_by'            => $it->riskInvestasi->approved_by,
+                    'approved_by_name'       => $it->riskInvestasi->approvedByUser ? get_decrypted_name($it->riskInvestasi->approvedByUser) : null,
+                    'approved_at'            => optional($it->riskInvestasi->approved_at)->toISOString(),
+
+                    'dampak_risiko_awal'     => $it->riskInvestasi->dampak_risiko_awal,
+                    'kemungkinan_awal'       => $it->riskInvestasi->kemungkinan_awal,
+                    'eksposure_level_awal'   => $it->riskInvestasi->eksposure_level_awal,
+                    'eksposure_ltmh_awal'    => $it->riskInvestasi->eksposure_ltmh_awal,
+
+                    'dampak_risiko_akhir'    => $it->riskInvestasi->dampak_risiko_akhir,
+                    'kemungkinan_akhir'      => $it->riskInvestasi->kemungkinan_akhir,
+                    'eksposure_level_akhir'  => $it->riskInvestasi->eksposure_level_akhir,
+                    'eksposure_ltmh_akhir'   => $it->riskInvestasi->eksposure_ltmh_akhir,
+
+                    'biaya_mitigasi_risiko'  => $it->riskInvestasi->biaya_mitigasi_risiko,
+                ] : null,
+                
                 'has_risk_profile'   => (bool) $it->riskInvestasi,
                 'created_at'         => optional($it->created_at)->toISOString(),
                 'updated_at'         => optional($it->updated_at)->toISOString(),

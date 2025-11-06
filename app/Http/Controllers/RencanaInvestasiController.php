@@ -17,30 +17,47 @@ class RencanaInvestasiController extends Controller
         $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $sortMap = [
-            'tahun'         => 'year',
-            'nilai'         => 'nilai_rkap',
-            'nilai_erkap'   => 'nilai_rkap',
-            'nilai_revisi'  => 'nilai_revisi',
+            'tahun'                => 'year',
+            'nilai'                => 'nilai_rkap',
+            'nilai_erkap'          => 'nilai_rkap',
+            'nilai_revisi'         => 'nilai_revisi',
             'nilai_budget_transfer'=> 'nilai_budget_transfer',
         ];
         $sortColumn = $sortMap[$sortBy] ?? 'id';
+        $now   = now();
+        $tahun = (int) ($request->integer('tahun') ?: $now->year);
+        $bulan = (int) ($request->integer('bulan') ?: $now->month);
+        $week  = (int) ($request->integer('week')  ?: ceil($now->day / 7));
 
         $query = RencanaInvestasi::with([
             'createdBy:id,username',
             'updatedBy:id,username',
             'riskInvestasi:erkap_id,status,approved_by,approved_at,dampak_risiko_awal,kemungkinan_awal,eksposure_level_awal,eksposure_ltmh_awal,dampak_risiko_akhir,kemungkinan_akhir,eksposure_level_akhir,eksposure_ltmh_akhir,biaya_mitigasi_risiko',
             'riskInvestasi.approvedByUser:id,username,name',
+            'periods' => function ($q) use ($tahun, $bulan, $week, $request) {
+                $q->where('year', $tahun);
+
+                if ($request->filled('bulan')) {
+                    $q->where('month', (int) $request->bulan);
+                } else {
+                    $q->where('month', $bulan);
+                }
+
+                if ($request->filled('week')) {
+                    $q->where('week', (int) $request->week);
+                } else {
+                    $q->where('week', $week);
+                }
+            },
         ])
         ->when($request->filled('tahun'), fn($q) => $q->where('year', (int)$request->tahun))
         ->when($request->filled('jenis_investasi'), fn($q) => $q->where('jenis_investasi','like','%'.$request->jenis_investasi.'%'))
         ->when($request->filled('department_name'), fn($q) => $q->where('department_name','like','%'.$request->department_name.'%'))
-        ->when($request->filled('search'), function ($q) use ($request) {
-            $s = $request->search;
-            $q->where(function($qq) use ($s) {
-                $qq->where('nama_investasi','like',"%$s%")
-                   ->orWhere('department_name','like',"%$s%")
-                   ->orWhere('kategori_investasi','like',"%$s%")
-                   ->orWhere('jenis_investasi','like',"%$s%");
+        ->when($request->filled('bulan') || $request->filled('week'), function ($q) use ($tahun, $bulan, $week, $request) {
+            $q->whereHas('periods', function ($qq) use ($tahun, $bulan, $week, $request) {
+                $qq->where('year', $tahun)
+                ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
+                ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
             });
         })
         ->orderBy($sortColumn, $sortOrder);
@@ -52,6 +69,21 @@ class RencanaInvestasiController extends Controller
         }
 
         $resData = collect($data->items())->map(function ($it) {
+            $period = $it->periods->first();
+            $targetTimeline = null;
+            if ($period && is_array($period->detail_json)) {
+                $firstDetail = $period->detail_json[0] ?? null;
+                if (is_array($firstDetail) && !empty($firstDetail['timeline_target'])) {
+                    $firstTl = $firstDetail['timeline_target'][0] ?? null;
+                    if (is_array($firstTl)) {
+                        $targetTimeline = [
+                            'color' => $firstTl['color'] ?? null,
+                            'label' => $firstTl['label'] ?? null,
+                        ];
+                    }
+                }
+            }
+
             return [
                 'id'                 => $it->id,
                 'erkap_id'           => $it->erkap_id,
@@ -62,11 +94,17 @@ class RencanaInvestasiController extends Controller
                 'year'               => $it->year,
                 'nilai_rkap'         => $it->nilai_rkap,
                 'nilai_revisi'       => $it->nilai_revisi,
-                // ➕ kolom tambahan
+
+                // ➕ kolom tambahan (tetap dipertahankan)
                 'nilai_budget_transfer' => $it->nilai_budget_transfer,
                 'nilai_realisasi'       => $it->nilai_realisasi,
-                'target_timeline'       => $it->target_timeline,
+
+                // ➕ sesuai permintaan: target_timeline dari ERKAP periods JSON
+                'target_timeline'       => $targetTimeline,
+
+                // realisasi_timeline: skip (tetap seperti sekarang)
                 'realisasi_timeline'    => $it->realisasi_timeline,
+
                 'ld_inherent'           => $it->ld_inherent,
                 'dampak_inherent'       => $it->dampak_inherent,
                 'ld_current'            => $it->ld_current,
@@ -75,10 +113,10 @@ class RencanaInvestasiController extends Controller
                 'dampak_current'        => $it->dampak_current,
                 'level_residual'        => $it->level_residual,
                 'dampak_residual'       => $it->dampak_residual,
-                'keterangan'         => $it->keterangan,
-                'status'             => $it->status,
+                'keterangan'            => $it->keterangan,
+                'status'                => $it->status,
 
-                'has_risk_profile'     => (bool) $it->riskInvestasi,
+                'has_risk_profile'      => (bool) $it->riskInvestasi,
 
                 'risk_investasi' => $it->riskInvestasi ? [
                     'erkap_id'               => $it->riskInvestasi->erkap_id,
@@ -99,7 +137,7 @@ class RencanaInvestasiController extends Controller
 
                     'biaya_mitigasi_risiko'  => $it->riskInvestasi->biaya_mitigasi_risiko,
                 ] : null,
-                
+
                 'has_risk_profile'   => (bool) $it->riskInvestasi,
                 'created_at'         => optional($it->created_at)->toISOString(),
                 'updated_at'         => optional($it->updated_at)->toISOString(),
@@ -122,6 +160,7 @@ class RencanaInvestasiController extends Controller
 
         return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
     }
+
 
     public function store(Request $request)
     {

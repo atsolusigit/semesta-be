@@ -38,6 +38,13 @@ class RencanaInvestasi extends Model
         'updated_at',
     ];
 
+    protected $casts = [
+        'nilai_rkap'            => 'decimal:2',
+        'nilai_revisi'          => 'decimal:2',
+        'nilai_budget_transfer' => 'decimal:2',
+        'nilai_realisasi'       => 'decimal:2',
+    ];
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by')
@@ -52,5 +59,10 @@ class RencanaInvestasi extends Model
     public function riskInvestasi()
     {
         return $this->hasOne(TrRiskInvestasi::class, 'erkap_id', 'erkap_id');
+    }
+
+    public function periods()
+    {
+        return $this->hasMany(RencanaInvestasiPeriod::class, 'rencana_investasi_id');
     }
 }

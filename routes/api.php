@@ -35,6 +35,7 @@ use App\Http\Controllers\RencanaInvestasiController;
 use App\Http\Controllers\MstJenisRisikoController;
 use App\Http\Controllers\TrRiskInvestasiController;
 use App\Http\Controllers\MstRcsaController;
+use App\Http\Controllers\RecommendationNotifController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -383,4 +384,10 @@ Route::middleware(['auth:api'])->group(function () {
     Route::post('/rcsa-mst', [MstRcsaController::class, 'store']);             
     Route::put('/rcsa-mst/{id}', [MstRcsaController::class, 'update']);      
     Route::delete('/rcsa-mst/{id}', [MstRcsaController::class, 'destroy']);   
+});
+
+// ===================== EMAIL RECOMMENDATION RENCANA INVESTASI =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::post('/send-rekomendasi-investasi', [RecommendationNotifController::class, 'sendRecommendationEmails']);
+    Route::get('/list-rekomendasi/{id}', [RecommendationNotifController::class, 'show']);   
 });

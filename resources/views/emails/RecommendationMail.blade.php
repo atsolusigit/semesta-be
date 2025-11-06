@@ -5,14 +5,14 @@
     <title>[SEMESTA-NOTIFICATION] Informasi Rekomendasi Baru</title>
     <style>
         body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
-        .header { background-color: #097b44; color: white; padding: 10px; text-align: center; }
+        .header { background-color: #097b44; color: white; padding: 10px; }
         .footer { background-color: #f1f1f1; color: #555; padding: 10px; text-align: center; font-size: 12px; }
         .content { background-color: white; padding: 20px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <p style="text-align: left;">Yth {{ $riskInvestasi->createdBy ?? 'Semesta User' }},</p>
+        <p style="text-align: left;"><h1>Yth {{ $risk_owner ?? 'Semesta User' }},</h1></p>
         <p style="text-align: right;">{{ date('d-m-Y') }}</p>
     </div>
 

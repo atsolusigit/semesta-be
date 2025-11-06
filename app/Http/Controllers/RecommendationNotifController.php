@@ -60,15 +60,16 @@ class RecommendationNotifController extends Controller
             $myRequest['kirim_ke'] = 'atsolusigit@gmail.com';
             $myRequest['dikirim_oleh'] = get_decrypted_name(auth()->id());
             $myRequest['status'] = 'Terkirim';
-
+            
             $item = RecommendationInvestasiNotif::create($myRequest);
+            
             $responseData = [
                 'Erkap_id' => $data->erkap_id,
                 'nama_investasi' => $data->nama_investasi,
                 'kategori_investasi' => $data->kategori_investasi,
                 'total' => $data->tahun,
                 'rekomendasi' => $data->rekomendasi,
-                'status' => $data->status,
+                'status' => $myRequest['status'] ,
             ];
 
             if(Mail::to(['atsolusigit@gmail.com', 'ramdhaniteddy21@gmail.com'])

@@ -21,7 +21,7 @@ class RecommendationNotifController extends Controller
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
-        return json(200, true, 'Detail Ditemukan', 'Detail data berhasil diambil.', $data);
+        return json(200, true, 'Detail Ditemukan', 'Detail data berhasil diambil.', $rekomendasi);
     }
 
     public function sendRecommendationEmails(Request $request) {
@@ -60,7 +60,7 @@ class RecommendationNotifController extends Controller
             $myRequest['kirim_ke'] = 'atsolusigit@gmail.com';
             $myRequest['dikirim_oleh'] = get_decrypted_name(auth()->id());
             $myRequest['status'] = 'Terkirim';
-            
+
             $item = RecommendationInvestasiNotif::create($myRequest);
             
             $responseData = [

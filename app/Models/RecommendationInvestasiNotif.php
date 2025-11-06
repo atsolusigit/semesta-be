@@ -11,6 +11,7 @@ class RecommendationInvestasiNotif extends Model
     protected $fillable = [
         'erkap_id',
         'nama_investasi',
+        'kategori_investasi',
         'tahun',
         'rekomendasi',
         'kirim_ke',

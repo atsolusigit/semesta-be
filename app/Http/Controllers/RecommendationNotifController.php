@@ -59,6 +59,7 @@ class RecommendationNotifController extends Controller
             $myRequest['created_by'] = auth()->id();
             $myRequest['kirim_ke'] = 'atsolusigit@gmail.com';
             $myRequest['dikirim_oleh'] = get_decrypted_name(auth()->id());
+            $myRequest['status'] = 'Terkirim';
 
             $item = RecommendationInvestasiNotif::create($myRequest);
             $responseData = [
@@ -67,7 +68,7 @@ class RecommendationNotifController extends Controller
                 'kategori_investasi' => $data->kategori_investasi,
                 'total' => $data->tahun,
                 'rekomendasi' => $data->rekomendasi,
-                'risk_owner' => $data->risk_owner,
+                'status' => $data->status,
             ];
 
             if(Mail::to(['atsolusigit@gmail.com', 'ramdhaniteddy21@gmail.com'])
@@ -85,10 +86,11 @@ class RecommendationNotifController extends Controller
                 return json(200, true, 'Email Terkirim', 'Email berhasil dikirim.', $responseData);
 
             } else {
+                $list_email='';
                 foreach(Mail::failures as $email_address) {
-                    echo " - $email_address <br />";
+                    $list_email .= $email_address .", ";
                 }
-                return json(500, true, 'Email Gagal Terkirim', 'Email gagal dikirim.', $responseData);
+                return json(500, true, 'Email Gagal Terkirim', 'Email gagal dikirim.', $list_email);
             }
 
             

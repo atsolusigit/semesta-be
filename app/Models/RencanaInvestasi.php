@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class RencanaInvestasi extends Model
 {
-   protected $table = 'rencana_investasi';
+    protected $table = 'rencana_investasi';
 
     protected $fillable = [
         'erkap_id',
@@ -23,7 +23,7 @@ class RencanaInvestasi extends Model
         'updated_at',
         'created_at',
         'created_by',
-        'updated_by'
+        'updated_by',
     ];
 
     public function createdBy()
@@ -35,6 +35,11 @@ class RencanaInvestasi extends Model
     public function updatedBy()
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function riskInvestasi()
+    {
+        return $this->belongsTo(\App\Models\RencanaInvestasi::class, 'erkap_id', 'erkap_id');
     }
 
 }

@@ -24,7 +24,7 @@ class TrRcsaHeaderController extends Controller
 
         $perPage = $request->input('per_page', 10);
 
-        $sortBy = $request->input('sortBy', 'id');       
+        $sortBy = $request->input('sortBy', 'id');
         $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $query = TrRcsaHeader::with([

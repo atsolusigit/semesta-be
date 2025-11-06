@@ -11,46 +11,72 @@ use Illuminate\Support\Facades\DB;
 class MstJabatanController extends Controller
 {
     /**
-     * Display a listing of jabatan
-     */
-    public function index(Request $request)
-    {
-        $request->validate([
-            'department_id' => 'nullable|integer',
-            'search' => 'nullable|string|max:255',
-            'per_page' => 'nullable|integer|min:1|max:100'
-        ]);
+ * Display a listing of jabatan
+ */
+public function index(Request $request)
+{
+    $request->validate([
+        'department_id' => 'nullable|integer',
+        'search' => 'nullable|string|max:255',
+        'per_page' => 'nullable|integer|min:1|max:100'
+    ]);
 
-        $query = MstJabatan::with('department:id,name');
+    $perPage = $request->input('per_page', 10);
 
-        // Role-based access control
-        $user = auth()->user();
-        $userRole = $user->role->id ?? $user->role_id ?? 1;
-        $userDepartmentId = $user->department_id ?? null;
+    $query = MstJabatan::with('department:id,name')->orderBy('name', 'asc');
 
-        // Role 1 dapat melihat semua data, role 2,3,4,5 hanya departemen mereka
-        if (in_array($userRole, [2, 3, 4, 5]) && $userDepartmentId) {
-            $query->where('department_id', $userDepartmentId);
-        }
+    // Role-based access control
+    $user = auth()->user();
+    $userRole = $user->role->id ?? $user->role_id ?? 1;
+    $userDepartmentId = $user->department_id ?? null;
 
-        // Apply filters
-        if ($request->department_id) {
-            $query->where('department_id', $request->department_id);
-        }
-
-        if ($request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                  ->orWhere('nipp', 'like', '%' . $search . '%');
-            });
-        }
-
-        $perPage = $request->input('per_page', 15);
-        $data = $query->orderBy('name', 'asc')->paginate($perPage);
-
-        return json(200, true, 'Berhasil', 'List data jabatan', $data);
+    // Role 1 dapat melihat semua data, role 2,3,4,5 hanya departemen mereka
+    if (in_array($userRole, [2, 3, 4, 5]) && $userDepartmentId) {
+        $query->where('department_id', $userDepartmentId);
     }
+
+    // Apply filters
+    if ($request->department_id) {
+        $query->where('department_id', $request->department_id);
+    }
+
+    if ($request->search) {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->where('name', 'like', '%' . $search . '%')
+              ->orWhere('nipp', 'like', '%' . $search . '%');
+        });
+    }
+
+    // Pagination
+    $data = $query->paginate($perPage);
+
+    // Mapping data
+    $mappedData = $data->getCollection()->map(function ($item) {
+        return [
+            'id' => $item->id,
+            'name' => $item->name,
+            'nipp' => $item->nipp,
+            'department_id' => $item->department_id,
+            'department_name' => $item->department?->name,
+            'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+            'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+        ];
+    });
+
+    // Prepare response dengan pagination
+    $responseData = [
+        'current_page' => $data->currentPage(),
+        'per_page' => $data->perPage(),
+        'total' => $data->total(),
+        'last_page' => $data->lastPage(),
+        'from' => $data->firstItem(),
+        'to' => $data->lastItem(),
+        'data' => $mappedData,
+    ];
+
+    return json(200, true, 'Berhasil', 'List data jabatan', $responseData);
+}
 
     /**
      * Store a new jabatan

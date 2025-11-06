@@ -49,6 +49,11 @@ class RecommendationNotifController extends Controller
             ]);
 
         $data = (object) $myRequest;
+
+        setlocale(LC_TIME, 'id_ID.UTF8', 'id_ID', 'IND');
+        $timestamp = time();
+        $IDN_Date = strftime('%d %B %Y', $timestamp);
+        $data->current_date =  $IDN_Date;
         
         try {
 
@@ -81,6 +86,7 @@ class RecommendationNotifController extends Controller
                     $data->tahun,
                     $data->rekomendasi,
                     $data->risk_owner,
+                    $data->current_date,
             )) instanceof SentMessage){
 
                 DB::commit();

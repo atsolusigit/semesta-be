@@ -13,7 +13,7 @@
 <body>
     <div class="header">
         <p style="text-align: left;">Yth {{ $riskInvestasi->createdBy ?? 'Semesta User' }},</p>
-        <p style="text-align: right;">{{ $current_date }}</p>
+        <p style="text-align: right;">{{ date('d-m-Y') }}</p>
     </div>
 
     <div class="content">

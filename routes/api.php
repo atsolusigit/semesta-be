@@ -389,4 +389,5 @@ Route::middleware(['auth:api'])->group(function () {
 // ===================== EMAIL RECOMMENDATION RENCANA INVESTASI =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::post('/send-rekomendasi-investasi', [RecommendationNotifController::class, 'sendRecommendationEmails']);
+    Route::get('/list-rekomendasi/{id}', [RecommendationNotifController::class, 'show']);   
 });

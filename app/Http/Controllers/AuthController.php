@@ -15,6 +15,9 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\UserToken;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
+use App\Mail\UserRegisteredMail;
+use App\Mail\UserRegistrationConfirmationMail;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -23,10 +26,11 @@ class AuthController extends Controller
         $this->user = $user;
     }
 
-    public function register(Request $request)
-    {
-        DB::beginTransaction();
+public function register(Request $request)
+{
+    DB::beginTransaction();
 
+    try {
         $existingUsernames = User::all()->map(function ($user) {
             try {
                 return encrypt_decrypt_db('dec', $user->username, $user->id);
@@ -46,6 +50,17 @@ class AuthController extends Controller
             ], 400);
         }
 
+        // Validasi domain email kbn.co.id
+        if (!preg_match('/^[\w\-\.]+@kbn\.co\.id$/i', $request->email)) {
+            return response()->json([
+                'code' => 400,
+                'status' => 'error_validation',
+                'message' => 'error validation. [400 - bad request]',
+                'data' => [
+                    'email' => ['Maaf, gunakan email @kbn.co.id untuk proses register.']
+                ]
+            ], 400);
+        }
 
         $array_validation = [
             'email' => 'required|string|email:rfc,dns|max:255|unique:users',
@@ -63,51 +78,75 @@ class AuthController extends Controller
             return $validation[1];
         }
 
-        try {
-            $name = $request['username'];
-            $profile_img = 'default.png';
-            $role_id = 3;
-            $department_id = 1;
-            $fbtk = 'FBTK-' . strtoupper(Str::random(10));
+        $name = $request['username'];
+        $profile_img = 'default.png';
+        $role_id = 3;
+        $department_id = 1;
+        $fbtk = 'FBTK-' . strtoupper(Str::random(10));
 
-            $user = $this->user::create([
-                'name' => $name,
-                'email' => $request['email'],
-                'username' => $request['username'],
-                'password' => bcrypt($request['password']),
-                'profile_img' => $profile_img,
-                'role_id' => $role_id,
-                'jtkn' => '',
-                'fbtk' => $fbtk,
-                'department_id' => $department_id,
-                'status' => 0,
-            ]);
+        $user = $this->user::create([
+            'name' => $name,
+            'email' => $request['email'],
+            'username' => $request['username'],
+            'password' => bcrypt($request['password']),
+            'profile_img' => $profile_img,
+            'role_id' => $role_id,
+            'jtkn' => '',
+            'fbtk' => $fbtk,
+            'department_id' => $department_id,
+            'status' => 0,
+        ]);
 
-            User::where('id', $user->id)->update([
-                'email' => DB::raw(encrypt_decrypt_db('enc', $request['email'], $user->id)),
-                'name' => DB::raw(encrypt_decrypt_db('enc', $name, $user->id)),
-                'username' => DB::raw(encrypt_decrypt_db('enc', $request['username'], $user->id)),
-            ]);
+        User::where('id', $user->id)->update([
+            'email' => DB::raw(encrypt_decrypt_db('enc', $request['email'], $user->id)),
+            'name' => DB::raw(encrypt_decrypt_db('enc', $name, $user->id)),
+            'username' => DB::raw(encrypt_decrypt_db('enc', $request['username'], $user->id)),
+        ]);
 
-            DB::commit();
+        // ========== KIRIM EMAIL SEBELUM COMMIT ==========
+        // Siapkan data plain untuk email
+        $userDataForEmail = (object)[
+            'id' => $user->id,
+            'name' => $name,
+            'username' => $request->username,
+            'email' => $request->email,
+            'created_at' => $user->created_at,
+        ];
 
-            return json(200, 'true', 'success', 'Akun berhasil didaftarkan. Menunggu persetujuan admin.', [
-                'user' => [
-                    'id' => encrypt_decrypt_md5('enc', $user->id),
-                    'name' => $name,
-                    'username' => $request->username,
-                    'email' => $request->email,
-                    'role_id' => $user->role_id,
-                    'role_name' => optional($user->role)->name,
-                    'status' => $user->status,
-                    'profile_img' => $user->profile_img,
-                ]
-            ]);
-        } catch (\Exception $e) {
-            DB::rollback();
-            return json(500, 'false', 'register_failed', $e->getMessage(), []);
+        // Email ke USER (Konfirmasi Registrasi)
+        Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
+
+        // Email ke ADMIN/SPV (Notifikasi User Baru)
+        $admins = User::whereIn('role_id', [1, 2])
+                     ->where('status', 1)
+                     ->get();
+
+        foreach ($admins as $admin) {
+            $adminEmail = encrypt_decrypt_db('dec', $admin->email, $admin->id);
+            Mail::to($adminEmail)->send(new UserRegisteredMail($userDataForEmail));
         }
+
+        // Jika sampai sini tidak ada error, commit transaksi
+        DB::commit();
+
+        return json(200, 'true', 'success', 'Akun berhasil didaftarkan. Menunggu persetujuan admin.', [
+            'user' => [
+                'id' => encrypt_decrypt_md5('enc', $user->id),
+                'name' => $name,
+                'username' => $request->username,
+                'email' => $request->email,
+                'role_id' => $user->role_id,
+                'role_name' => optional($user->role)->name,
+                'status' => $user->status,
+                'profile_img' => $user->profile_img,
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollback();
+        return json(500, 'false', 'register_failed', $e->getMessage(), []);
     }
+}
 
     public function login(Request $request)
 {

@@ -24,7 +24,7 @@ class TrRcsaHeaderController extends Controller
 
         $perPage = $request->input('per_page', 10);
 
-        $sortBy = $request->input('sortBy', 'id');       
+        $sortBy = $request->input('sortBy', 'id');
         $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $query = TrRcsaHeader::with([
@@ -87,7 +87,7 @@ class TrRcsaHeaderController extends Controller
 
         $sortColumn = $sortMap[$sortBy] ?? 'id';
         $query->orderBy($sortColumn, $sortOrder);
-        
+
         $data = $query->paginate($perPage);
 
         if (empty($data->items())) {
@@ -153,7 +153,7 @@ class TrRcsaHeaderController extends Controller
                 'kategori_threshold_kri_hati_hati' => $item->kategori_threshold_kri_hati_hati,
                 'kategori_threshold_kri_aman' => $item->kategori_threshold_kri_aman,
                 'kategori_risiko_bumn' => $item->kategori_risiko_bumn,
-             ];    
+             ];
         });
 
         $cleanData = clean_recursive([

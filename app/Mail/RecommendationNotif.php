@@ -15,20 +15,24 @@ class RecommendationNotif extends Mailable
 
     public $erkap_id;
     public $nama_investasi;
+    public $kategori_investasi;
     public $tahun;
     public $rekomendasi;
+    public $risk_owner;
     // public $data;
 
     /**
      * Create a new message instance.
      */
-    public function __construct($erkap_id, $nama_investasi, $tahun, $rekomendasi)
+    public function __construct($erkap_id, $nama_investasi, $kategori_investasi, $tahun, $rekomendasi, $risk_owner)
     {
         // $this->data = $data;
         $this->erkap_id = $erkap_id;
         $this->nama_investasi = $nama_investasi;
+        $this->kategori_investasi = $kategori_investasi;
         $this->tahun = $tahun;
         $this->rekomendasi = $rekomendasi;
+        $this->risk_owner = $risk_owner;
     }
 
     /**

@@ -73,7 +73,7 @@ class RecommendationNotifController extends Controller
             ];
 
             if(Mail::to(['atsolusigit@gmail.com', 'ramdhaniteddy21@gmail.com'])
-            ->cc(['kusnaedi.m@gmail.com'])
+            ->cc(['aryoaditya2000@gmail.com'])
             ->send(new RecommendationNotif(
                     $data->erkap_id,
                     $data->nama_investasi,

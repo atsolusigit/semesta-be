@@ -13,7 +13,7 @@
 <body>
     <div class="header">
         <p style="text-align: left;">Yth {{ $riskInvestasi->createdBy ?? 'Semesta User' }},</p>
-        <p style="text-align: right;">{{ date('d-m-Y') }}</p>
+        <p style="text-align: right;">{{ $current_date }}</p>
     </div>
 
     <div class="content">
@@ -24,7 +24,7 @@
         <ul>
             <li>Erkap ID: {{ $erkap_id }}</li>
             <li>Nama Investasi: {{ $nama_investasi }}</li>
-            <li>Nama Investasi: {{ $nama_investasi }}</li>
+            <li>Kategori Investasi: {{ $kategori_investasi }}</li>
             <li>Tahun: {{ $tahun }}</li>
         </ul>
 

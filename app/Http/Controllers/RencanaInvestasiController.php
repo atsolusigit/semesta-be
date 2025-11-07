@@ -71,6 +71,8 @@ class RencanaInvestasiController extends Controller
                 'updated_by_name' => $it->updatedBy ? get_decrypted_name($it->updatedBy) : null,
             ];
         });
+    })
+    ->orderBy($sortColumn, $sortOrder);
 
         $cleanData = clean_recursive([
             'current_page' => $data->currentPage(),
@@ -82,8 +84,111 @@ class RencanaInvestasiController extends Controller
             'data' => $resData,
         ]);
 
-        return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
+    if (empty($data->items())) {
+        return json(404, false, 'Tidak Ada Data', 'Data rencana investasi tidak ditemukan.', null);
     }
+
+    $resData = collect($data->items())->map(function ($it) use ($tahun, $bulan, $week) {
+        $period = $it->periods->first();
+
+        $targetTimeline = null;
+        if ($period && is_array($period->detail_json)) {
+            $firstDetail = $period->detail_json[0] ?? null;
+            if (is_array($firstDetail) && !empty($firstDetail['timeline_target'])) {
+                $firstTl = $firstDetail['timeline_target'][0] ?? null;
+                if (is_array($firstTl)) {
+                    $targetTimeline = [
+                        'color' => $firstTl['color'] ?? null,
+                        'label' => $firstTl['label'] ?? null,
+                    ];
+                }
+            }
+        }
+
+        $realisasiTimeline = null;
+        $cache = \App\Models\RencanaInvestasiTimelineYear::where('erkap_id', $it->erkap_id)
+            ->where('year', $tahun)
+            ->first();
+
+        if ($cache && is_array($cache->timeline_json)) {
+            $bulanEntry = collect($cache->timeline_json)->firstWhere('bulan_id', (int)$bulan);
+            if (is_array($bulanEntry)) {
+                $w = max(1, min((int)$week, 4));
+                $colorKey = "week{$w}_color";
+                $labelKey = "week{$w}_label";
+                $color = $bulanEntry[$colorKey] ?? null;
+                $label = $bulanEntry[$labelKey] ?? null;
+                if ($color || $label) {
+                    $realisasiTimeline = ['color' => $color, 'label' => $label];
+                }
+            }
+        }
+
+        return [
+            'id'                      => $it->id,
+            'erkap_id'                => $it->erkap_id,
+            'department_name'         => $it->department_name,
+            'nama_investasi'          => $it->nama_investasi,
+            'kategori_investasi'      => $it->kategori_investasi,
+            'jenis_investasi'         => $it->jenis_investasi,
+            'year'                    => $it->year,
+            'nilai_rkap'              => $it->nilai_rkap,
+            'nilai_revisi'            => $it->nilai_revisi,
+            'nilai_budget_transfer'   => $it->nilai_budget_transfer,
+            'nilai_realisasi'         => $it->nilai_realisasi,
+            'target_timeline'         => $targetTimeline,
+            'realisasi_timeline'      => $realisasiTimeline,
+            'ld_inherent'             => $it->ld_inherent,
+            'dampak_inherent'         => $it->dampak_inherent,
+            'ld_current'              => $it->ld_current,
+            'lk_current'              => $it->lk_current,
+            'level_current'           => $it->level_current,
+            'dampak_current'          => $it->dampak_current,
+            'level_residual'          => $it->level_residual,
+            'dampak_residual'         => $it->dampak_residual,
+            'keterangan'              => $it->keterangan,
+            'status'                  => $it->status,
+            'has_risk_profile'        => (bool) $it->riskInvestasi,
+            'risk_investasi' => $it->riskInvestasi ? [
+                'erkap_id'               => $it->riskInvestasi->erkap_id,
+                'status'                 => $it->riskInvestasi->status,
+                'approved_by'            => $it->riskInvestasi->approved_by,
+                'approved_by_name'       => $it->riskInvestasi->approvedByUser ? get_decrypted_name($it->riskInvestasi->approvedByUser) : null,
+                'approved_at'            => optional($it->riskInvestasi->approved_at)->toISOString(),
+                'dampak_risiko_awal'     => $it->riskInvestasi->dampak_risiko_awal,
+                'kemungkinan_awal'       => $it->riskInvestasi->kemungkinan_awal,
+                'eksposure_level_awal'   => $it->riskInvestasi->eksposure_level_awal,
+                'eksposure_ltmh_awal'    => $it->riskInvestasi->eksposure_ltmh_awal,
+                'dampak_risiko_akhir'    => $it->riskInvestasi->dampak_risiko_akhir,
+                'kemungkinan_akhir'      => $it->riskInvestasi->kemungkinan_akhir,
+                'eksposure_level_akhir'  => $it->riskInvestasi->eksposure_level_akhir,
+                'eksposure_ltmh_akhir'   => $it->riskInvestasi->eksposure_ltmh_akhir,
+                'biaya_mitigasi_risiko'  => $it->riskInvestasi->biaya_mitigasi_risiko,
+            ] : null,
+            'has_risk_profile'        => (bool) $it->riskInvestasi,
+            'created_at'              => optional($it->created_at)->toISOString(),
+            'updated_at'              => optional($it->updated_at)->toISOString(),
+            'created_by'              => $it->created_by,
+            'created_by_name'         => get_decrypted_name($it->createdBy),
+            'updated_by'              => $it->updated_by,
+            'updated_by_name'         => $it->updatedBy ? get_decrypted_name($it->updatedBy) : null,
+        ];
+    });
+
+    $cleanData = clean_recursive([
+        'current_page' => $data->currentPage(),
+        'per_page'     => $data->perPage(),
+        'total'        => $data->total(),
+        'last_page'    => $data->lastPage(),
+        'from'         => $data->firstItem(),
+        'to'           => $data->lastItem(),
+        'data'         => $resData,
+    ]);
+
+    return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
+}
+
+
 
     public function store(Request $request)
     {

@@ -51,7 +51,6 @@ class TrRcsaHeader extends Model
         'rencana_perlakuan_risiko',
         'sasaran_kbumn',
         'status',
-        'isSubmit',
         'timeline_bulan_akhir',
         'timeline_bulan_awal',
         'unit_kerja_id',
@@ -68,9 +67,7 @@ class TrRcsaHeader extends Model
 
     protected $casts = [
         'isMainRisk' => 'boolean',
-        'isSubmit'   => 'boolean',
     ];
-
 
     public function rcsaResidual(): HasMany
     {

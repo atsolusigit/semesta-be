@@ -8,9 +8,10 @@ use Illuminate\Support\Facades\Validator;
 
 class MstRiskCodeController extends Controller
 {
-    // Ambil semua data jenis risiko
-   public function index(Request $request)
+    public function index(Request $request)
 {
+    $perPage = $request->input('per_page', 10);
+
     $query = MstRiskCode::query()->orderBy('id', 'asc');
 
     // Search filter (code dan name)
@@ -22,10 +23,34 @@ class MstRiskCodeController extends Controller
         });
     }
 
-    $data = $query->get();
+    // Pagination
+    $data = $query->paginate($perPage);
 
-    return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $data);
+    // Mapping data
+    $mappedData = $data->getCollection()->map(function ($item) {
+        return [
+            'id' => $item->id,
+            'code' => $item->code,
+            'name' => $item->name,
+            'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+            'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+        ];
+    });
+
+    // Prepare response dengan pagination
+    $responseData = [
+        'current_page' => $data->currentPage(),
+        'per_page' => $data->perPage(),
+        'total' => $data->total(),
+        'last_page' => $data->lastPage(),
+        'from' => $data->firstItem(),
+        'to' => $data->lastItem(),
+        'data' => $mappedData,
+    ];
+
+    return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $responseData);
 }
+
 
     // Tambah data jenis risiko
     public function store(Request $request)
@@ -40,7 +65,7 @@ class MstRiskCodeController extends Controller
 
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|unique:mst_risk_code,code',
-            'name' => 'required|string',
+            'name' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -84,7 +109,7 @@ class MstRiskCodeController extends Controller
 
         $validator = Validator::make($request->all(), [
             'code' => 'required|string|unique:mst_risk_code,code,' . $id,
-            'name' => 'required|string',
+            'name' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {

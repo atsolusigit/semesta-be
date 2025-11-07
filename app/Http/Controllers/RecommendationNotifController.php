@@ -39,6 +39,9 @@ class RecommendationNotifController extends Controller
         ]);
         if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
 
+        $jmlNotif = RecommendationInvestasiNotif::where('erkap_id', $request->erkap_id)->count();
+        $jmlNotif +=1;
+
         $myRequest = $request->only([
                 'erkap_id',
                 'nama_investasi',
@@ -49,16 +52,16 @@ class RecommendationNotifController extends Controller
             ]);
 
         $data = (object) $myRequest;
-        
+        $data->count_notif = $jmlNotif;
         try {
 
             DB::beginTransaction();
 
-            $currentUser = auth()->user();
-            
+            $currentUser = get_decrypted_name(auth()->user());
+
             $myRequest['created_by'] = auth()->id();
             $myRequest['kirim_ke'] = 'atsolusigit@gmail.com';
-            $myRequest['dikirim_oleh'] = get_decrypted_name(auth()->id());
+            $myRequest['dikirim_oleh'] = $currentUser;
             $myRequest['status'] = 'Terkirim';
 
             $item = RecommendationInvestasiNotif::create($myRequest);
@@ -71,18 +74,20 @@ class RecommendationNotifController extends Controller
                 'rekomendasi' => $data->rekomendasi,
                 'status' => $myRequest['status'] ,
             ];
-
+            
             if(Mail::to(['atsolusigit@gmail.com', 'ramdhaniteddy21@gmail.com'])
             ->cc(['aryoaditya2000@gmail.com'])
             ->send(new RecommendationNotif(
-                    $data->erkap_id,
-                    $data->nama_investasi,
-                    $data->kategori_investasi,
-                    $data->tahun,
-                    $data->rekomendasi,
-                    $data->risk_owner,
+                    $data
+                    // $data->erkap_id,
+                    // $data->nama_investasi,
+                    // $data->kategori_investasi,
+                    // $data->tahun,
+                    // $data->rekomendasi,
+                    // $data->risk_owner,
+                    // $data->count_notif,
             )) instanceof SentMessage){
-
+        
                 DB::commit();
                 return json(200, true, 'Email Terkirim', 'Email berhasil dikirim.', $responseData);
 

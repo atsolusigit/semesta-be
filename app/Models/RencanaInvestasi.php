@@ -17,25 +17,13 @@ class RencanaInvestasi extends Model
         'year',
         'nilai_rkap',
         'nilai_revisi',
-        'nilai_budget_transfer',
-        'nilai_realisasi',
-        'target_timeline',
-        'realisasi_timeline',
-        'ld_inherent',
-        'dampak_inherent',
-        'ld_current',
-        'lk_current',
-        'level_current',
-        'dampak_current',
-        'level_residual',
-        'dampak_residual',
         'keterangan',
         'status',
         'unit_kerja_id',
+        'updated_at',
+        'created_at',
         'created_by',
         'updated_by',
-        'created_at',
-        'updated_at',
     ];
 
     public function createdBy()
@@ -53,4 +41,5 @@ class RencanaInvestasi extends Model
     {
         return $this->belongsTo(\App\Models\RencanaInvestasi::class, 'erkap_id', 'erkap_id');
     }
+
 }

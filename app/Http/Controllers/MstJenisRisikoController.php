@@ -2,31 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MstOption;
+use App\Models\MstJenisRisiko;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
-class MstOptionController extends Controller
+class MstJenisRisikoController extends Controller
 {
-    public function index(Request $request)
+ public function index(Request $request)
 {
     $perPage = $request->input('per_page', 10);
 
-    $query = MstOption::query()->orderBy('id', 'asc');
+    $query = MstJenisRisiko::with(['createdBy:id,username'])
+        ->orderBy('id', 'asc');
 
     // Search filter
     if ($request->filled('search')) {
         $search = $request->search;
-        $query->where(function ($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('position', 'like', "%{$search}%")
-              ->orWhere('type', 'like', "%{$search}%");
-        });
-    }
-
-    // Filter berdasarkan type
-    if ($request->filled('type')) {
-        $query->where('type', $request->type);
+        $query->where('nama_jenis_risiko', 'like', "%{$search}%");
     }
 
     // Pagination
@@ -36,9 +28,9 @@ class MstOptionController extends Controller
     $mappedData = $data->getCollection()->map(function ($item) {
         return [
             'id' => $item->id,
-            'name' => $item->name,
-            'position' => $item->position,
-            'type' => $item->type,
+            'nama_jenis_risiko' => $item->nama_jenis_risiko,
+            'created_by' => $item->created_by,
+            'created_by_username' => get_decrypted_username($item->createdBy),
             'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
             'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
         ];
@@ -57,6 +49,7 @@ class MstOptionController extends Controller
 
     return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $responseData);
 }
+
     public function store(Request $request)
     {
         // Check authorization: only role 1 and 2 can store
@@ -66,28 +59,19 @@ class MstOptionController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'position' => 'required|in:Depan,Belakang',
-            'type' => 'required|in:kuantitatif,kualitatif',
+            'nama_jenis_risiko' => 'required|string|max:855',
         ]);
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
-        $data = MstOption::create($request->only('name', 'position', 'type'));
+        $data = MstJenisRisiko::create([
+            'nama_jenis_risiko' => $request->nama_jenis_risiko,
+            'created_by' => auth()->id(),
+        ]);
 
         return json(200, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
-    }
-
-    public function show($id)
-    {
-        $data = MstOption::find($id);
-        if (!$data) {
-            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
-        }
-
-        return json(200, true, 'Detail Ditemukan', 'Detail data berhasil diambil.', $data);
     }
 
     public function update(Request $request, $id)
@@ -98,22 +82,22 @@ class MstOptionController extends Controller
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
         }
 
-        $data = MstOption::find($id);
+        $data = MstJenisRisiko::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'position' => 'required|in:Depan,Belakang',
-            'type' => 'required|in:kuantitatif,kualitatif',
+            'nama_jenis_risiko' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
-        $data->update($request->only('name', 'position', 'type'));
+        $data->update([
+            'nama_jenis_risiko' => $request->nama_jenis_risiko,
+        ]);
 
         return json(200, true, 'Berhasil Diperbarui', 'Data berhasil diperbarui.', $data);
     }
@@ -126,7 +110,7 @@ class MstOptionController extends Controller
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menghapus data', null);
         }
 
-        $data = MstOption::find($id);
+        $data = MstJenisRisiko::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }

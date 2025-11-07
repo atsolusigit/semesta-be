@@ -3,29 +3,32 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\MstRcsa;
+use App\Models\MstEmailRiskOwner;
 use Illuminate\Support\Facades\Validator;
 
-class MstRcsaController extends Controller
+class MstEmailRiskOwnerController extends Controller
 {
+    /**
+     * Display a listing of the resource.
+     */
     public function index(Request $request)
-    {
+   {
         $perPage = $request->input('per_page', 10);
 
-        $query = MstRcsa::query()->orderBy('id', 'asc');
+        $query = MstEmailRiskOwner::query()->orderBy('id', 'asc');
 
         // Search filter
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
-                ->orWhere('kategori', 'like', "%{$search}%");
+                $q->where('unit_kerja_nama', 'like', "%{$search}%")
+                ->orWhere('unit_kerja_email', 'like', "%{$search}%");
             });
         }
 
-        // Filter berdasarkan kategori
-        if ($request->filled('kategori')) {
-            $query->where('kategori', $request->kategori);
+        // Filter berdasarkan risk_owner
+        if ($request->filled('unit_kerja_nama')) {
+            $query->where('unit_kerja_nama', $request->kategori);
         }
 
         // Pagination
@@ -34,8 +37,9 @@ class MstRcsaController extends Controller
         $resData = $data->getCollection()->map(function ($item) {
             return [
                 'id' => $item->id,
-                'nama' => $item->nama,
-                'kategori' => $item->kategori,
+                'unit_kerja_id' => $item->unit_kerja_id,
+                'unit_kerja_email' => $item->unit_kerja_email,
+                'unit_kerja_nama' => $item->unit_kerja_nama,
                 'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
                 'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
             ];
@@ -54,6 +58,9 @@ class MstRcsaController extends Controller
         return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $responseData);
     }
 
+    /**
+     * Show the form for creating a new resource.
+     */
     public function store(Request $request)
     {
         // Check authorization: only role 1 and 2 can store
@@ -62,29 +69,40 @@ class MstRcsaController extends Controller
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
         }
 
+        $exists = MstEmailRiskOwner::where('unit_kerja_id', $request->unit_kerja_id)->exists();
+
+        if ($exists) {
+            return json(500, false, 'Unit Kerja Exist', 'Unit Kerja '.$request->unit_kerja_id.' Exists', null);
+        }
+
          $user = auth()->user();
 
         $validator = Validator::make($request->all(), [
-            'nama' => 'required|string|max:255',
-            'kategori' => 'required|string|max:255',
+            'unit_kerja_nama' => 'required|string',
+            'unit_kerja_email' => 'required|string',
+            'unit_kerja_id' => 'required|integer',
         ]);
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
-        $data = MstRcsa::create([
-            'nama' => $request->nama,
-            'kategori' => $request->kategori,
+        $data = MstEmailRiskOwner::create([
+            'unit_kerja_nama' => $request->unit_kerja_nama,
+            'unit_kerja_email' => $request->unit_kerja_email,
+            'unit_kerja_id' => $request->unit_kerja_id,
             'created_by' => $user->id,
         ]);
 
         return json(200, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
     }
 
+    /**
+     * Display the specified resource.
+     */
     public function show($id)
     {
-        $data = MstRcsa::find($id);
+        $data = MstEmailRiskOwner::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
@@ -92,7 +110,18 @@ class MstRcsaController extends Controller
         return json(200, true, 'Detail Ditemukan', 'Detail data berhasil diambil.', $data);
     }
 
-    public function update(Request $request, $id)
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(string $id)
+    {
+        //
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+     public function update(Request $request, $id)
     {
         // Check authorization: only role 1 and 2 can update
         $userRole = auth()->user()->role_id ?? null;
@@ -100,25 +129,29 @@ class MstRcsaController extends Controller
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
         }
 
-        $data = MstRcsa::find($id);
+        $data = MstEmailRiskOwner::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
         $validator = Validator::make($request->all(), [
-            'nama' => 'required|string|max:255',
-            'kategori' => 'required|string|max:255',
+            'unit_kerja_nama' => 'required|string',
+            'unit_kerja_email' => 'required|string',
+            'unit_kerja_id' => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
-        $data->update($request->only('nama', 'kategori'));
+        $data->update($request->only('unit_kerja_id', 'unit_kerja_nama','unit_kerja_email'));
 
         return json(200, true, 'Berhasil Diperbarui', 'Data berhasil diperbarui.', $data);
     }
 
+    /**
+     * Remove the specified resource from storage.
+     */
     public function destroy($id)
     {
         // Check authorization: only role 1 can delete
@@ -127,7 +160,7 @@ class MstRcsaController extends Controller
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menghapus data', null);
         }
 
-        $data = MstRcsa::find($id);
+        $data = MstEmailRiskOwner::find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }

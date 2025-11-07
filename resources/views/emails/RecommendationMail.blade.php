@@ -22,13 +22,13 @@
         </p>
         <h1>Informasi Investasi:</h1>
         <ul>
-            <li>Erkap ID: {{ $erkap_id }}</li>
-            <li>Nama Investasi: {{ $nama_investasi }}</li>
-            <li>Kategori Investasi: {{ $kategori_investasi }}</li>
-            <li>Tahun: {{ $tahun }}</li>
+            <li>Erkap ID: {{ $data->erkap_id }}</li>
+            <li>Nama Investasi: {{ $data->nama_investasi }}</li>
+            <li>Kategori Investasi: {{ $data->kategori_investasi }}</li>
+            <li>Tahun: {{ $data->tahun }}</li>
         </ul>
 
-        <h1>Rekomendasi:</h1> {{ $rekomendasi }}
+        <h1>Rekomendasi:</h1> {{ $data->rekomendasi }}
 
         <p>
             Apabila terdapat pertanyaan lebih lanjut terkait rekomendasi yang diberikan, 

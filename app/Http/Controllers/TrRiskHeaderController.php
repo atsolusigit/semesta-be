@@ -1311,6 +1311,27 @@ private function handleRejectedUpdate(Request $request, $riskHeader)
         ], 404);
     }
 
+     // ============================================
+    // VALIDASI DUPLIKASI RCSA_ID
+    // ============================================
+
+    $rcsaId = $request->input('rcsa_id');
+
+    // Cek apakah rcsa_id sudah digunakan oleh header lain (KECUALI header yang sedang di-update)
+    if ($rcsaId !== null) {
+        $existingHeader = TrRiskHeader::where('rcsa_id', $rcsaId)
+            ->where('id', '!=', $riskHeader->id) // TAMBAHKAN INI: Exclude record yang sedang di-update
+            ->first();
+
+        if ($existingHeader) {
+            return json(400, false, 'RCSA ID Sudah Digunakan', 'RCSA ID ini sudah digunakan oleh risk profile lain. Silakan gunakan RCSA ID yang berbeda.', [
+                'rcsa_id' => $rcsaId,
+                'existing_header_id' => $existingHeader->id,
+                'message' => 'RCSA ID harus unik untuk setiap risk header.'
+            ]);
+        }
+    }
+
     // Validasi 14 field dasar
     $validator = Validator::make($request->all(), [
         'rcsa_id' => 'nullable|integer',
@@ -1522,6 +1543,27 @@ private function handleDraftUpdate(Request $request, $riskHeader)
                 'instruction' => 'Hapus semua field yang tidak diizinkan dari request Anda.'
             ]
         ], 404);
+    }
+
+     // ============================================
+    // VALIDASI DUPLIKASI RCSA_ID
+    // ============================================
+
+    $rcsaId = $request->input('rcsa_id');
+
+    // Cek apakah rcsa_id sudah digunakan oleh header lain (KECUALI header yang sedang di-update)
+    if ($rcsaId !== null) {
+        $existingHeader = TrRiskHeader::where('rcsa_id', $rcsaId)
+            ->where('id', '!=', $riskHeader->id) // TAMBAHKAN INI: Exclude record yang sedang di-update
+            ->first();
+
+        if ($existingHeader) {
+            return json(400, false, 'RCSA ID Sudah Digunakan', 'RCSA ID ini sudah digunakan oleh risk profile lain. Silakan gunakan RCSA ID yang berbeda.', [
+                'rcsa_id' => $rcsaId,
+                'existing_header_id' => $existingHeader->id,
+                'message' => 'RCSA ID harus unik untuk setiap risk header.'
+            ]);
+        }
     }
 
     // Validasi 14 field dasar

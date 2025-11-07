@@ -161,6 +161,10 @@ class TrRcsaHeaderController extends Controller
                 'kategori_threshold_kri_aman' => $item->kategori_threshold_kri_aman,
                 'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
                 'kategori_risiko_bumn' => $item->kategori_risiko_bumn,
+                'opsi_perlakuan_risiko' => $item->opsi_perlakuan_risiko,
+                'rencana_perlakuan_risiko' => $item->rencana_perlakuan_risiko,
+                'output_perlakuan_risiko' => $item->output_perlakuan_risiko,
+                'biaya_perlakuan_risiko' => $item->biaya_perlakuan_risiko,
 
              ];    
         });

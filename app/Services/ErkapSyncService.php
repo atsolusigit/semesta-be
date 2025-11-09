@@ -40,7 +40,8 @@ class ErkapSyncService
                 // 1) Upsert MASTER (by erkap_id + year)
                 $ri = RencanaInvestasi::updateOrCreate(
                     ['erkap_id' => $item['capex_id'], 'year' => $item['tahun']],
-                    [
+                    [   
+                        'department_id'       => $item['unit_kerja_id'] ?? null,
                         'department_name'       => $item['unit_kerja_nama'] ?? null,
                         'nama_investasi'        => $item['nama_pekerjaan'] ?? null,
                         'kategori_investasi'    => $item['kategori_nama'] ?? null,

@@ -10,6 +10,7 @@ class RencanaInvestasi extends Model
 
     protected $fillable = [
         'erkap_id',
+        'department_id',
         'department_name',
         'nama_investasi',
         'kategori_investasi',
@@ -31,6 +32,7 @@ class RencanaInvestasi extends Model
         'nilai_revisi'          => 'decimal:2',
         'nilai_budget_transfer' => 'decimal:2',
         'nilai_realisasi'       => 'decimal:2',
+        'department_id'         => 'integer',
     ];
 
     public function createdBy()

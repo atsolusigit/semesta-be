@@ -62,8 +62,12 @@ class TrRcsaHeader extends Model
         'year',
         'submitted_at',
         'submitted_by',
+        'approval_notes',
     ];
 
+    protected $casts = [
+        'isMainRisk' => 'boolean',
+    ];
 
     public function rcsaResidual(): HasMany
     {
@@ -90,6 +94,12 @@ class TrRcsaHeader extends Model
     {
         return $this->belongsTo(MstDepartment::class, 'unit_kerja_id')
         ->select(['id', 'name']);;
+    }
+
+    public function approvalSvp()
+    {
+        return $this->hasOne(\App\Models\MstApproval::class, 'document_id', 'id')
+                    ->select(['id', 'document_id', 'note']); 
     }
 
 }

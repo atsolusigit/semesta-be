@@ -13,10 +13,10 @@ use Illuminate\Support\Facades\Log;
 class LostEventController extends Controller
 {
 
-    //=====================================
-    // LIST LOST EVENT WITH FILTER < 50%
-    //=====================================
-   public function index(Request $request)
+    //===============================================================
+    // LIST LOST EVENT HEADER WITH REALIZATION BELOW DANGER THRESHOLD
+    //===============================================================
+  public function index(Request $request)
 {
     $user = auth()->user();
 
@@ -30,7 +30,9 @@ class LostEventController extends Controller
 
     $headers = TrRiskHeader::with([
         'department:id,name',
+        'jenisRisiko:id,nama_jenis_risiko',
         'optionTargetSatuTahun:id,name,type',
+        'rcsa:id,kategori_threshold_kri_aman,kategori_threshold_kri_hati_hati,kategori_threshold_kri_bahaya',
         'monthlyData' => function ($query) {
             $query->where('is_finalize', true)->orderBy('month', 'asc');
         }
@@ -50,21 +52,33 @@ class LostEventController extends Controller
         });
     })
     ->when($request->jenis_risiko, function ($query) use ($request) {
-        $query->where('jenis_risiko', 'like', '%' . $request->jenis_risiko . '%');
+        $search = $request->jenis_risiko;
+        if (is_numeric($search)) {
+            $query->where('jenis_risiko', $search);
+        } else {
+            $query->whereHas('jenisRisiko', function ($q) use ($search) {
+                $q->where('nama_jenis_risiko', 'like', '%' . $search . '%');
+            });
+        }
     })
     ->when($search, function ($query) use ($search) {
         $query->where(function ($q) use ($search) {
             $q->where('year', 'like', '%' . $search . '%')
-              ->orWhere('jenis_risiko', 'like', '%' . $search . '%')
-              ->orWhere('peristiwa_risiko', 'like', '%' . $search . '%')
-              ->orWhere('mitigasi', 'like', '%' . $search . '%')
-              ->orWhereHas('department', function ($dept) use ($search) {
-                  $dept->where('name', 'like', '%' . $search . '%');
-              });
+            ->orWhere('peristiwa_risiko', 'like', '%' . $search . '%')
+            ->orWhere('mitigasi', 'like', '%' . $search . '%')
+            ->orWhereHas('department', function ($dept) use ($search) {
+                $dept->where('name', 'like', '%' . $search . '%');
+            })
+            ->orWhereHas('jenisRisiko', function ($jr) use ($search) {
+                $jr->where('nama_jenis_risiko', 'like', '%' . $search . '%');
+            });
         });
     })
     ->orderBy('id', 'desc')
-    ->get();
+    ->get()
+    ->filter(function ($header) {
+        return $header->monthlyData->count() === 12;
+    });
 
     $filteredData = collect();
 
@@ -89,6 +103,17 @@ class LostEventController extends Controller
         $targetValue = null;
         $realizationValue = null;
 
+        // Ambil threshold dari RCSA
+        $thresholdAman = null;
+        $thresholdHatiHati = null;
+        $thresholdBahaya = null;
+
+        if ($item->rcsa) {
+            $thresholdAman = (float) str_replace(['%', ','], ['', '.'], $item->rcsa->kategori_threshold_kri_aman ?? '0');
+            $thresholdHatiHati = (float) str_replace(['%', ','], ['', '.'], $item->rcsa->kategori_threshold_kri_hati_hati ?? '0');
+            $thresholdBahaya = (float) str_replace(['%', ','], ['', '.'], $item->rcsa->kategori_threshold_kri_bahaya ?? '0');
+        }
+
         if (in_array($normalizedType, ['kuantitatif', 'quantitative'])) {
             $totalTarget = 0;
             $totalRealisasi = 0;
@@ -104,18 +129,43 @@ class LostEventController extends Controller
                 $targetValue = $totalTarget;
                 $realizationValue = $totalRealisasi;
                 $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
-                $shouldInclude = $percentage <= 50;
+
+                // LOGIKA BARU: Hanya muncul jika realisasi <= threshold_bahaya
+                if ($item->rcsa && $thresholdBahaya > 0) {
+                    $shouldInclude = $percentage <= $thresholdBahaya;
+                } else {
+                    // Fallback ke logika lama jika tidak ada RCSA
+                    $shouldInclude = $percentage <= 50;
+                }
             }
 
         } elseif (in_array($normalizedType, ['kualitatif', 'qualitative'])) {
-            $targetValue = 100;
-            $desemberData = $item->monthlyData->firstWhere('month', 12);
+            $totalTarget = 0;
+            $totalRealisasi = 0;
 
-            if ($desemberData && !empty($desemberData->realization_kualitatif)) {
-                $realText = trim(str_replace(['%', ','], ['', '.'], $desemberData->realization_kualitatif));
-                $realizationValue = (float) $realText;
-                $percentage = round($realizationValue, 2);
-                $shouldInclude = $percentage <= 50;
+            foreach ($item->monthlyData as $monthly) {
+                $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+                $targetNum = (float) $targetText;
+
+                $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+                $realNum = (float) $realText;
+
+                $totalTarget += $targetNum;
+                $totalRealisasi += $realNum;
+            }
+
+            if ($totalTarget > 0) {
+                $targetValue = $totalTarget;
+                $realizationValue = $totalRealisasi;
+                $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+
+                // LOGIKA BARU: Hanya muncul jika realisasi <= threshold_bahaya
+                if ($item->rcsa && $thresholdBahaya > 0) {
+                    $shouldInclude = $percentage <= $thresholdBahaya;
+                } else {
+                    // Fallback ke logika lama jika tidak ada RCSA
+                    $shouldInclude = $percentage <= 50;
+                }
             }
         }
 
@@ -124,6 +174,9 @@ class LostEventController extends Controller
             $item->calculated_target = $targetValue;
             $item->calculated_realization = $realizationValue;
             $item->detected_type = $normalizedType;
+            $item->threshold_aman = $thresholdAman;
+            $item->threshold_hati_hati = $thresholdHatiHati;
+            $item->threshold_bahaya = $thresholdBahaya;
             $filteredData->push($item);
         }
     }
@@ -151,9 +204,11 @@ class LostEventController extends Controller
         return [
             'lost_event_id' => $lostEvent->id ?? null,
             'header_id' => $item->id,
+            'rcsa_id' => $item->rcsa_id,
             'tahun' => $item->year,
             'risk_owner_department' => optional($item->department)->name ?? '',
-            'jenis_risiko' => $item->jenis_risiko ?? '',
+            'jenis_risiko_id' => $item->jenis_risiko ?? null,
+            'jenis_risiko' => $item->jenisRisiko->nama_jenis_risiko ?? '',
             'nama_kejadian' => $lostEvent->nama_kejadian ?? '',
             'identifikasi_kejadian' => $item->peristiwa_risiko ?? '',
             'kategori_kejadian' => $lostEvent->kategori_kejadian ?? null,
@@ -163,8 +218,8 @@ class LostEventController extends Controller
             'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian ?? null,
             'pihak_terkait' => $lostEvent->pihak_terkait ?? null,
             'status_asuransi' => $lostEvent->status_asuransi ?? null,
-            'kategori_risiko_bumn' => null,
-            'kategori_risiko_t2_t3_kbumn' => null,
+            'kategori_risiko_bumn' => $lostEvent->kategori_risiko_bumn ?? null,
+            'kategori_risiko_t2_t3_kbumn' => $lostEvent->kategori_risiko_t2_t3_kbumn ?? null,
             'penjelasan_kerugian' => $lostEvent->penjelasan_kerugian ?? null,
             'nilai_kerugian' => $lostEvent->nilai_kerugian ?? null,
             'kejadian_berulang' => $lostEvent->kejadian_berulang ?? null,
@@ -185,6 +240,9 @@ class LostEventController extends Controller
             'realization_percentage' => $item->calculated_percentage !== null
                 ? rtrim(rtrim(number_format($item->calculated_percentage, 2), '0'), '.') . '%'
                 : null,
+            'threshold_aman' => $item->threshold_aman,
+            'threshold_hati_hati' => $item->threshold_hati_hati,
+            'threshold_bahaya' => $item->threshold_bahaya,
         ];
     })->values();
 
@@ -198,7 +256,7 @@ class LostEventController extends Controller
         'data' => $orderedData,
     ]);
 
-    return json(200, true, 'Data Ditemukan', 'Data header dengan realisasi < 50% berhasil diambil.', $cleanData);
+    return json(200, true, 'Data Ditemukan', 'Data header dengan realisasi di bawah threshold bahaya berhasil diambil.', $cleanData);
 }
 
    //=====================================
@@ -214,24 +272,28 @@ class LostEventController extends Controller
 
     $header = TrRiskHeader::with([
         'department:id,name',
+        'jenisRisiko:id,nama_jenis_risiko',
         'optionTargetSatuTahun:id,name,type',
+        'rcsa:id,kategori_threshold_kri_aman,kategori_threshold_kri_hati_hati,kategori_threshold_kri_bahaya',
         'monthlyData' => function ($query) {
             $query->where('is_finalize', true)->orderBy('month', 'asc');
         }
     ])
-        ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
-            $query->where('department_id', $user->department_id);
-        })
-        ->find($headerId);
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+        $query->where('department_id', $user->department_id);
+    })
+    ->find($headerId);
 
     if (!$header) {
         return json(404, false, 'Tidak Ditemukan', 'Header tidak ditemukan.', null);
     }
 
-    // Hitung realization percentage dan type
+    if ($header->monthlyData->count() !== 12) {
+        return json(400, false, 'Data Tidak Lengkap', 'Data risiko belum memiliki 12 bulan yang difinalisasi.', null);
+    }
+
     $targetType = $header->optionTargetSatuTahun->type ?? null;
 
-    // Deteksi manual kalau type kosong
     if (!$targetType) {
         if (!empty($header->target_quantitative_satu_tahun)) {
             if (preg_match('/\d/', $header->target_quantitative_satu_tahun)) {
@@ -243,25 +305,31 @@ class LostEventController extends Controller
         }
     }
 
-    // Normalisasi penulisan
     $normalizedType = strtolower($targetType);
 
     $percentage = 0;
     $targetValue = null;
     $realizationValue = null;
 
+    // Ambil threshold dari RCSA
+    $thresholdAman = null;
+    $thresholdHatiHati = null;
+    $thresholdBahaya = null;
+
+    if ($header->rcsa) {
+        $thresholdAman = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_aman ?? '0');
+        $thresholdHatiHati = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_hati_hati ?? '0');
+        $thresholdBahaya = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_bahaya ?? '0');
+    }
+
     if ($normalizedType === 'kuantitatif' || $normalizedType === 'quantitative') {
-        // Hitung total target dan realisasi 12 bulan
         $totalTarget = 0;
         $totalRealisasi = 0;
 
         foreach ($header->monthlyData as $monthly) {
-            $targetText = $monthly->target_quantitative ?? '0';
-            $targetNum = (float)str_replace([',', '.', ' '], ['', '', ''], $targetText);
+            $targetNum = (float) preg_replace('/[^0-9]/', '', $monthly->target_quantitative ?? '0');
+            $realNum = (float) preg_replace('/[^0-9]/', '', $monthly->realization_quantitative ?? '0');
             $totalTarget += $targetNum;
-
-            $realText = $monthly->realization_quantitative ?? '0';
-            $realNum = (float)str_replace([',', '.', ' '], ['', '', ''], $realText);
             $totalRealisasi += $realNum;
         }
 
@@ -272,14 +340,24 @@ class LostEventController extends Controller
         }
 
     } elseif ($normalizedType === 'kualitatif' || $normalizedType === 'qualitative') {
-        // Ambil hanya bulan Desember
-        $targetValue = 100;
-        $desemberData = $header->monthlyData->firstWhere('month', 12);
+        $totalTarget = 0;
+        $totalRealisasi = 0;
 
-        if ($desemberData && !empty($desemberData->realization_kualitatif)) {
-            $realText = $desemberData->realization_kualitatif;
-            $realizationValue = (float)str_replace(['%', ' ', ','], ['', '', '.'], trim($realText));
-            $percentage = round($realizationValue, 2);
+        foreach ($header->monthlyData as $monthly) {
+            $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+            $targetNum = (float) $targetText;
+
+            $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+            $realNum = (float) $realText;
+
+            $totalTarget += $targetNum;
+            $totalRealisasi += $realNum;
+        }
+
+        if ($totalTarget > 0) {
+            $targetValue = $totalTarget; // DIPERBAIKI: $totalTarget bukan $totalTotal
+            $realizationValue = $totalRealisasi;
+            $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
         }
     }
 
@@ -291,14 +369,14 @@ class LostEventController extends Controller
         try {
             DB::beginTransaction();
 
-            // Ambil penyebab_risiko dari header - SAMA seperti di index()
             $penyebabKejadian = $header->penyebab_risiko ?? '';
 
             $lostEvent = LostEvent::create([
                 'header_id' => $header->id,
+                'rcsa_id' => $header->rcsa_id,
                 'tahun' => $header->year,
                 'risk_owner_department' => optional($header->department)->name ?? '',
-                'jenis_risiko' => $header->jenis_risiko ?? '',
+                'jenis_risiko' => $header->jenisRisiko->nama_jenis_risiko ?? '',
                 'nama_kejadian' => '',
                 'identifikasi_kejadian' => $header->peristiwa_risiko ?? '',
                 'kategori_kejadian' => null,
@@ -336,8 +414,10 @@ class LostEventController extends Controller
     $data = [
         'lost_event_id' => $lostEvent->id,
         'header_id' => $lostEvent->header_id,
+        'rcsa_id' => $header->rcsa_id,
         'tahun' => $lostEvent->tahun,
         'risk_owner_department' => $lostEvent->risk_owner_department,
+        'jenis_risiko_id' => $header->jenis_risiko ?? null,
         'jenis_risiko' => $lostEvent->jenis_risiko,
         'nama_kejadian' => $lostEvent->nama_kejadian,
         'identifikasi_kejadian' => $lostEvent->identifikasi_kejadian,
@@ -359,8 +439,8 @@ class LostEventController extends Controller
         'perbaikan_mendatang' => $lostEvent->perbaikan_mendatang,
         'nilai_premi' => $lostEvent->nilai_premi,
         'nilai_klaim' => $lostEvent->nilai_klaim,
-        'created_at' => $lostEvent && $lostEvent->created_at? $lostEvent->created_at->format('Y-m-d'): null,
-        'updated_at' => $lostEvent && $lostEvent->updated_at? $lostEvent->updated_at->format('Y-m-d')  : null,
+        'created_at' => $lostEvent && $lostEvent->created_at ? $lostEvent->created_at->format('Y-m-d') : null,
+        'updated_at' => $lostEvent && $lostEvent->updated_at ? $lostEvent->updated_at->format('Y-m-d') : null,
         'created_by' => $lostEvent->created_by,
         'created_by_name' => get_decrypted_name($lostEvent->createdBy),
         'updated_by' => $lostEvent->updated_by,
@@ -369,6 +449,9 @@ class LostEventController extends Controller
         'realization_percentage' => $percentage !== null
             ? rtrim(rtrim(number_format($percentage, 2), '0'), '.') . '%'
             : null,
+        'threshold_aman' => $thresholdAman,
+        'threshold_hati_hati' => $thresholdHatiHati,
+        'threshold_bahaya' => $thresholdBahaya,
     ];
 
     $cleanData = clean_recursive($data);
@@ -383,18 +466,18 @@ public function detail($id)
 {
     $user = auth()->user();
 
-    // Batasi role yang boleh akses
     if (!in_array($user->role_id, [1, 5])) {
         return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk melihat data ini.', null);
     }
 
-    // Ambil lost event berdasarkan ID dengan relasi header
     $lostEvent = LostEvent::with([
         'createdBy:id,username',
         'updatedBy:id,username',
         'header' => function($query) {
             $query->with([
+                'jenisRisiko:id,nama_jenis_risiko',
                 'optionTargetSatuTahun:id,name,type',
+                'rcsa:id,kategori_threshold_kri_aman,kategori_threshold_kri_hati_hati,kategori_threshold_kri_bahaya',
                 'monthlyData' => function ($q) {
                     $q->where('is_finalize', true)->orderBy('month', 'asc');
                 }
@@ -406,11 +489,18 @@ public function detail($id)
         return json(404, false, 'Tidak Ditemukan', 'Lost event tidak ditemukan.', null);
     }
 
-    // Hitung realization percentage dan type dari header
     $header = $lostEvent->header;
+
+    if (!$header) {
+        return json(404, false, 'Tidak Ditemukan', 'Header risiko tidak ditemukan.', null);
+    }
+
+    if ($header->monthlyData->count() !== 12) {
+        return json(400, false, 'Data Tidak Lengkap', 'Data risiko belum memiliki 12 bulan yang difinalisasi.', null);
+    }
+
     $targetType = optional($header->optionTargetSatuTahun)->type ?? null;
 
-    // Deteksi manual kalau type kosong
     if (!$targetType && $header) {
         if (!empty($header->target_quantitative_satu_tahun)) {
             if (preg_match('/\d/', $header->target_quantitative_satu_tahun)) {
@@ -422,25 +512,31 @@ public function detail($id)
         }
     }
 
-    // Normalisasi penulisan
     $normalizedType = strtolower($targetType ?? 'unknown');
 
     $percentage = 0;
     $targetValue = null;
     $realizationValue = null;
 
+    // Ambil threshold dari RCSA
+    $thresholdAman = null;
+    $thresholdHatiHati = null;
+    $thresholdBahaya = null;
+
+    if ($header->rcsa) {
+        $thresholdAman = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_aman ?? '0');
+        $thresholdHatiHati = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_hati_hati ?? '0');
+        $thresholdBahaya = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_bahaya ?? '0');
+    }
+
     if ($header && ($normalizedType === 'kuantitatif' || $normalizedType === 'quantitative')) {
-        // Hitung total target dan realisasi 12 bulan
         $totalTarget = 0;
         $totalRealisasi = 0;
 
         foreach ($header->monthlyData as $monthly) {
-            $targetText = $monthly->target_quantitative ?? '0';
-            $targetNum = (float)str_replace([',', '.', ' '], ['', '', ''], $targetText);
+            $targetNum = (float) preg_replace('/[^0-9]/', '', $monthly->target_quantitative ?? '0');
+            $realNum = (float) preg_replace('/[^0-9]/', '', $monthly->realization_quantitative ?? '0');
             $totalTarget += $targetNum;
-
-            $realText = $monthly->realization_quantitative ?? '0';
-            $realNum = (float)str_replace([',', '.', ' '], ['', '', ''], $realText);
             $totalRealisasi += $realNum;
         }
 
@@ -451,23 +547,34 @@ public function detail($id)
         }
 
     } elseif ($header && ($normalizedType === 'kualitatif' || $normalizedType === 'qualitative')) {
-        // Ambil hanya bulan Desember
-        $targetValue = 100;
-        $desemberData = $header->monthlyData->firstWhere('month', 12);
+        $totalTarget = 0;
+        $totalRealisasi = 0;
 
-        if ($desemberData && !empty($desemberData->realization_kualitatif)) {
-            $realText = $desemberData->realization_kualitatif;
-            $realizationValue = (float)str_replace(['%', ' ', ','], ['', '', '.'], trim($realText));
-            $percentage = round($realizationValue, 2);
+        foreach ($header->monthlyData as $monthly) {
+            $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+            $targetNum = (float) $targetText;
+
+            $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+            $realNum = (float) $realText;
+
+            $totalTarget += $targetNum;
+            $totalRealisasi += $realNum;
+        }
+
+        if ($totalTarget > 0) {
+            $targetValue = $totalTarget;
+            $realizationValue = $totalRealisasi;
+            $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
         }
     }
 
-    // Siapkan data respons
     $data = [
         'lost_event_id' => $lostEvent->id,
         'header_id' => $lostEvent->header_id,
+        'rcsa_id' => $header->rcsa_id,
         'tahun' => $lostEvent->tahun,
         'risk_owner_department' => $lostEvent->risk_owner_department,
+        'jenis_risiko_id' => $header->jenis_risiko ?? null,
         'jenis_risiko' => $lostEvent->jenis_risiko,
         'nama_kejadian' => $lostEvent->nama_kejadian,
         'identifikasi_kejadian' => $lostEvent->identifikasi_kejadian,
@@ -499,6 +606,9 @@ public function detail($id)
         'realization_percentage' => $percentage !== null
             ? rtrim(rtrim(number_format($percentage, 2), '0'), '.') . '%'
             : null,
+        'threshold_aman' => $thresholdAman,
+        'threshold_hati_hati' => $thresholdHatiHati,
+        'threshold_bahaya' => $thresholdBahaya,
     ];
 
     $cleanData = clean_recursive($data);

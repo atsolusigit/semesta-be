@@ -1,0 +1,109 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Mail\SentMessage;
+use App\Mail\RecommendationNotif;
+use App\Models\RecommendationInvestasiNotif;
+
+class RecommendationNotifController extends Controller
+{
+
+    public function show($id)
+    {
+        $rekomendasi = RecommendationInvestasiNotif::where('erkap_id', $id)->get();
+
+        if (!$rekomendasi) {
+            return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
+        }
+
+        return json(200, true, 'Detail Ditemukan', 'Detail data berhasil diambil.', $rekomendasi);
+    }
+
+    public function sendRecommendationEmails(Request $request) {
+
+        $result = check_role(auth()->user(), [1,2]);
+        if ($result !== true) return $result;
+
+        $validator = Validator::make($request->all(), [
+            'erkap_id' =>'required|integer',
+            'nama_investasi' => 'required|string',
+            'kategori_investasi' => 'required|string',
+            'tahun'=> 'required|numeric',
+            'rekomendasi' => 'required|string',
+            'risk_owner' => 'required|string',
+        ]);
+        if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
+
+        $jmlNotif = RecommendationInvestasiNotif::where('erkap_id', $request->erkap_id)->count();
+        $jmlNotif +=1;
+
+        $myRequest = $request->only([
+                'erkap_id',
+                'nama_investasi',
+                'kategori_investasi',
+                'tahun',
+                'rekomendasi',
+                'risk_owner'
+            ]);
+
+        $data = (object) $myRequest;
+        $data->count_notif = $jmlNotif;
+        try {
+
+            DB::beginTransaction();
+
+            $currentUser = get_decrypted_name(auth()->user());
+
+            $myRequest['created_by'] = auth()->id();
+            $myRequest['kirim_ke'] = 'atsolusigit@gmail.com';
+            $myRequest['dikirim_oleh'] = $currentUser;
+            $myRequest['status'] = 'Terkirim';
+
+            $item = RecommendationInvestasiNotif::create($myRequest);
+            
+            $responseData = [
+                'Erkap_id' => $data->erkap_id,
+                'nama_investasi' => $data->nama_investasi,
+                'kategori_investasi' => $data->kategori_investasi,
+                'total' => $data->tahun,
+                'rekomendasi' => $data->rekomendasi,
+                'status' => $myRequest['status'] ,
+            ];
+            
+            if(Mail::to(['atsolusigit@gmail.com', 'ramdhaniteddy21@gmail.com'])
+            ->cc(['aryoaditya2000@gmail.com'])
+            ->send(new RecommendationNotif(
+                    $data
+                    // $data->erkap_id,
+                    // $data->nama_investasi,
+                    // $data->kategori_investasi,
+                    // $data->tahun,
+                    // $data->rekomendasi,
+                    // $data->risk_owner,
+                    // $data->count_notif,
+            )) instanceof SentMessage){
+        
+                DB::commit();
+                return json(200, true, 'Email Terkirim', 'Email berhasil dikirim.', $responseData);
+
+            } else {
+                $list_email='';
+                foreach(Mail::failures as $email_address) {
+                    $list_email .= $email_address .", ";
+                }
+                return json(500, true, 'Email Gagal Terkirim', 'Email gagal dikirim.', $list_email);
+            }
+
+            
+        } catch (\Exception $e) {
+            // Log the error or handle it as needed
+            \Log::error('Mail sending failed for order ' . $data->erkap_id . ': ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to send email for order ' . $data->erkap_id], 500);
+        }
+    }
+}

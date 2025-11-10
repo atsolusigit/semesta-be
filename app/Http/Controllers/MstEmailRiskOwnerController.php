@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\MstEmailRiskOwner;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Models\RencanaInvestasi;
 
 class MstEmailRiskOwnerController extends Controller
 {
@@ -161,12 +162,19 @@ class MstEmailRiskOwnerController extends Controller
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menghapus data', null);
         }
 
-        $data = MstEmailRiskOwner::find($id);
+        $data = MstEmailRiskOwner::where('unit_kerja_id', $id)->exists();
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
-        $data->delete();
+        $emailExists = RencanaInvestasi::where('unit_kerja_id', $id)->exists();
+
+        if ($emailExists) {
+            return json(500, false, 'Unit Kerja Exists', 'Unit kerja exists di rencana investasi.', null);
+        }
+
+        MstEmailRiskOwner::where('unit_kerja_id', $id)->delete();
+
 
         return json(200, true, 'Berhasil Dihapus', 'Data berhasil dihapus.', null);
     }
@@ -198,9 +206,7 @@ class MstEmailRiskOwnerController extends Controller
                                 'created_by' =>  $user->id,
                             ]
                         );
-
                     }
-                    
                     
                 DB::commit();
             } catch (\Throwable $th) {

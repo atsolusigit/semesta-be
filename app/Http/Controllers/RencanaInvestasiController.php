@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Models\RencanaInvestasi;
 use App\Models\TrRiskInvestasi;
+use App\Models\RencanaInvestasiTimelineYear;
+use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\RencanaInvestasi\MultiSheetRencanaInvestasiExport;
 
 class RencanaInvestasiController extends Controller
 {
@@ -322,6 +326,171 @@ class RencanaInvestasiController extends Controller
             DB::rollBack();
             return json(500,false,'Gagal Update','Terjadi kesalahan sistem.',$th->getMessage());
         }
+    }
+
+
+    public function export(Request $request, string $format)
+    {
+        if (!in_array($format, ['excel', 'pdf'])) {
+            return response()->json([
+                'status'  => 400,
+                'success' => false,
+                'message' => 'Format tidak didukung',
+                'data'    => 'Format yang didukung: excel, pdf'
+            ], 400);
+        }
+
+        $now              = now();
+        $tahunForTimeline = (int) $now->year;
+        $bulanForTimeline = (int) $now->month;
+        $weekForTimeline  = (int) max(1, min((int)ceil($now->day / 7), 4));
+        $monthName        = $this->getMonthName($bulanForTimeline);
+
+        $rows = \App\Models\RencanaInvestasi::query()
+            ->select('rencana_investasi.*', 'mst_email_unit_kerja.unit_kerja_nama as department_name_joined')
+            ->leftJoin('mst_email_unit_kerja', 'rencana_investasi.unit_kerja_id', '=', 'mst_email_unit_kerja.unit_kerja_id')
+            ->with([
+                'createdBy:id,username',
+                'updatedBy:id,username',
+                'riskInvestasi:erkap_id,status,approved_by,approved_at,dampak_risiko_awal,kemungkinan_awal,eksposure_level_awal,eksposure_ltmh_awal,dampak_risiko_akhir,kemungkinan_akhir,eksposure_level_akhir,eksposure_ltmh_akhir,biaya_mitigasi_risiko',
+                'riskInvestasi.approvedByUser:id,username,name',
+                'periods' => function ($q) use ($tahunForTimeline, $bulanForTimeline, $weekForTimeline) {
+                    $q->where('year',  $tahunForTimeline)
+                    ->where('month', $bulanForTimeline)
+                    ->where('week',  $weekForTimeline);
+                },
+            ])
+            ->orderBy('rencana_investasi.id', 'asc')
+            ->get();
+
+        $departmentName = $this->guessDepartmentName($rows, null);
+
+        $flatRows = $rows->map(function ($it) use ($tahunForTimeline, $bulanForTimeline, $weekForTimeline) {
+            [$targetColor, $targetLabel] = $this->extractTargetTimeline($it);
+            [$realColor, $realLabel]     = $this->extractRealisasiTimeline(
+                (int)$it->erkap_id,
+                $tahunForTimeline,
+                $bulanForTimeline,
+                $weekForTimeline
+            );
+            $deptName = $it->department_name_joined ?? $it->department_name;
+
+            return [
+                'ID'                        => $it->id,
+                'ERKAP ID'                  => $it->erkap_id,
+                'Department'                => $deptName,
+                'Nama Investasi'            => $it->nama_investasi,
+                'Kategori Investasi'        => $it->kategori_investasi,
+                'Jenis Investasi'           => $it->jenis_investasi,
+                'Tahun'                     => $it->year,
+                'Nilai RKAP'                => (string)$it->nilai_rkap,
+                'Nilai Revisi'              => (string)$it->nilai_revisi,
+                'Budget Transfer'           => (string)$it->nilai_budget_transfer,
+                'Realisasi'                 => (string)$it->nilai_realisasi,
+                'Target Timeline Label'     => $targetLabel,
+                'Target Timeline Color'     => $targetColor,
+                'Realisasi Timeline Label'  => $realLabel,
+                'Realisasi Timeline Color'  => $realColor,
+                'Status'                    => $it->status,
+                'Keterangan'                => $it->keterangan,
+                'Created At'                => optional($it->created_at)->format('Y-m-d H:i:s'),
+                'Updated At'                => optional($it->updated_at)->format('Y-m-d H:i:s'),
+            ];
+        })->values();
+
+        try {
+            if ($format === 'excel') {
+                $filename = "RencanaInvestasi_{$departmentName}_{$monthName}_{$tahunForTimeline}_" . time() . ".xlsx";
+                return \Maatwebsite\Excel\Facades\Excel::download(
+                    new \App\Exports\RencanaInvestasi\MultiSheetRencanaInvestasiExport(
+                        $flatRows,
+                        $tahunForTimeline,
+                        $bulanForTimeline,
+                        $weekForTimeline,
+                        $departmentName,
+                        $monthName
+                    ),
+                    $filename
+                );
+            }
+
+            // PDF
+            $filename = "RencanaInvestasi_{$departmentName}_{$monthName}_{$tahunForTimeline}_" . time() . ".pdf";
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.rencana_investasi_pdf', [
+                'rows'           => $flatRows,
+                'monthName'      => $monthName,
+                'year'           => $tahunForTimeline,
+                'departmentName' => $departmentName,
+            ])->setPaper('A4', 'landscape');
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 500,
+                'success' => false,
+                'message' => 'Gagal melakukan export',
+                'data'    => ['error' => $e->getMessage()]
+            ], 500);
+        }
+    }
+
+
+
+    private function extractTargetTimeline($it): array
+    {
+        $period = $it->periods->first();
+        if ($period && is_array($period->detail_json)) {
+            $firstDetail = $period->detail_json[0] ?? null;
+            if (is_array($firstDetail) && !empty($firstDetail['timeline_target'])) {
+                $firstTl = $firstDetail['timeline_target'][0] ?? null;
+                if (is_array($firstTl)) {
+                    return [$firstTl['color'] ?? null, $firstTl['label'] ?? null];
+                }
+            }
+        }
+        return [null, null];
+    }
+
+    private function extractRealisasiTimeline(int $erkapId, int $tahun, int $bulan, int $week): array
+    {
+        $cache = RencanaInvestasiTimelineYear::where('erkap_id', $erkapId)->where('year', $tahun)->first();
+        if ($cache && is_array($cache->timeline_json)) {
+            $bulanEntry = collect($cache->timeline_json)->firstWhere('bulan_id', (int)$bulan);
+            if (is_array($bulanEntry)) {
+                $w = max(1, min((int)$week, 4));
+                return [$bulanEntry["week{$w}_color"] ?? null, $bulanEntry["week{$w}_label"] ?? null];
+            }
+        }
+        return [null, null];
+    }
+
+    private function normalizeMonth($month)
+    {
+        if (is_array($month) && isset($month['month'])) return (int)$month['month'];
+        return !is_null($month) ? (int)$month : null;
+    }
+
+    private function getMonthName(int $month): string
+    {
+        $map = [1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'];
+        return $map[$month] ?? (string)$month;
+    }
+
+    private function guessDepartmentName($rows, $filterDepartment)
+    {
+        if ($filterDepartment) {
+            $hit = $rows->firstWhere('department_id', $filterDepartment);
+            if ($hit) return $hit->department_name_joined ?? $hit->department_name ?? 'Department';
+        }
+        $hit = $rows->first();
+        return $hit?->department_name_joined ?? $hit?->department_name ?? 'All-Dept';
+    }
+
+    private function shouldFilterByUserDepartment(): bool
+    {
+
+        return false;
     }
 
 }

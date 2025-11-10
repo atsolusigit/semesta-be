@@ -47,7 +47,7 @@ public function register(Request $request)
                 'data' => [
                     'username' => ['The username has already been taken.']
                 ]
-            ], 400);
+            ], 200);
         }
 
         // Validasi domain email kbn.co.id
@@ -59,7 +59,7 @@ public function register(Request $request)
                 'data' => [
                     'email' => ['Maaf, gunakan email @kbn.co.id untuk proses register.']
                 ]
-            ], 400);
+            ], 200);
         }
 
         $array_validation = [

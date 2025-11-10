@@ -10,6 +10,7 @@ class MstEmailRiskOwner extends Model
     use HasFactory;
 
     protected $table = 'mst_email_unit_kerja';
+    protected $primaryKey = 'unit_kerja_id';
 
     protected $fillable = [
         'unit_kerja_id',

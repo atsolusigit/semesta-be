@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\MstEmailRiskOwner;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use App\Models\RencanaInvestasi;
 
 class MstEmailRiskOwnerController extends Controller
 {
@@ -75,7 +77,7 @@ class MstEmailRiskOwnerController extends Controller
             return json(500, false, 'Unit Kerja Exist', 'Unit Kerja '.$request->unit_kerja_id.' Exists', null);
         }
 
-         $user = auth()->user();
+        $user = auth()->user();
 
         $validator = Validator::make($request->all(), [
             'unit_kerja_nama' => 'required|string',
@@ -160,13 +162,60 @@ class MstEmailRiskOwnerController extends Controller
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menghapus data', null);
         }
 
-        $data = MstEmailRiskOwner::find($id);
+        $data = MstEmailRiskOwner::where('unit_kerja_id', $id)->exists();
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
 
-        $data->delete();
+        $emailExists = RencanaInvestasi::where('unit_kerja_id', $id)->exists();
+
+        if ($emailExists) {
+            return json(500, false, 'Unit Kerja Exists', 'Unit kerja exists di rencana investasi.', null);
+        }
+
+        MstEmailRiskOwner::where('unit_kerja_id', $id)->delete();
+
 
         return json(200, true, 'Berhasil Dihapus', 'Data berhasil dihapus.', null);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+     public function sync(Request $request)
+    {
+        // Check authorization: only role 1 and 2 can update
+        $userRole = auth()->user()->role_id ?? null;
+        if (!in_array($userRole, [1, 2])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
+        }
+        $dataUnitKerja = (array) $request->input('UnitKerjaErkap');
+        $user = auth()->user();
+
+        if(!empty($dataUnitKerja)){
+
+            try {
+                DB::beginTransaction();
+
+                    foreach($dataUnitKerja as $item){
+        
+                       $resUpdate = MstEmailRiskOwner::updateOrCreate(
+                            ['unit_kerja_id' => $item['unit_kerja_id']], // Match condition
+                            [ 
+                                'unit_kerja_nama' => $item['unit_kerja_nama'],
+                                'created_by' =>  $user->id,
+                            ]
+                        );
+                    }
+                    
+                DB::commit();
+            } catch (\Throwable $th) {
+                DB::rollBack();
+                return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $th->getMessage());
+            }
+            
+        }
+
+        return json(200, true, 'Berhasil di syncronize', 'Data berhasil di syncronize.', null);
     }
 }

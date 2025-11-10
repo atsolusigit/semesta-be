@@ -348,7 +348,7 @@ class LostEventController extends Controller
         'last_page' => $paginatedData->lastPage(),
         'from' => $paginatedData->firstItem(),
         'to' => $paginatedData->lastItem(),
-        'data' => $paginatedData->items(),
+        'data' => array_values($paginatedData->items()), // tetap menggunakan array_values untuk reset index
     ]);
 
     return json(200, true, 'Data Ditemukan', 'Data header dengan realisasi di bawah threshold bahaya dan lost event independen berhasil diambil.', $cleanData);

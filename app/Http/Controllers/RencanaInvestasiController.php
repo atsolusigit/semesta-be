@@ -76,20 +76,6 @@ class RencanaInvestasiController extends Controller
             $period = $it->periods->first();
 
             $targetTimeline = null;
-            if ($period && is_array($period->detail_json)) {
-                $firstDetail = $period->detail_json[0] ?? null;
-                if (is_array($firstDetail) && !empty($firstDetail['timeline_target'])) {
-                    $firstTl = $firstDetail['timeline_target'][0] ?? null;
-                    if (is_array($firstTl)) {
-                        $targetTimeline = [
-                            'color' => $firstTl['color'] ?? null,
-                            'label' => $firstTl['label'] ?? null,
-                        ];
-                    }
-                }
-            }
-
-            $realisasiTimeline = null;
             $cache = \App\Models\RencanaInvestasiTimelineYear::where('erkap_id', $it->erkap_id)
                 ->where('year', $tahun)
                 ->first();
@@ -103,10 +89,16 @@ class RencanaInvestasiController extends Controller
                     $color = $bulanEntry[$colorKey] ?? null;
                     $label = $bulanEntry[$labelKey] ?? null;
                     if ($color || $label) {
-                        $realisasiTimeline = ['color' => $color, 'label' => $label];
+                        $targetTimeline = ['color' => $color, 'label' => $label];
                     }
                 }
             }
+
+            $realisasiTimeline = !empty($it->realisasi_timeline)
+                ? (is_string($it->realisasi_timeline)
+                    ? $it->realisasi_timeline
+                    : json_encode($it->realisasi_timeline))
+                : null;
 
             $departmentName = $it->department_name_joined ?? $it->department_name;
 
@@ -172,6 +164,7 @@ class RencanaInvestasiController extends Controller
 
         return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
     }
+
 
 
 

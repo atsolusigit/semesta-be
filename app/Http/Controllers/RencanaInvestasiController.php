@@ -76,20 +76,6 @@ class RencanaInvestasiController extends Controller
             $period = $it->periods->first();
 
             $targetTimeline = null;
-            if ($period && is_array($period->detail_json)) {
-                $firstDetail = $period->detail_json[0] ?? null;
-                if (is_array($firstDetail) && !empty($firstDetail['timeline_target'])) {
-                    $firstTl = $firstDetail['timeline_target'][0] ?? null;
-                    if (is_array($firstTl)) {
-                        $targetTimeline = [
-                            'color' => $firstTl['color'] ?? null,
-                            'label' => $firstTl['label'] ?? null,
-                        ];
-                    }
-                }
-            }
-
-            $realisasiTimeline = null;
             $cache = \App\Models\RencanaInvestasiTimelineYear::where('erkap_id', $it->erkap_id)
                 ->where('year', $tahun)
                 ->first();
@@ -103,10 +89,16 @@ class RencanaInvestasiController extends Controller
                     $color = $bulanEntry[$colorKey] ?? null;
                     $label = $bulanEntry[$labelKey] ?? null;
                     if ($color || $label) {
-                        $realisasiTimeline = ['color' => $color, 'label' => $label];
+                        $targetTimeline = ['color' => $color, 'label' => $label];
                     }
                 }
             }
+
+            $realisasiTimeline = !empty($it->realisasi_timeline)
+                ? (is_string($it->realisasi_timeline)
+                    ? $it->realisasi_timeline
+                    : json_encode($it->realisasi_timeline))
+                : null;
 
             $departmentName = $it->department_name_joined ?? $it->department_name;
 
@@ -172,6 +164,7 @@ class RencanaInvestasiController extends Controller
 
         return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
     }
+
 
 
 
@@ -270,47 +263,42 @@ class RencanaInvestasiController extends Controller
 
     public function update(Request $request, $id)
     {
-        $result = check_role(auth()->user(), [1,2,3]);
+        $result = check_role(auth()->user(), [1, 2, 3]);
         if ($result !== true) return $result;
 
         $item = RencanaInvestasi::find($id);
-        if (!$item) return json(404,false,'Tidak Ditemukan','Rencana investasi tidak ditemukan.',null);
+        if (!$item) {
+            return json(404, false, 'Tidak Ditemukan', 'Rencana investasi tidak ditemukan.', null);
+        }
 
         $locked = TrRiskInvestasi::where('erkap_id', $item->erkap_id)->exists();
-        if ($locked) return json(403,false,'Terkunci','Risk Profile Investasi sudah dibuat. Rencana Investasi tidak dapat diupdate.',null);
+        if ($locked) {
+            return json(403, false, 'Terkunci', 'Risk Profile Investasi sudah dibuat. Rencana Investasi tidak dapat diupdate.', null);
+        }
 
         $validator = Validator::make($request->all(), [
-            'department_name'     => 'nullable|string',
-            'nama_investasi'      => 'nullable|string',
-            'kategori_investasi'  => 'nullable|string',
-            'jenis_investasi'     => 'nullable|string',
-            'year'                => 'nullable|numeric',
-            'nilai_rkap'          => 'nullable|numeric',
-            'nilai_revisi'        => 'nullable|numeric',
-            'keterangan'          => 'nullable|string',
-            'status'              => 'nullable|string',
-            'nilai_budget_transfer' => 'nullable|integer',
-            'nilai_realisasi'       => 'nullable|integer',
-            'target_timeline'       => 'nullable|string',
-            'realisasi_timeline'    => 'nullable|string',
-            'ld_inherent'           => 'nullable|integer',
-            'dampak_inherent'       => 'nullable|string',
-            'ld_current'            => 'nullable|integer',
-            'lk_current'            => 'nullable|integer',
-            'level_current'         => 'nullable|integer',
-            'dampak_current'        => 'nullable|string',
-            'level_residual'        => 'nullable|string',
-            'dampak_residual'       => 'nullable|string',
+            'ld_current'         => 'nullable|integer',
+            'lk_current'         => 'nullable|integer',
+            'level_current'      => 'nullable|integer',
+            'dampak_residual'    => 'nullable|string',
+            'realisasi_timeline' => 'nullable|string',
         ]);
-        if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        }
 
         try {
             DB::beginTransaction();
 
             $payload = $request->only([
-                'department_name','nama_investasi','kategori_investasi','jenis_investasi',
-                'year','nilai_rkap','nilai_revisi','keterangan','status'
+                'ld_current',
+                'lk_current',
+                'level_current',
+                'dampak_residual',
+                'realisasi_timeline',
             ]);
+
             if (!empty($payload)) {
                 $payload['updated_by'] = auth()->id();
                 $item->update($payload);
@@ -318,13 +306,20 @@ class RencanaInvestasiController extends Controller
 
             DB::commit();
 
-            return json(200,true,'Berhasil Diperbarui','Rencana investasi berhasil diupdate.',$item->only([
-                'id','erkap_id','nama_investasi','kategori_investasi','jenis_investasi','year','nilai_rkap','nilai_revisi','status'
+            return json(200, true, 'Berhasil Diperbarui', 'Rencana investasi berhasil diupdate.', $item->only([
+                'id',
+                'erkap_id',
+                'ld_current',
+                'lk_current',
+                'level_current',
+                'dampak_residual',
+                'realisasi_timeline',
+                'updated_by',
+                'updated_at',
             ]));
-
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(500,false,'Gagal Update','Terjadi kesalahan sistem.',$th->getMessage());
+            return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $th->getMessage());
         }
     }
 

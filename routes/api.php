@@ -36,6 +36,7 @@ use App\Http\Controllers\MstJenisRisikoController;
 use App\Http\Controllers\TrRiskInvestasiController;
 use App\Http\Controllers\MstRcsaController;
 use App\Http\Controllers\RecommendationNotifController;
+use App\Http\Controllers\MstEmailRiskOwnerController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -390,5 +391,12 @@ Route::middleware(['auth:api'])->group(function () {
 // ===================== EMAIL RECOMMENDATION RENCANA INVESTASI =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::post('/send-rekomendasi-investasi', [RecommendationNotifController::class, 'sendRecommendationEmails']);
-    Route::get('/list-rekomendasi/{id}', [RecommendationNotifController::class, 'show']);
+    Route::get('/list-rekomendasi/{id}', [RecommendationNotifController::class, 'show']);   
+});
+
+// ===================== EMAIL RECOMMENDATION RENCANA INVESTASI =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'index']);             
+    Route::get('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'show']);         
+    Route::post('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'store']);   
 });

@@ -12,7 +12,7 @@
 </head>
 <body>
     <div class="header">
-        <p style="text-align: left;"><h1>Yth {{ $risk_owner ?? 'Semesta User' }},</h1></p>
+        <p style="text-align: left;"><h1>Yth {{ $data->risk_owner ?? 'Semesta User' }},</h1></p>
         <p style="text-align: right;">{{ date('d-m-Y') }}</p>
     </div>
 
@@ -22,13 +22,13 @@
         </p>
         <h1>Informasi Investasi:</h1>
         <ul>
-            <li>Erkap ID: {{ $erkap_id }}</li>
-            <li>Nama Investasi: {{ $nama_investasi }}</li>
-            <li>Kategori Investasi: {{ $kategori_investasi }}</li>
-            <li>Tahun: {{ $tahun }}</li>
+            <li>Erkap ID: {{ $data->erkap_id }}</li>
+            <li>Nama Investasi: {{ $data->nama_investasi }}</li>
+            <li>Kategori Investasi: {{ $data->kategori_investasi }}</li>
+            <li>Tahun: {{ $data->tahun }}</li>
         </ul>
 
-        <h1>Rekomendasi:</h1> {{ $rekomendasi }}
+        <h1>Rekomendasi:</h1> {{ $data->rekomendasi }}
 
         <p>
             Apabila terdapat pertanyaan lebih lanjut terkait rekomendasi yang diberikan, 

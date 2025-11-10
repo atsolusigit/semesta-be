@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Mail\SentMessage;
 use App\Mail\RecommendationNotif;
 use App\Models\RecommendationInvestasiNotif;
+use App\Models\MstEmailRiskOwner;
 
 class RecommendationNotifController extends Controller
 {
@@ -36,8 +37,18 @@ class RecommendationNotifController extends Controller
             'tahun'=> 'required|numeric',
             'rekomendasi' => 'required|string',
             'risk_owner' => 'required|string',
+            'risk_owner_id' => 'required|numeric',
         ]);
         if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
+
+        $email_user = MstEmailRiskOwner::where('unit_kerja_id', $request->risk_owner_id)->value('unit_kerja_email');
+        $email_user = explode(",", $email_user);
+        if (empty($email_user)) {
+             return json(404, false, 'Email Tidak Ditemukan', 'Email '.$request->risk_owner.' tidak ditemukan, harap tambahkan di master email.', null);
+        }
+
+        $jmlNotif = RecommendationInvestasiNotif::where('erkap_id', $request->erkap_id)->count();
+        $jmlNotif +=1;
 
         $myRequest = $request->only([
                 'erkap_id',
@@ -49,16 +60,16 @@ class RecommendationNotifController extends Controller
             ]);
 
         $data = (object) $myRequest;
-        
+        $data->count_notif = $jmlNotif;
         try {
 
             DB::beginTransaction();
 
-            $currentUser = auth()->user();
-            
+            $currentUser = get_decrypted_name(auth()->user());
+
             $myRequest['created_by'] = auth()->id();
             $myRequest['kirim_ke'] = 'atsolusigit@gmail.com';
-            $myRequest['dikirim_oleh'] = get_decrypted_name(auth()->id());
+            $myRequest['dikirim_oleh'] = $currentUser;
             $myRequest['status'] = 'Terkirim';
 
             $item = RecommendationInvestasiNotif::create($myRequest);
@@ -71,18 +82,14 @@ class RecommendationNotifController extends Controller
                 'rekomendasi' => $data->rekomendasi,
                 'status' => $myRequest['status'] ,
             ];
-
-            if(Mail::to(['atsolusigit@gmail.com', 'ramdhaniteddy21@gmail.com'])
-            ->cc(['aryoaditya2000@gmail.com'])
+            
+            $cc = '';
+            if(Mail::to($email_user)
+            ->when($cc, fn($mail) => $mail->cc($cc))
             ->send(new RecommendationNotif(
-                    $data->erkap_id,
-                    $data->nama_investasi,
-                    $data->kategori_investasi,
-                    $data->tahun,
-                    $data->rekomendasi,
-                    $data->risk_owner,
+                    $data
             )) instanceof SentMessage){
-
+        
                 DB::commit();
                 return json(200, true, 'Email Terkirim', 'Email berhasil dikirim.', $responseData);
 

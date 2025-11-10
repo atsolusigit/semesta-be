@@ -394,9 +394,12 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/list-rekomendasi/{id}', [RecommendationNotifController::class, 'show']);   
 });
 
-// ===================== EMAIL RECOMMENDATION RENCANA INVESTASI =====================
+// ===================== MASTER EMAIL UNIT KERJA =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'index']);             
     Route::get('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'show']);         
     Route::post('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'store']);   
+    Route::put('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'update']);
+    Route::post('/sync-email-unit-kerja', [MstEmailRiskOwnerController::class, 'sync']);
+    Route::delete('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'destroy']);
 });

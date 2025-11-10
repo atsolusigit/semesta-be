@@ -1948,6 +1948,13 @@ public function monitoring(Request $request)
     // Paginate
     $data = $query->paginate($perPage);
 
+    // Nama bulan dalam bahasa Indonesia
+    $monthNames = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+    ];
+
     // Helper function untuk menangani persentase dengan target yang bisa string atau angka
     $calculatePercentage = function ($target, $realization) {
         // Jika target adalah string atau tidak numeric, return null untuk menandakan tidak dapat dihitung
@@ -1975,7 +1982,7 @@ public function monitoring(Request $request)
     };
 
     // Mapping data with same structure as index
-    $orderedData = collect($data->items())->map(function ($item) use ($calculatePercentage, $formatTargetQuantitative) {
+    $orderedData = collect($data->items())->map(function ($item) use ($calculatePercentage, $formatTargetQuantitative, $monthNames) {
         $inherentColor = get_color_by_position($item->inherent_risk_posisi_risiko);
         $residualTargetColor = get_color_by_position($item->residual_target_posisi_risiko);
 
@@ -2143,7 +2150,7 @@ public function monitoring(Request $request)
             'rr_kemungkinan' => $item->rrKemungkinan ?? null,
             'department' => $item->department ?? null,
 
-            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) use ($riskCodes, $calculatePercentage, $formatTargetQuantitative) {
+            'monthly_data' => $item->monthlyData->map(function ($dataBulanan) use ($riskCodes, $calculatePercentage, $formatTargetQuantitative, $monthNames, $item) {
                 $target = $dataBulanan->target_quantitative;
                 $realization = $dataBulanan->realization_quantitative ?? 0;
                 $percentage = $calculatePercentage($target, $realization);
@@ -2152,6 +2159,8 @@ public function monitoring(Request $request)
                     'id' => $dataBulanan->id,
                     'header_id' => $dataBulanan->header_id,
                     'month' => $dataBulanan->month,
+                    'month_name' => $monthNames[$dataBulanan->month] ?? 'Unknown',
+                    'month_full_name' => ($monthNames[$dataBulanan->month] ?? 'Unknown') . ' ' . $item->year,
                     'risk_code' => $riskCodes, // PERBAIKAN: Gunakan array risk codes dari header
                     'status_risiko' => $dataBulanan->status_risiko,
                     'process_code' => $dataBulanan->process_code,

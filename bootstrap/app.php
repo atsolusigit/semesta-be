@@ -11,9 +11,9 @@ use Illuminate\Auth\AuthenticationException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web:    __DIR__ . '/../routes/web.php',
-        api:    __DIR__ . '/../routes/api.php',
-        commands: __DIR__ . '/../routes/console.php',
+        web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
+        commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -32,8 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withSchedule(function (Schedule $schedule) {
-        $tz       = config('app.timezone', 'Asia/Jakarta');
-        $syncTime = config('services.erkap.sync_time', '01:00');
+        $tz           = (string) config('app.timezone', 'Asia/Jakarta');
+        $syncTime     = (string) config('services.erkap.sync_time', '01:00');
+        $prefetchTime = (string) config('services.erkap.prefetch_time', '22:30');
 
         $schedule->command('erkap:sync-daily')
             ->dailyAt($syncTime)
@@ -42,7 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->onOneServer();
 
         $schedule->command('erkap:prefetch-timeline')
-            ->dailyAt($syncTime)
+            ->dailyAt($prefetchTime)
             ->timezone($tz)
             ->withoutOverlapping()
             ->onOneServer();

@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\Validator;
 
 class MstOptionController extends Controller
 {
-    public function index(Request $request)
+   public function index(Request $request)
 {
-    $perPage = $request->input('per_page', 10);
+    $perPage = $request->input('per_page');
 
     $query = MstOption::query()->orderBy('id', 'asc');
 
@@ -29,8 +29,29 @@ class MstOptionController extends Controller
         $query->where('type', $request->type);
     }
 
+    // Jika per_page kosong atau 'all', ambil semua data tanpa pagination
+    if (empty($perPage) || $perPage === 'all') {
+        $data = $query->get();
+
+        $mappedData = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'position' => $item->position,
+                'type' => $item->type,
+                'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+                'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+            ];
+        });
+
+        return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', [
+            'total' => $mappedData->count(),
+            'data' => $mappedData,
+        ]);
+    }
+
     // Pagination
-    $data = $query->paginate($perPage);
+    $data = $query->paginate((int) $perPage);
 
     // Mapping data
     $mappedData = $data->getCollection()->map(function ($item) {
@@ -57,6 +78,7 @@ class MstOptionController extends Controller
 
     return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $responseData);
 }
+
     public function store(Request $request)
     {
         // Check authorization: only role 1 and 2 can store

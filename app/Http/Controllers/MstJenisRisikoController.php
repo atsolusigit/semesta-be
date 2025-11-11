@@ -10,7 +10,7 @@ class MstJenisRisikoController extends Controller
 {
  public function index(Request $request)
 {
-    $perPage = $request->input('per_page', 10);
+    $perPage = $request->input('per_page');
 
     $query = MstJenisRisiko::with(['createdBy:id,username'])
         ->orderBy('id', 'asc');
@@ -21,10 +21,30 @@ class MstJenisRisikoController extends Controller
         $query->where('nama_jenis_risiko', 'like', "%{$search}%");
     }
 
-    // Pagination
+    // Jika per_page kosong atau = "all", ambil semua data tanpa pagination
+    if (empty($perPage) || $perPage === 'all') {
+        $data = $query->get();
+
+        $mappedData = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'nama_jenis_risiko' => $item->nama_jenis_risiko,
+                'created_by' => $item->created_by,
+                'created_by_username' => get_decrypted_username($item->createdBy),
+                'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+                'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+            ];
+        });
+
+        return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', [
+            'total' => $mappedData->count(),
+            'data' => $mappedData,
+        ]);
+    }
+
+    // Kalau per_page dikirim, gunakan pagination Laravel
     $data = $query->paginate($perPage);
 
-    // Mapping data
     $mappedData = $data->getCollection()->map(function ($item) {
         return [
             'id' => $item->id,
@@ -36,7 +56,6 @@ class MstJenisRisikoController extends Controller
         ];
     });
 
-    // Prepare response dengan pagination
     $responseData = [
         'current_page' => $data->currentPage(),
         'per_page' => $data->perPage(),
@@ -49,6 +68,7 @@ class MstJenisRisikoController extends Controller
 
     return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $responseData);
 }
+
 
     public function store(Request $request)
     {

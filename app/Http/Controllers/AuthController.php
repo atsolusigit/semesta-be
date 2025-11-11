@@ -50,14 +50,14 @@ public function register(Request $request)
             ], 200);
         }
 
-        // Validasi domain email kbn.co.id
-        if (!preg_match('/^[\w\-\.]+@kbn\.co\.id$/i', $request->email)) {
+        // Validasi domain email agar hanya @kbn.co.id atau @gmail.com
+        if (!preg_match('/^[\w\-\.]+@(kbn\.co\.id|gmail\.com)$/i', $request->email)) {
             return response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
                 'message' => 'error validation. [400 - bad request]',
                 'data' => [
-                    'email' => ['Maaf, gunakan email @kbn.co.id untuk proses register.']
+                    'email' => ['Maaf, gunakan email @kbn.co.id atau @gmail.com untuk proses register.']
                 ]
             ], 200);
         }
@@ -104,7 +104,6 @@ public function register(Request $request)
         ]);
 
         // ========== KIRIM EMAIL SEBELUM COMMIT ==========
-        // Siapkan data plain untuk email
         $userDataForEmail = (object)[
             'id' => $user->id,
             'name' => $name,
@@ -113,10 +112,8 @@ public function register(Request $request)
             'created_at' => $user->created_at,
         ];
 
-        // Email ke USER (Konfirmasi Registrasi)
         Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
 
-        // Email ke ADMIN/SPV (Notifikasi User Baru)
         $admins = User::whereIn('role_id', [1, 2])
                      ->where('status', 1)
                      ->get();
@@ -126,7 +123,6 @@ public function register(Request $request)
             Mail::to($adminEmail)->send(new UserRegisteredMail($userDataForEmail));
         }
 
-        // Jika sampai sini tidak ada error, commit transaksi
         DB::commit();
 
         return json(200, 'true', 'success', 'Akun berhasil didaftarkan. Menunggu persetujuan admin.', [

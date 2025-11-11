@@ -486,6 +486,7 @@ public function rejectUser($id)
         return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menolak user di departemen ini.', []);
     }
 
+    // Update status menjadi rejected
     $user->status = 2; // 2 = rejected
     $user->save();
 
@@ -503,7 +504,15 @@ public function rejectUser($id)
         \Log::error('Failed to send rejection email: ' . $e->getMessage());
     }
 
-    return json(200, 'true', 'success', 'User berhasil ditolak dan email notifikasi telah dikirim.', []);
+    // Setelah email dikirim, hapus user dari database
+    try {
+        $user->delete();
+    } catch (\Throwable $e) {
+        \Log::error('Gagal menghapus user yang ditolak: ' . $e->getMessage());
+        return json(500, 'false', 'delete_failed', 'User ditolak tetapi gagal dihapus dari database.', []);
+    }
+
+    return json(200, 'true', 'success', 'User berhasil ditolak, email notifikasi telah dikirim, dan data user telah dihapus.', []);
 }
 
    public function getPendingUsers(Request $request)

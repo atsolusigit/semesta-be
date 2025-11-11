@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class MstJabatanController extends Controller
 {
-    /**
+  /**
  * Display a listing of jabatan
  */
 public function index(Request $request)
@@ -18,10 +18,10 @@ public function index(Request $request)
     $request->validate([
         'department_id' => 'nullable|integer',
         'search' => 'nullable|string|max:255',
-        'per_page' => 'nullable|integer|min:1|max:100'
+        'per_page' => 'nullable' // biarkan FE bebas atur, tidak wajib integer
     ]);
 
-    $perPage = $request->input('per_page', 10);
+    $perPage = $request->input('per_page');
 
     $query = MstJabatan::with('department:id,name')->orderBy('name', 'asc');
 
@@ -48,7 +48,29 @@ public function index(Request $request)
         });
     }
 
-    // Pagination
+    // Jika per_page kosong atau 'all', ambil semua data tanpa pagination
+    if (empty($perPage) || $perPage === 'all') {
+        $data = $query->get();
+
+        $mappedData = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'nipp' => $item->nipp,
+                'department_id' => $item->department_id,
+                'department_name' => $item->department?->name,
+                'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+                'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+            ];
+        });
+
+        return json(200, true, 'Berhasil', 'List data jabatan', [
+            'total' => $mappedData->count(),
+            'data' => $mappedData,
+        ]);
+    }
+
+    // Kalau per_page dikirim, gunakan pagination
     $data = $query->paginate($perPage);
 
     // Mapping data

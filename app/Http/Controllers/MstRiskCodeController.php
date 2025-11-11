@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\Validator;
 
 class MstRiskCodeController extends Controller
 {
-    public function index(Request $request)
+   public function index(Request $request)
 {
-    $perPage = $request->input('per_page', 10);
+    $perPage = $request->input('per_page');
 
     $query = MstRiskCode::query()->orderBy('id', 'asc');
 
@@ -23,8 +23,28 @@ class MstRiskCodeController extends Controller
         });
     }
 
+    // Jika per_page kosong atau 'all', ambil semua data tanpa pagination
+    if (empty($perPage) || $perPage === 'all') {
+        $data = $query->get();
+
+        $mappedData = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'code' => $item->code,
+                'name' => $item->name,
+                'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+                'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+            ];
+        });
+
+        return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', [
+            'total' => $mappedData->count(),
+            'data' => $mappedData,
+        ]);
+    }
+
     // Pagination
-    $data = $query->paginate($perPage);
+    $data = $query->paginate((int) $perPage);
 
     // Mapping data
     $mappedData = $data->getCollection()->map(function ($item) {
@@ -50,7 +70,6 @@ class MstRiskCodeController extends Controller
 
     return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $responseData);
 }
-
 
     // Tambah data jenis risiko
     public function store(Request $request)

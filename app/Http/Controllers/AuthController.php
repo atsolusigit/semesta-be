@@ -43,7 +43,7 @@ public function register(Request $request)
             return response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
-                'message' => 'error validation. [400 - bad request]',
+                'message' => 'The username has already been taken.',
                 'data' => [
                     'username' => ['The username has already been taken.']
                 ]
@@ -55,7 +55,7 @@ public function register(Request $request)
             return response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
-                'message' => 'error validation. [400 - bad request]',
+                'message' => 'Maaf, gunakan email @kbn.co.id atau @gmail.com untuk proses register.',
                 'data' => [
                     'email' => ['Maaf, gunakan email @kbn.co.id atau @gmail.com untuk proses register.']
                 ]
@@ -278,7 +278,7 @@ public function register(Request $request)
                 return response()->json([
                     'code' => 400,
                     'status' => 'error_validation',
-                    'message' => 'error validation. [400 - bad request]',
+                    'message' => 'Password lama salah.',
                     'data' => [
                         'old_password' => ['Password lama salah.']
                     ]

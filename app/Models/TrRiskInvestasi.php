@@ -39,7 +39,8 @@ class TrRiskInvestasi extends Model
         'menrisk_by',
         'menrisk_at',
         'created_by',
-        'updated_by'
+        'updated_by',
+        'synced_at',
     ];
 
     protected $casts = [

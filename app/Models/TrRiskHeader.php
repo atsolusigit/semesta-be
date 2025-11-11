@@ -13,6 +13,7 @@ class TrRiskHeader extends Model
     protected $table = 'tr_risk_header';
 
     protected $fillable = [
+        'rcsa_id',
         'risk_code',
         'process_code',
         'jenis_risiko',
@@ -47,12 +48,16 @@ class TrRiskHeader extends Model
         'menrisk_note',
         'menrisk_by',
         'menrisk_at',
+        'reviewed',
+        'reviewed_by',
+        'reviewed_at',
         'vp_menrisk_by',
         'vp_menrisk_at',
         'vp_menrisk_note',
     ];
 
     protected $casts = [
+        'rcsa_id' => 'integer',
         'biaya_perlakuan_risiko' => 'decimal:2',
         'process_code' => 'integer',
     ];
@@ -122,6 +127,16 @@ class TrRiskHeader extends Model
     // =====================================
     // RELATIONS
     // =====================================
+
+    public function rcsa()
+    {
+        return $this->belongsTo(TrRcsaHeader::class, 'rcsa_id', 'id');
+    }
+
+    public function reviewedBy()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
 
        public function creatorRole()
     {

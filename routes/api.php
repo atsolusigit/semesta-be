@@ -34,6 +34,9 @@ use App\Http\Controllers\LostEventController;
 use App\Http\Controllers\RencanaInvestasiController;
 use App\Http\Controllers\MstJenisRisikoController;
 use App\Http\Controllers\TrRiskInvestasiController;
+use App\Http\Controllers\MstRcsaController;
+use App\Http\Controllers\RecommendationNotifController;
+use App\Http\Controllers\MstEmailRiskOwnerController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -195,6 +198,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/risk-headers/{id}/reject-menrisk', [TrRiskHeaderController::class, 'rejectMenrisk']);   // Reject menrisk (role 4)
     Route::patch('/risk-headers/{id}/approve-vpmenrisk', [TrRiskHeaderController::class, 'approveVpMenrisk']); // Approve VP MenRisk (role 6)
     Route::patch('/risk-headers/{id}/reject-vpmenrisk', [TrRiskHeaderController::class, 'rejectVpMenrisk']);   // Reject VP MenRisk (role 6)
+    Route::patch('/risk-headers/{id}/review', [TrRiskHeaderController::class, 'reviewRiskHeader']);  // Review risk header (role 1,7)
 });
 
 // ===================== MITIGATION MONTHLY =====================
@@ -311,6 +315,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/lost-events', [LostEventController::class, 'index']); // List header < 50%
     Route::get('/lost-events/{id}', [LostEventController::class, 'show']);
     Route::get('/lost-events/detail/{id}', [LostEventController::class, 'detail']); // Detail by lost_event_id
+    Route::post('/lost-events', [LostEventController::class, 'store']); // Create new lost event
     Route::put('/lost-events/{id}', [LostEventController::class, 'update']); // Update by lost_event_id
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
 });
@@ -353,6 +358,9 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/rcsa-sasaran', [TrRcsaHeaderController::class, 'sasaran']);
     Route::put('/rcsa-header/{id}', [TrRcsaHeaderController::class, 'update']);
     Route::post('/rcsa-header/{id}/submit', [TrRcsaHeaderController::class, 'submit']);
+    Route::patch('/rcsa-header/{id}/approve', [TrRcsaHeaderController::class, 'approve']);
+    Route::patch('/rcsa-header/{id}/reject', [TrRcsaHeaderController::class, 'reject']);
+    Route::patch('/rcsa-header/{id}/is-main-risk', [TrRcsaHeaderController::class, 'updateIsMainRisk']);
 });
 
 // ===================== RENCANA INVESTASI =====================
@@ -371,4 +379,32 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/risk-investasi/{id}/approve', [TrRiskInvestasiController::class, 'approve']);
     Route::patch('/risk-investasi/{id}/reject', [TrRiskInvestasiController::class, 'reject']);
     Route::get('/risk-investasi/erkap/{erkap_id}', [TrRiskInvestasiController::class, 'getByErkapID']);
+});
+
+// ===================== MASTER UNTUK KEPERLUAN OPSI RCSA =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/rcsa-mst', [MstRcsaController::class, 'index']);
+    Route::get('/rcsa-mst/{id}', [MstRcsaController::class, 'show']);
+    Route::post('/rcsa-mst', [MstRcsaController::class, 'store']);
+    Route::put('/rcsa-mst/{id}', [MstRcsaController::class, 'update']);
+    Route::delete('/rcsa-mst/{id}', [MstRcsaController::class, 'destroy']);
+});
+
+// ===================== EMAIL RECOMMENDATION RENCANA INVESTASI =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::post('/send-rekomendasi-investasi', [RecommendationNotifController::class, 'sendRecommendationEmails']);
+    Route::get('/list-rekomendasi/{id}', [RecommendationNotifController::class, 'show']);
+});
+
+// ===================== MASTER EMAIL UNIT KERJA =====================
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'index']);
+    Route::get('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'show']);
+    Route::post('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'store']);
+    Route::put('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'update']);
+    Route::post('/sync-email-unit-kerja', [MstEmailRiskOwnerController::class, 'sync']);
+    Route::delete('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'destroy']);
+    Route::get('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'index']);
+    Route::get('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'show']);
+    Route::post('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'store']);
 });

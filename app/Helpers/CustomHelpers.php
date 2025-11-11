@@ -556,8 +556,8 @@ if (!function_exists('validate_bulk_quantitative_data')) {
             if (array_key_exists('target_quantitative', $monthData) && is_null($monthData['target_quantitative'])) {
                 return [
                     'valid' => false,
-                    'title' => 'Target Quantitative Tidak Boleh Kosong',
-                    'message' => "Data pada index {$index} memiliki kuantitatif target yang kosong. Mohon isi dengan nilai yang valid.",
+                    'title' => 'Data Tidak Boleh Kosong',
+                    'message' => "Ada data yang masih kosong. Mohon mengisi data dengan benar.",
                     'data' => [
                         'header_id' => $headerId,
                         'invalid_index' => $index,
@@ -974,6 +974,30 @@ if (!function_exists('get_decrypted_name')) {
         }
 
         return 'User Tidak diketahui';
+    }
+}
+
+if (!function_exists('get_decrypted_email')) {
+    function get_decrypted_email($userObject)
+    {
+        if (!$userObject || empty($userObject->id)) {
+            return 'Email Tidak diketahui';
+        }
+
+        try {
+            $row = \DB::select("
+                SELECT CAST(AES_DECRYPT(email, CONCAT('SM', ?)) AS CHAR) as result
+                FROM users WHERE id = ? LIMIT 1
+            ", [$userObject->id, $userObject->id]);
+
+            if ($row && !empty($row[0]->result)) {
+                return clean_string($row[0]->result);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Error decrypt email for user ID {$userObject->id}: " . $e->getMessage());
+        }
+
+        return 'Email Tidak diketahui';
     }
 }
 

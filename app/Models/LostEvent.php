@@ -14,6 +14,7 @@ class LostEvent extends Model
 
     protected $fillable = [
         'header_id',
+        'rcsa_id',
         'tahun',
         'risk_owner_department',
         'jenis_risiko',
@@ -56,6 +57,14 @@ class LostEvent extends Model
     public function header()
     {
         return $this->belongsTo(TrRiskHeader::class, 'header_id');
+    }
+
+       /**
+     * Relasi ke TrRcsaHeader
+     */
+    public function rcsa()
+    {
+        return $this->belongsTo(TrRcsaHeader::class, 'rcsa_id');
     }
 
     /**

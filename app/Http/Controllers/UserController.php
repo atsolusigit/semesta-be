@@ -15,12 +15,16 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use App\Mail\UserApprovedMail;
+use App\Mail\UserRejectedMail;
+use Illuminate\Support\Facades\Mail;
 
 class UserController extends Controller
 {
-   public function index(Request $request)
+  public function index(Request $request)
 {
     $search = $request->input('search');
+    $perPage = $request->input('per_page', 10);
     $authUser = auth()->user();
 
     // Cek apakah user yang login ada
@@ -93,10 +97,28 @@ class UserController extends Controller
         ];
     }
 
+    // Manual pagination untuk array result
+    $total = count($result);
+    $currentPage = $request->input('page', 1);
+    $offset = ($currentPage - 1) * $perPage;
+    $paginatedResult = array_slice($result, $offset, $perPage);
+    $lastPage = (int) ceil($total / $perPage);
+
+    // Prepare response dengan pagination
+    $responseData = [
+        'current_page' => (int) $currentPage,
+        'per_page' => (int) $perPage,
+        'total' => $total,
+        'last_page' => $lastPage,
+        'from' => $total > 0 ? $offset + 1 : null,
+        'to' => $total > 0 ? min($offset + $perPage, $total) : null,
+        'data' => $paginatedResult,
+    ];
+
     return response()->json([
         'status' => true,
         'message' => 'List data user.',
-        'data' => $result
+        'data' => $responseData
     ]);
 }
 
@@ -395,15 +417,13 @@ public function show(Request $request, $id)
     public function approveUser($id)
 {
     try {
-        $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
+        $id = encrypt_decrypt_md5('dec', $id);
     } catch (\Throwable $e) {
         return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
     }
 
-    $authUser = auth()->user(); // User yang login
+    $authUser = auth()->user();
 
-    // Cek apakah user yang login memiliki role_id 1 atau 2
-    // Jika bukan, return response unauthorized
     $roleCheck = check_role($authUser, [1, 2]);
     if ($roleCheck !== true) {
         return $roleCheck;
@@ -414,8 +434,6 @@ public function show(Request $request, $id)
         return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
     }
 
-    // Jika role user adalah 2 → hanya bisa approve user dari departement yang sama
-    // Role 1 bisa approve semua user
     if ((int) $authUser->role_id === 2 && $authUser->department_id != $user->department_id) {
         return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menyetujui user di departemen ini.', []);
     }
@@ -423,23 +441,38 @@ public function show(Request $request, $id)
     $user->status = 1;
     $user->save();
 
-    return json(200, 'true', 'success', 'User berhasil diaktifkan.', []);
+    // Kirim email approval ke user
+    try {
+        $userEmail = encrypt_decrypt_db('dec', $user->email, $user->id);
+        $userName = encrypt_decrypt_db('dec', $user->name, $user->id);
+        $userUsername = encrypt_decrypt_db('dec', $user->username, $user->id);
+
+        $userDataForEmail = (object)[
+            'id' => $user->id,
+            'name' => $userName,
+            'username' => $userUsername,
+            'email' => $userEmail,
+        ];
+
+        Mail::to($userEmail)->send(new UserApprovedMail($userDataForEmail));
+    } catch (\Exception $e) {
+        \Log::error('Failed to send approval email: ' . $e->getMessage());
+    }
+
+    return json(200, 'true', 'success', 'User berhasil diaktifkan dan email notifikasi telah dikirim.', []);
 }
 
 public function rejectUser($id)
 {
     try {
-        $id = encrypt_decrypt_md5('dec', $id); // Dekripsi ID menggunakan MD5
+        $id = encrypt_decrypt_md5('dec', $id);
     } catch (\Throwable $e) {
         return json(400, 'false', 'invalid_id', 'ID tidak valid atau gagal didekripsi.', []);
     }
 
-    $authUser = auth()->user(); // User yang login
+    $authUser = auth()->user();
 
-    // Cek apakah user yang login memiliki role_id 1 atau 2
-    // Jika bukan, return response unauthorized
     $roleCheck = check_role($authUser, [1, 2]);
-
     if ($roleCheck !== true) {
         return $roleCheck;
     }
@@ -449,16 +482,37 @@ public function rejectUser($id)
         return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
     }
 
-    // Jika role user adalah 2 → hanya bisa reject user dari departement yang sama
-    // Role 1 bisa reject semua user
     if ((int) $authUser->role_id === 2 && $authUser->department_id != $user->department_id) {
         return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menolak user di departemen ini.', []);
     }
 
-    $user->status = 2;
+    // Update status menjadi rejected
+    $user->status = 2; // 2 = rejected
     $user->save();
 
-    return json(200, 'true', 'success', 'User berhasil ditolak.', []);
+    // Kirim email penolakan
+    try {
+        $userDataForEmail = (object)[
+            'id'       => $user->id,
+            'name'     => get_decrypted_name($user),
+            'username' => get_decrypted_username($user),
+            'email'    => get_decrypted_email($user),
+        ];
+
+        Mail::to($userDataForEmail->email)->send(new UserRejectedMail($userDataForEmail));
+    } catch (\Exception $e) {
+        \Log::error('Failed to send rejection email: ' . $e->getMessage());
+    }
+
+    // Setelah email dikirim, hapus user dari database
+    try {
+        $user->delete();
+    } catch (\Throwable $e) {
+        \Log::error('Gagal menghapus user yang ditolak: ' . $e->getMessage());
+        return json(500, 'false', 'delete_failed', 'User ditolak tetapi gagal dihapus dari database.', []);
+    }
+
+    return json(200, 'true', 'success', 'User berhasil ditolak, email notifikasi telah dikirim, dan data user telah dihapus.', []);
 }
 
    public function getPendingUsers(Request $request)

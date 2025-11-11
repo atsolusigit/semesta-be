@@ -14,58 +14,114 @@ use Illuminate\Support\Arr;
 class MstDepartmentController extends Controller
 {
     public function index(Request $request)
-    {
-        $query = MstDepartment::select('id', 'name', 'abbreviation');
+{
+    $perPage = $request->input('per_page');
 
-        $user = auth()->user();
+    $query = MstDepartment::select('id', 'name', 'abbreviation', 'created_at', 'created_by')
+        ->with('createdBy:id,name,email');
 
-        if ($user) {
-            // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
-            if (!in_array($user->role->id, [1, 2])) {
-                $query->where('id', $user->department_id);
-            }
+    $user = auth()->user();
+
+    if ($user) {
+        // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
+        if (!in_array($user->role->id, [1, 2])) {
+            $query->where('id', $user->department_id);
         }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('abbreviation', 'like', "%{$search}%");
-            });
-        }
-
-        $departments = $query->orderBy('id')->get();
-
-        if ($departments->isEmpty()) {
-            return json(404, false, 'Not Found', 'Data departemen tidak ditemukan.', []);
-        }
-
-        return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $departments);
     }
 
-    public function show($id)
-    {
-        $user = auth()->user();
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('abbreviation', 'like', "%{$search}%");
+        });
+    }
 
-        if ($user) {
-            // Hanya role selain 1 & 2 yang dibatasi
-            if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
-                return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
-            }
-        }
+    // Jika per_page kosong atau = "all", ambil semua data
+    if (empty($perPage) || $perPage === 'all') {
+        $data = $query->orderBy('id')->get();
 
-        $department = MstDepartment::select('id', 'name', 'abbreviation')->find($id);
-
-        if (!$department) {
-            return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
-        }
-
-        $safeData = collect($department)->map(function ($value) {
-            return is_string($value) ? mb_convert_encoding($value, 'UTF-8', 'UTF-8') : $value;
+        $mappedData = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'abbreviation' => $item->abbreviation,
+                'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+                'created_by' => $item->created_by,
+                'created_by_name' => $item->createdBy ? get_decrypted_name($item->createdBy) : null,
+                'created_by_email' => $item->createdBy ? get_decrypted_email($item->createdBy) : null,
+            ];
         });
 
-        return json(200, 'success', 'Success', 'Data department berhasil ditemukan.', $safeData);
+        return json(200, true, 'Success', 'Daftar departemen yang tersedia.', [
+            'total' => $mappedData->count(),
+            'data' => $mappedData,
+        ]);
     }
+
+    // Kalau per_page dikirim, tetap gunakan pagination Laravel
+    $data = $query->orderBy('id')->paginate($perPage);
+
+    $mappedData = $data->getCollection()->map(function ($item) {
+        return [
+            'id' => $item->id,
+            'name' => $item->name,
+            'abbreviation' => $item->abbreviation,
+            'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+            'created_by' => $item->created_by,
+            'created_by_name' => $item->createdBy ? get_decrypted_name($item->createdBy) : null,
+            'created_by_email' => $item->createdBy ? get_decrypted_email($item->createdBy) : null,
+        ];
+    });
+
+    $responseData = [
+        'current_page' => $data->currentPage(),
+        'per_page' => $data->perPage(),
+        'total' => $data->total(),
+        'last_page' => $data->lastPage(),
+        'from' => $data->firstItem(),
+        'to' => $data->lastItem(),
+        'data' => $mappedData,
+    ];
+
+    if ($mappedData->isEmpty()) {
+        return json(404, false, 'Not Found', 'Data departemen tidak ditemukan.', []);
+    }
+
+    return json(200, true, 'Success', 'Daftar departemen yang tersedia.', $responseData);
+}
+
+public function show($id)
+{
+    $user = auth()->user();
+
+    if ($user) {
+        // Hanya role selain 1 & 2 yang dibatasi
+        if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
+            return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
+        }
+    }
+
+    $department = MstDepartment::select('id', 'name', 'abbreviation', 'created_at', 'created_by')
+        ->with('createdBy:id,name,email')
+        ->find($id);
+
+    if (!$department) {
+        return json(404, 'error', 'Not Found', 'Departemen tidak ditemukan.', null);
+    }
+
+    $safeData = [
+        'id' => $department->id,
+        'name' => is_string($department->name) ? mb_convert_encoding($department->name, 'UTF-8', 'UTF-8') : $department->name,
+        'abbreviation' => is_string($department->abbreviation) ? mb_convert_encoding($department->abbreviation, 'UTF-8', 'UTF-8') : $department->abbreviation,
+        'created_at' => $department->created_at ? $department->created_at->format('Y-m-d') : null,
+        'created_by' => $department->created_by,
+        'created_by_name' => $department->createdBy ? get_decrypted_name($department->createdBy) : null,
+        'created_by_email' => $department->createdBy ? get_decrypted_email($department->createdBy) : null,
+    ];
+
+    return json(200, 'success', 'Success', 'Data department berhasil ditemukan.', $safeData);
+}
 
     public function store(Request $request)
     {

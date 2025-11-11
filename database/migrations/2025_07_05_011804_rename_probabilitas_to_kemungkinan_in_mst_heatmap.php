@@ -8,9 +8,9 @@ class RenameProbabilitasToKemungkinanInMstHeatmap extends Migration
 {
     public function up()
     {
-        // Schema::table('mst_heatmap', function (Blueprint $table) {
-        //     $table->renameColumn('probabilitas', 'kemungkinan');
-        // });
+        Schema::table('mst_heatmap', function (Blueprint $table) {
+            $table->renameColumn('probabilitas', 'kemungkinan');
+        });
     }
 
     public function down()

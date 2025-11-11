@@ -8,9 +8,10 @@ use Illuminate\Support\Facades\Validator;
 
 class MstRiskCodeController extends Controller
 {
-    // Ambil semua data jenis risiko
    public function index(Request $request)
 {
+    $perPage = $request->input('per_page');
+
     $query = MstRiskCode::query()->orderBy('id', 'asc');
 
     // Search filter (code dan name)
@@ -22,9 +23,52 @@ class MstRiskCodeController extends Controller
         });
     }
 
-    $data = $query->get();
+    // Jika per_page kosong atau 'all', ambil semua data tanpa pagination
+    if (empty($perPage) || $perPage === 'all') {
+        $data = $query->get();
 
-    return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $data);
+        $mappedData = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'code' => $item->code,
+                'name' => $item->name,
+                'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+                'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+            ];
+        });
+
+        return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', [
+            'total' => $mappedData->count(),
+            'data' => $mappedData,
+        ]);
+    }
+
+    // Pagination
+    $data = $query->paginate((int) $perPage);
+
+    // Mapping data
+    $mappedData = $data->getCollection()->map(function ($item) {
+        return [
+            'id' => $item->id,
+            'code' => $item->code,
+            'name' => $item->name,
+            'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+            'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+        ];
+    });
+
+    // Prepare response dengan pagination
+    $responseData = [
+        'current_page' => $data->currentPage(),
+        'per_page' => $data->perPage(),
+        'total' => $data->total(),
+        'last_page' => $data->lastPage(),
+        'from' => $data->firstItem(),
+        'to' => $data->lastItem(),
+        'data' => $mappedData,
+    ];
+
+    return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $responseData);
 }
 
     // Tambah data jenis risiko

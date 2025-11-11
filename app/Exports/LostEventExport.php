@@ -7,7 +7,6 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -65,7 +64,6 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
 
         return [
             ["LAPORAN LOST EVENT"],
-            // Hilangkan baris nama departemen
             ["Tanggal Cetak: {$tanggalCetak}"],
             [],
             [
@@ -100,7 +98,7 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
 
     public function styles(Worksheet $sheet)
     {
-        $headerRow = 4; // karena hanya 3 baris header sekarang
+        $headerRow = 4;
         $lastRow = $this->data->count() + $headerRow;
 
         // Merge dan isi header
@@ -133,8 +131,12 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
                 'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
             ],
         ]);
+
+        // Set minimum row height untuk header
+        $sheet->getRowDimension($headerRow)->setRowHeight(30);
 
         // Border semua sel
         $sheet->getStyle("A{$headerRow}:Y{$lastRow}")->applyFromArray([
@@ -146,35 +148,20 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
             ],
         ]);
 
-        // Wrap text untuk kolom tertentu
-        $wrapCols = ['F', 'H', 'I', 'J', 'K', 'P', 'T', 'U', 'V'];
-        foreach ($wrapCols as $col) {
-            $sheet->getStyle("{$col}5:{$col}{$lastRow}")->getAlignment()->setWrapText(true);
-        }
+        // Wrap text untuk SEMUA kolom data (kecuali No)
+        $sheet->getStyle("B5:Y{$lastRow}")->getAlignment()->setWrapText(true);
 
-        // Center alignment
+        // Vertical alignment untuk semua data
+        $sheet->getStyle("A5:Y{$lastRow}")->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+
+        // Center alignment untuk kolom tertentu
         $sheet->getStyle("A5:A{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle("B5:B{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle("Y5:Y{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // Auto-size khusus untuk kolom nilai (Q, W, X)
-        // Kolom Q = Nilai Kerugian, W = Nilai Premi, X = Nilai Klaim
-        $nilaiColumns = ['Q', 'W', 'X'];
-        foreach ($nilaiColumns as $col) {
-            // Cari lebar maksimal dari data di kolom ini
-            $maxLength = 15; // minimum width
-            $columnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($col);
-
-            for ($row = 5; $row <= $lastRow; $row++) {
-                $cellValue = $sheet->getCell("{$col}{$row}")->getValue();
-                $cellLength = strlen((string)$cellValue);
-                if ($cellLength > $maxLength) {
-                    $maxLength = $cellLength;
-                }
-            }
-
-            // Set width dengan buffer sedikit
-            $sheet->getColumnDimension($col)->setWidth(min($maxLength + 2, 35));
+        // Set minimum row height untuk setiap baris data agar text tidak terpotong
+        for ($row = 5; $row <= $lastRow; $row++) {
+            $sheet->getRowDimension($row)->setRowHeight(-1); // Auto height
         }
 
         return [];
@@ -183,11 +170,31 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
     public function columnWidths(): array
     {
         return [
-            'A' => 5,   'B' => 8,   'C' => 30,  'D' => 20,  'E' => 25,
-            'F' => 30,  'G' => 20,  'H' => 30,  'I' => 30,  'J' => 30,
-            'K' => 35,  'L' => 20,  'M' => 15,  'N' => 25,  'O' => 35,
-            'P' => 30,  'Q' => -1,  'R' => 20,  'S' => 25,  'T' => 35,
-            'U' => 30,  'V' => 30,  'W' => -1,  'X' => -1,  'Y' => 12,
+            'A' => 5,   // No
+            'B' => 8,   // Tahun
+            'C' => 30,  // Risk Owner Department
+            'D' => 25,  // Jenis Risiko
+            'E' => 30,  // Nama Kejadian
+            'F' => 35,  // Identifikasi Kejadian
+            'G' => 25,  // Kategori Kejadian
+            'H' => 35,  // Sumber Penyebab Kejadian
+            'I' => 35,  // Penyebab Kejadian
+            'J' => 35,  // Penanganan Saat Kejadian
+            'K' => 40,  // Deskripsi Kejadian
+            'L' => 25,  // Pihak Terkait
+            'M' => 20,  // Status Asuransi
+            'N' => 30,  // Kategori Risiko BUMN
+            'O' => 40,  // Kategori Risiko T2 & T3 KBUMN
+            'P' => 35,  // Penjelasan Kerugian
+            'Q' => 20,  // Nilai Kerugian
+            'R' => 20,  // Kejadian Berulang
+            'S' => 20,  // Frekuensi Kejadian
+            'T' => 40,  // Mitigasi Yang Direncanakan
+            'U' => 35,  // Realisasi Mitigasi
+            'V' => 35,  // Perbaikan Mendatang
+            'W' => 20,  // Nilai Premi
+            'X' => 20,  // Nilai Klaim
+            'Y' => 12,  // Realisasi (%)
         ];
     }
 

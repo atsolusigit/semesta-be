@@ -24,7 +24,7 @@ class LostEventController extends Controller
         return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk melihat data ini.', null);
     }
 
-    $perPage = $request->input('per_page', 10);
+    $perPage = $request->input('per_page');
     $filterType = strtolower($request->query('type', ''));
     $search = $request->query('search');
 
@@ -332,6 +332,17 @@ class LostEventController extends Controller
         return $b['lost_event_id'] - $a['lost_event_id'];
     })->values();
 
+    // Jika per_page kosong atau = "all", ambil semua data
+    if (empty($perPage) || $perPage === 'all') {
+        $cleanData = clean_recursive([
+            'total' => $sortedData->count(),
+            'data' => $sortedData->toArray(),
+        ]);
+
+        return json(200, true, 'Data Ditemukan', 'Data header dengan realisasi di bawah threshold bahaya dan lost event independen berhasil diambil.', $cleanData);
+    }
+
+    // Kalau per_page dikirim, gunakan pagination
     $page = $request->input('page', 1);
     $paginatedData = new \Illuminate\Pagination\LengthAwarePaginator(
         $sortedData->forPage($page, $perPage),
@@ -348,7 +359,7 @@ class LostEventController extends Controller
         'last_page' => $paginatedData->lastPage(),
         'from' => $paginatedData->firstItem(),
         'to' => $paginatedData->lastItem(),
-        'data' => array_values($paginatedData->items()), // tetap menggunakan array_values untuk reset index
+        'data' => array_values($paginatedData->items()),
     ]);
 
     return json(200, true, 'Data Ditemukan', 'Data header dengan realisasi di bawah threshold bahaya dan lost event independen berhasil diambil.', $cleanData);

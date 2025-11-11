@@ -870,107 +870,39 @@ public function exportLostEvent(Request $request, $format)
     $user = Auth::user();
 
     $filterYear = $request->get('year');
-    $filterType = strtolower($request->get('type', '')); // <--- Tambahan filter type
+    $filterType = strtolower($request->get('type', ''));
     $filterDepartment = $request->get('department_id');
     $search = $request->get('search');
 
-    // Ambil data header
-    $headers = TrRiskHeader::with([
-        'department:id,name',
-        'optionTargetSatuTahun:id,name,type',
-        'jenisRisiko:id,nama_jenis_risiko',
-        'monthlyData' => function ($query) {
-            $query->where('is_finalize', true)->orderBy('month', 'asc');
+    // Ambil data dari LostEvent dengan relasi header untuk perhitungan persentase
+    $lostEvents = \App\Models\LostEvent::with([
+        'header' => function ($query) {
+            $query->with([
+                'optionTargetSatuTahun:id,name,type',
+                'monthlyData' => function ($q) {
+                    $q->where('is_finalize', true)->orderBy('month', 'asc');
+                }
+            ]);
         }
     ])
     ->when($filterYear, function ($query) use ($filterYear) {
-        $query->where('year', $filterYear);
+        $query->where('tahun', $filterYear);
     })
     ->when($filterDepartment, function ($query) use ($filterDepartment) {
-        $query->where('department_id', $filterDepartment);
+        $query->where('risk_owner_department', 'like', '%' . $filterDepartment . '%');
     })
     ->when($search, function ($query) use ($search) {
         $query->where(function ($q) use ($search) {
-            $q->where('year', 'like', '%' . $search . '%')
+            $q->where('tahun', 'like', '%' . $search . '%')
               ->orWhere('jenis_risiko', 'like', '%' . $search . '%')
-              ->orWhere('peristiwa_risiko', 'like', '%' . $search . '%')
-              ->orWhereHas('department', function ($dept) use ($search) {
-                  $dept->where('name', 'like', '%' . $search . '%');
-              });
+              ->orWhere('nama_kejadian', 'like', '%' . $search . '%')
+              ->orWhere('identifikasi_kejadian', 'like', '%' . $search . '%')
+              ->orWhere('risk_owner_department', 'like', '%' . $search . '%');
         });
     })
-    ->orderBy('id', 'desc')
-    ->get()
-    ->unique('id')
-    ->values();
-
-    if ($headers->isEmpty()) {
-        return response()->json([
-            'status' => 404,
-            'success' => false,
-            'message' => 'Tidak ada data Lost Event untuk diexport.',
-        ], 404);
-    }
-
-    $filteredData = collect();
-
-    foreach ($headers as $item) {
-        $targetType = optional($item->optionTargetSatuTahun)->type;
-
-        if (!$targetType) {
-            if (!empty($item->target_quantitative_satu_tahun) && preg_match('/\d/', $item->target_quantitative_satu_tahun)) {
-                $targetType = 'kuantitatif';
-            } elseif (!empty($item->target_satu_tahun_notes)) {
-                $targetType = 'kualitatif';
-            }
-        }
-
-        $normalizedType = strtolower($targetType ?? 'unknown');
-
-        // Hitung persentase capaian
-        $percentage = 0;
-        if (in_array($normalizedType, ['kuantitatif', 'quantitative'])) {
-            $totalTarget = 0;
-            $totalRealisasi = 0;
-            foreach ($item->monthlyData as $monthly) {
-                $targetNum = (float) preg_replace('/[^0-9]/', '', $monthly->target_quantitative ?? '0');
-                $realNum = (float) preg_replace('/[^0-9]/', '', $monthly->realization_quantitative ?? '0');
-                $totalTarget += $targetNum;
-                $totalRealisasi += $realNum;
-            }
-            if ($totalTarget > 0) {
-                $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
-            }
-        } elseif (in_array($normalizedType, ['kualitatif', 'qualitative'])) {
-            $desemberData = $item->monthlyData->firstWhere('month', 12);
-            if ($desemberData && !empty($desemberData->realization_kualitatif)) {
-                $realText = trim(str_replace(['%', ','], ['', '.'], $desemberData->realization_kualitatif));
-                $percentage = round((float) $realText, 2);
-            }
-        }
-
-        $item->calculated_percentage = $percentage;
-        $item->detected_type = $normalizedType;
-        // Filter berdasarkan type jika diberikan
-        if (empty($filterType) || $normalizedType === $filterType) {
-            $filteredData->push($item);
-        }
-    }
-
-    if ($filteredData->isEmpty()) {
-        return response()->json([
-            'status' => 404,
-            'success' => false,
-            'message' => 'Data Lost Event tidak ditemukan untuk filter tersebut.',
-        ], 404);
-    }
-
-    // Ambil data Lost Event
-    $headerIds = $filteredData->pluck('id')->toArray();
-    $lostEvents = \App\Models\LostEvent::whereIn('header_id', $headerIds)
-        ->withTrashed()
-        ->get()
-        ->keyBy('header_id');
+    ->withTrashed()
+    ->orderBy('id', 'asc')
+    ->get();
 
     if ($lostEvents->isEmpty()) {
         return response()->json([
@@ -980,8 +912,87 @@ public function exportLostEvent(Request $request, $format)
         ], 404);
     }
 
+    // Hitung persentase untuk setiap lost event (sama seperti di index)
+    foreach ($lostEvents as $lostEvent) {
+        $percentage = 0;
+        $detectedType = 'independent';
+
+        // Jika ada header, hitung persentase
+        if ($lostEvent->header && $lostEvent->header->monthlyData->isNotEmpty()) {
+            $targetType = optional($lostEvent->header->optionTargetSatuTahun)->type;
+
+            // Deteksi type jika tidak ada di optionTargetSatuTahun
+            if (!$targetType) {
+                if (!empty($lostEvent->header->target_quantitative_satu_tahun) &&
+                    preg_match('/\d/', $lostEvent->header->target_quantitative_satu_tahun)) {
+                    $targetType = 'kuantitatif';
+                } elseif (!empty($lostEvent->header->target_satu_tahun_notes)) {
+                    $targetType = 'kualitatif';
+                }
+            }
+
+            $normalizedType = strtolower($targetType ?? 'unknown');
+            $detectedType = $normalizedType;
+
+            // Hitung persentase untuk Kuantitatif
+            if (in_array($normalizedType, ['kuantitatif', 'quantitative'])) {
+                $totalTarget = 0;
+                $totalRealisasi = 0;
+
+                foreach ($lostEvent->header->monthlyData as $monthly) {
+                    $targetNum = (float) preg_replace('/[^0-9]/', '', $monthly->target_quantitative ?? '0');
+                    $realNum = (float) preg_replace('/[^0-9]/', '', $monthly->realization_quantitative ?? '0');
+                    $totalTarget += $targetNum;
+                    $totalRealisasi += $realNum;
+                }
+
+                if ($totalTarget > 0) {
+                    $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+                }
+            }
+            // Hitung persentase untuk Kualitatif
+            elseif (in_array($normalizedType, ['kualitatif', 'qualitative'])) {
+                $totalTarget = 0;
+                $totalRealisasi = 0;
+
+                foreach ($lostEvent->header->monthlyData as $monthly) {
+                    $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+                    $targetNum = (float) $targetText;
+
+                    $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+                    $realNum = (float) $realText;
+
+                    $totalTarget += $targetNum;
+                    $totalRealisasi += $realNum;
+                }
+
+                if ($totalTarget > 0) {
+                    $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+                }
+            }
+        }
+
+        $lostEvent->calculated_percentage = $percentage;
+        $lostEvent->detected_type = $detectedType;
+    }
+
+    // Filter berdasarkan type jika diberikan
+    if (!empty($filterType)) {
+        $lostEvents = $lostEvents->filter(function ($lostEvent) use ($filterType) {
+            return strtolower($lostEvent->detected_type) === $filterType;
+        })->values();
+
+        if ($lostEvents->isEmpty()) {
+            return response()->json([
+                'status' => 404,
+                'success' => false,
+                'message' => 'Data Lost Event tidak ditemukan untuk filter type tersebut.',
+            ], 404);
+        }
+    }
+
     // Siapkan data export
-    $exportData = $this->prepareLostEventData($filteredData, $lostEvents);
+    $exportData = $this->prepareLostEventData($lostEvents);
     if (empty($exportData)) {
         return response()->json([
             'status' => 404,
@@ -990,7 +1001,7 @@ public function exportLostEvent(Request $request, $format)
         ], 404);
     }
 
-    $departmentName = $this->getDepartmentNameFromHeaders($filteredData, $filterDepartment);
+    $departmentName = $filterDepartment ?? 'SEMUA_DEPARTEMEN';
     $yearName = $filterYear ?? 'SEMUA_TAHUN';
 
     try {
@@ -1011,30 +1022,29 @@ public function exportLostEvent(Request $request, $format)
 
 
 /**
- * Prepare data untuk export
+ * Prepare data untuk export - mengambil dari LostEvent dengan perhitungan persentase
  */
-private function prepareLostEventData($headers, $lostEvents)
+private function prepareLostEventData($lostEvents)
 {
     $data = [];
     $no = 1;
 
-    foreach ($headers as $item) {
-        $lostEvent = $lostEvents->get($item->id);
-
-        if (!$lostEvent) {
-            continue;
-        }
+    foreach ($lostEvents as $lostEvent) {
+        // Format persentase: jika 0 atau tidak ada header maka 0%, jika ada maka tampilkan dengan 2 desimal
+        $percentageFormatted = $lostEvent->calculated_percentage !== null && $lostEvent->calculated_percentage > 0
+            ? rtrim(rtrim(number_format($lostEvent->calculated_percentage, 2), '0'), '.') . '%'
+            : '0%';
 
         $data[] = [
             'no' => $no++,
-            'tahun' => $item->year,
-            'risk_owner_department' => optional($item->department)->name ?? '',
-             'jenis_risiko' => $item->jenisRisiko->nama_jenis_risiko ?? '',
+            'tahun' => $lostEvent->tahun ?? '',
+            'risk_owner_department' => $lostEvent->risk_owner_department ?? '',
+            'jenis_risiko' => $lostEvent->jenis_risiko ?? '',
             'nama_kejadian' => $lostEvent->nama_kejadian ?? '',
-            'identifikasi_kejadian' => $item->peristiwa_risiko ?? '',
+            'identifikasi_kejadian' => $lostEvent->identifikasi_kejadian ?? '',
             'kategori_kejadian' => $lostEvent->kategori_kejadian ?? '',
             'sumber_penyebab_kejadian' => $lostEvent->sumber_penyebab_kejadian ?? '',
-            'penyebab_kejadian' => $item->penyebab_risiko ?? '',
+            'penyebab_kejadian' => $lostEvent->penyebab_kejadian ?? '',
             'penanganan_saat_kejadian' => $lostEvent->penanganan_saat_kejadian ?? '',
             'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian ?? '',
             'pihak_terkait' => $lostEvent->pihak_terkait ?? '',
@@ -1046,15 +1056,15 @@ private function prepareLostEventData($headers, $lostEvents)
             'nilai_kerugian_formatted' => $this->formatCurrency($lostEvent->nilai_kerugian ?? 0),
             'kejadian_berulang' => $lostEvent->kejadian_berulang ?? '',
             'frekuensi_kejadian' => $lostEvent->frekuensi_kejadian ?? '',
-            'mitigasi_yang_direncanakan' => $item->mitigasi ?? '',
+            'mitigasi_yang_direncanakan' => $lostEvent->mitigasi_yang_direncanakan ?? '',
             'realisasi_mitigasi' => $lostEvent->realisasi_mitigasi ?? '',
             'perbaikan_mendatang' => $lostEvent->perbaikan_mendatang ?? '',
             'nilai_premi' => $lostEvent->nilai_premi ?? 0,
             'nilai_premi_formatted' => $this->formatCurrency($lostEvent->nilai_premi ?? 0),
             'nilai_klaim' => $lostEvent->nilai_klaim ?? 0,
             'nilai_klaim_formatted' => $this->formatCurrency($lostEvent->nilai_klaim ?? 0),
-            'realization_percentage' => number_format($item->calculated_percentage, 2) . '%',
-            'type' => $item->detected_type ?? 'unknown',
+            'realization_percentage' => $percentageFormatted,
+            'type' => $lostEvent->detected_type ?? 'independent',
         ];
     }
 

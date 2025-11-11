@@ -15,7 +15,7 @@ class MstDepartmentController extends Controller
 {
     public function index(Request $request)
 {
-    $perPage = $request->input('per_page', 10);
+    $perPage = $request->input('per_page');
 
     $query = MstDepartment::select('id', 'name', 'abbreviation', 'created_at', 'created_by')
         ->with('createdBy:id,name,email');
@@ -37,10 +37,31 @@ class MstDepartmentController extends Controller
         });
     }
 
-    // Pagination
+    // Jika per_page kosong atau = "all", ambil semua data
+    if (empty($perPage) || $perPage === 'all') {
+        $data = $query->orderBy('id')->get();
+
+        $mappedData = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'abbreviation' => $item->abbreviation,
+                'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+                'created_by' => $item->created_by,
+                'created_by_name' => $item->createdBy ? get_decrypted_name($item->createdBy) : null,
+                'created_by_email' => $item->createdBy ? get_decrypted_email($item->createdBy) : null,
+            ];
+        });
+
+        return json(200, true, 'Success', 'Daftar departemen yang tersedia.', [
+            'total' => $mappedData->count(),
+            'data' => $mappedData,
+        ]);
+    }
+
+    // Kalau per_page dikirim, tetap gunakan pagination Laravel
     $data = $query->orderBy('id')->paginate($perPage);
 
-    // Mapping data
     $mappedData = $data->getCollection()->map(function ($item) {
         return [
             'id' => $item->id,
@@ -53,7 +74,6 @@ class MstDepartmentController extends Controller
         ];
     });
 
-    // Prepare response dengan pagination
     $responseData = [
         'current_page' => $data->currentPage(),
         'per_page' => $data->perPage(),

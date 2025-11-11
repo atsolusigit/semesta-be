@@ -39,7 +39,8 @@ class TrRiskInvestasi extends Model
         'menrisk_by',
         'menrisk_at',
         'created_by',
-        'updated_by'
+        'updated_by',
+        'synced_at',
     ];
 
     protected $casts = [
@@ -60,6 +61,6 @@ class TrRiskInvestasi extends Model
 
     public function approvedByUser()
     {
-        return $this->belongsTo(User::class, 'approved_by')->select(['id','name','username']);
+        return $this->belongsTo(User::class, 'approved_by', 'id');
     }
 }

@@ -368,9 +368,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::post('/investasi', [RencanaInvestasiController::class, 'store']);
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
     Route::get('/export-rencana-investasi/{format}', [RencanaInvestasiController::class, 'export'])
-        ->where(['format' => 'pdf|excel'])
-        // ->middleware(RoleAccessMiddleware::class . ':1,2,3')
-        ;
+        ->where(['format' => 'pdf|excel']);
 
     Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
     Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);

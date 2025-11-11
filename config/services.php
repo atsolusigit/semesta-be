@@ -39,6 +39,7 @@ return [
         'base_url'   => env('ERKAP_BASE_URL'),
         'basic_auth' => env('ERKAP_BASIC_AUTH'),
         'sync_time'  => env('ERKAP_SYNC_TIME', '01:00'),
+        'prefetch_time' => env('ERKAP_PREFETCH_TIME', '22:30'),
     ],
 
 

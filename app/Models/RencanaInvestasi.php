@@ -40,6 +40,7 @@ class RencanaInvestasi extends Model
         'updated_by',
         'created_at',
         'updated_at',
+        'last_sync', 
     ];
 
     protected $casts = [
@@ -55,6 +56,7 @@ class RencanaInvestasi extends Model
         'nilai_budget_transfer'  => 'decimal:2',
         'nilai_realisasi'        => 'decimal:2',
         'nilai_kontrak_total'    => 'decimal:2',
+        'last_sync'             => 'datetime',
     ];
 
     public function createdBy()

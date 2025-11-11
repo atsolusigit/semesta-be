@@ -15,155 +15,199 @@ use App\Exports\RencanaInvestasi\MultiSheetRencanaInvestasiExport;
 class RencanaInvestasiController extends Controller
 {
     public function index(Request $request)
-    {
-        $perPage   = (int) $request->input('per_page', 10);
-        $sortBy    = $request->input('sortBy');
-        $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
+{
+    $perPage   = (int) $request->input('per_page', 10);
+    $sortBy    = $request->input('sortBy');
+    $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $sortMap = [
-            'tahun'                 => 'year',
-            'nilai'                 => 'nilai_rkap',
-            'nilai_erkap'           => 'nilai_rkap',
-            'nilai_revisi'          => 'nilai_revisi',
-            'nilai_budget_transfer' => 'nilai_budget_transfer',
-        ];
-        $sortColumn = $sortMap[$sortBy] ?? 'rencana_investasi.id';
+    $sortMap = [
+        'tahun'                 => 'year',
+        'nilai'                 => 'nilai_rkap',
+        'nilai_erkap'           => 'nilai_rkap',
+        'nilai_revisi'          => 'nilai_revisi',
+        'nilai_budget_transfer' => 'nilai_budget_transfer',
+    ];
+    $sortColumn = $sortMap[$sortBy] ?? 'rencana_investasi.id';
 
-        $now   = now();
-        $tahun = (int) ($request->integer('tahun') ?: $now->year);
-        $bulan = (int) ($request->integer('bulan') ?: $now->month);
-        $week  = (int) ($request->integer('week')  ?: ceil($now->day / 7));
+    $now   = now();
+    $tahun = (int) ($request->integer('tahun') ?: $now->year);
+    $bulan = (int) ($request->integer('bulan') ?: $now->month);
+    $week  = (int) ($request->integer('week')  ?: ceil($now->day / 7));
 
-        $query = RencanaInvestasi::query()
-            ->select('rencana_investasi.*', 'mst_email_unit_kerja.unit_kerja_nama as department_name_joined')
-            ->leftJoin('mst_email_unit_kerja', 'rencana_investasi.unit_kerja_id', '=', 'mst_email_unit_kerja.unit_kerja_id')
-            ->with([
-                'createdBy:id,username',
-                'updatedBy:id,username',
-                'riskInvestasi:erkap_id,status,approved_by,approved_at,dampak_risiko_awal,kemungkinan_awal,eksposure_level_awal,eksposure_ltmh_awal,dampak_risiko_akhir,kemungkinan_akhir,eksposure_level_akhir,eksposure_ltmh_akhir,biaya_mitigasi_risiko',
-                'riskInvestasi.approvedByUser:id,username,name',
-                'periods' => function ($q) use ($tahun, $bulan, $week, $request) {
-                    $q->where('year', $tahun)
-                    ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
-                    ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
-                },
-            ])
-            ->when($request->filled('tahun'), fn($q) => $q->where('rencana_investasi.year', (int)$request->tahun))
-            ->when($request->filled('jenis_investasi'), fn($q) => $q->where('rencana_investasi.jenis_investasi', 'like', '%'.$request->jenis_investasi.'%'))
-            ->when($request->filled('department_name'), function ($q) use ($request) {
-                $q->where(function ($qq) use ($request) {
-                    $qq->where('rencana_investasi.department_name', 'like', '%'.$request->department_name.'%')
-                    ->orWhere('mst_email_unit_kerja.unit_kerja_nama', 'like', '%'.$request->department_name.'%');
+    // === Normalisasi filter ===
+    $filterTahun = $request->filled('tahun') ? (int)$request->get('tahun') : null;
+    $filterJenis = $request->filled('jenis_investasi') ? trim((string)$request->get('jenis_investasi')) : null;
+
+    // unit/divisi/risk owner: terima banyak alias; angka dianggap ID, teks dianggap nama
+    $unitParam = $request->get('unit')
+        ?? $request->get('divisi')
+        ?? $request->get('risk_owner')
+        ?? $request->get('department_id')
+        ?? $request->get('unit_kerja_id')
+        ?? $request->get('department_name');
+
+    $query = RencanaInvestasi::query()
+        ->select('rencana_investasi.*', 'mst_email_unit_kerja.unit_kerja_nama as department_name_joined')
+        ->leftJoin('mst_email_unit_kerja', 'rencana_investasi.unit_kerja_id', '=', 'mst_email_unit_kerja.unit_kerja_id')
+        ->with([
+            'createdBy:id,username',
+            'updatedBy:id,username',
+            'riskInvestasi:erkap_id,status,approved_by,approved_at,dampak_risiko_awal,kemungkinan_awal,eksposure_level_awal,eksposure_ltmh_awal,dampak_risiko_akhir,kemungkinan_akhir,eksposure_level_akhir,eksposure_ltmh_akhir,biaya_mitigasi_risiko',
+            'riskInvestasi.approvedByUser:id,username,name',
+            'periods' => function ($q) use ($tahun, $bulan, $week, $request) {
+                $q->where('year', $tahun)
+                  ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
+                  ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
+            },
+        ])
+        // Filter TAHUN (opsional)
+        ->when(!is_null($filterTahun), fn($q) => $q->where('rencana_investasi.year', $filterTahun))
+
+        // Filter JENIS INVESTASI (opsional)
+        ->when($filterJenis, fn($q) =>
+            $q->where('rencana_investasi.jenis_investasi', 'like', '%'.$filterJenis.'%')
+        )
+
+        // Filter UNIT/DIVISI/RISK OWNER (opsional, angka=id; teks=nama)
+        ->when(!is_null($unitParam), function ($q) use ($unitParam) {
+            if (is_numeric($unitParam)) {
+                $id = (int)$unitParam;
+                $q->where(function ($qq) use ($id) {
+                    $qq->where('rencana_investasi.department_id', $id)
+                       ->orWhere('rencana_investasi.unit_kerja_id', $id);
                 });
-            })
-            ->when($request->filled('erkap_id'), fn($q) => $q->where('rencana_investasi.erkap_id', (int)$request->erkap_id))
-            ->when($request->filled('bulan') || $request->filled('week'), function ($q) use ($tahun, $bulan, $week, $request) {
-                $q->whereHas('periods', function ($qq) use ($tahun, $bulan, $week, $request) {
-                    $qq->where('year', $tahun)
-                    ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
-                    ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
-                });
-            })
-            ->orderBy($sortColumn, $sortOrder);
-
-        $data = $query->paginate($perPage);
-
-        if (empty($data->items())) {
-            return json(404, false, 'Tidak Ada Data', 'Data rencana investasi tidak ditemukan.', null);
-        }
-
-        $resData = collect($data->items())->map(function ($it) use ($tahun, $bulan, $week) {
-            $period = $it->periods->first();
-
-            $targetTimeline = null;
-            $cache = \App\Models\RencanaInvestasiTimelineYear::where('erkap_id', $it->erkap_id)
-                ->where('year', $tahun)
-                ->first();
-
-            if ($cache && is_array($cache->timeline_json)) {
-                $bulanEntry = collect($cache->timeline_json)->firstWhere('bulan_id', (int)$bulan);
-                if (is_array($bulanEntry)) {
-                    $w = max(1, min((int)$week, 4));
-                    $colorKey = "week{$w}_color";
-                    $labelKey = "week{$w}_label";
-                    $color = $bulanEntry[$colorKey] ?? null;
-                    $label = $bulanEntry[$labelKey] ?? null;
-                    if ($color || $label) {
-                        $targetTimeline = ['color' => $color, 'label' => $label];
-                    }
+            } else {
+                $name = trim((string)$unitParam);
+                if ($name !== '') {
+                    $q->where(function ($qq) use ($name) {
+                        $qq->where('rencana_investasi.department_name', 'like', '%'.$name.'%')
+                           ->orWhere('mst_email_unit_kerja.unit_kerja_nama', 'like', '%'.$name.'%');
+                    });
                 }
             }
+        })
 
-            $realisasiTimeline = !empty($it->realisasi_timeline)
-                ? (is_string($it->realisasi_timeline)
-                    ? $it->realisasi_timeline
-                    : json_encode($it->realisasi_timeline))
-                : null;
+        // Backward-compat: tetap hormati parameter lama 'department_name'
+        ->when($request->filled('department_name'), function ($q) use ($request) {
+            $name = trim($request->department_name);
+            if ($name !== '') {
+                $q->where(function ($qq) use ($name) {
+                    $qq->where('rencana_investasi.department_name', 'like', '%'.$name.'%')
+                       ->orWhere('mst_email_unit_kerja.unit_kerja_nama', 'like', '%'.$name.'%');
+                });
+            }
+        })
 
-            $departmentName = $it->department_name_joined ?? $it->department_name;
+        // Filter erkap id (tetap ada)
+        ->when($request->filled('erkap_id'), fn($q) => $q->where('rencana_investasi.erkap_id', (int)$request->erkap_id))
 
-            return [
-                'id'                      => $it->id,
-                'erkap_id'                => $it->erkap_id,
-                'department_name'         => $departmentName,
-                'nama_investasi'          => $it->nama_investasi,
-                'kategori_investasi'      => $it->kategori_investasi,
-                'jenis_investasi'         => $it->jenis_investasi,
-                'year'                    => $it->year,
-                'nilai_rkap'              => $it->nilai_rkap,
-                'nilai_revisi'            => $it->nilai_revisi,
-                'nilai_budget_transfer'   => $it->nilai_budget_transfer,
-                'nilai_realisasi'         => $it->nilai_realisasi,
-                'target_timeline'         => $targetTimeline,
-                'realisasi_timeline'      => $realisasiTimeline,
-                'ld_inherent'             => $it->ld_inherent,
-                'dampak_inherent'         => $it->dampak_inherent,
-                'ld_current'              => $it->ld_current,
-                'lk_current'              => $it->lk_current,
-                'level_current'           => $it->level_current,
-                'dampak_current'          => $it->dampak_current,
-                'level_residual'          => $it->level_residual,
-                'dampak_residual'         => $it->dampak_residual,
-                'keterangan'              => $it->keterangan,
-                'status'                  => $it->status,
-                'has_risk_profile'        => (bool) $it->riskInvestasi,
-                'risk_investasi' => $it->riskInvestasi ? [
-                    'erkap_id'               => $it->riskInvestasi->erkap_id,
-                    'status'                 => $it->riskInvestasi->status,
-                    'approved_by'            => $it->riskInvestasi->approved_by,
-                    'approved_by_name'       => $it->riskInvestasi->approvedByUser ? get_decrypted_name($it->riskInvestasi->approvedByUser) : null,
-                    'approved_at'            => optional($it->riskInvestasi->approved_at)->toISOString(),
-                    'dampak_risiko_awal'     => $it->riskInvestasi->dampak_risiko_awal,
-                    'kemungkinan_awal'       => $it->riskInvestasi->kemungkinan_awal,
-                    'eksposure_level_awal'   => $it->riskInvestasi->eksposure_level_awal,
-                    'eksposure_ltmh_awal'    => $it->riskInvestasi->eksposure_ltmh_awal,
-                    'dampak_risiko_akhir'    => $it->riskInvestasi->dampak_risiko_akhir,
-                    'kemungkinan_akhir'      => $it->riskInvestasi->kemungkinan_akhir,
-                    'eksposure_level_akhir'  => $it->riskInvestasi->eksposure_level_akhir,
-                    'eksposure_ltmh_akhir'   => $it->riskInvestasi->eksposure_ltmh_akhir,
-                    'biaya_mitigasi_risiko'  => $it->riskInvestasi->biaya_mitigasi_risiko,
-                ] : null,
-                'created_at'              => optional($it->created_at)->toISOString(),
-                'updated_at'              => optional($it->updated_at)->toISOString(),
-                'created_by'              => $it->created_by,
-                'created_by_name'         => get_decrypted_name($it->createdBy),
-                'updated_by'              => $it->updated_by,
-                'updated_by_name'         => $it->updatedBy ? get_decrypted_name($it->updatedBy) : null,
-            ];
-        });
+        // Filter periods jika bulan/week diberikan
+        ->when($request->filled('bulan') || $request->filled('week'), function ($q) use ($tahun, $bulan, $week, $request) {
+            $q->whereHas('periods', function ($qq) use ($tahun, $bulan, $week, $request) {
+                $qq->where('year', $tahun)
+                   ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
+                   ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
+            });
+        })
+        ->orderBy($sortColumn, $sortOrder);
 
-        $cleanData = clean_recursive([
-            'current_page' => $data->currentPage(),
-            'per_page'     => $data->perPage(),
-            'total'        => $data->total(),
-            'last_page'    => $data->lastPage(),
-            'from'         => $data->firstItem(),
-            'to'           => $data->lastItem(),
-            'data'         => $resData,
-        ]);
+    $data = $query->paginate($perPage);
 
-        return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
+    if (empty($data->items())) {
+        return json(404, false, 'Tidak Ada Data', 'Data rencana investasi tidak ditemukan.', null);
     }
+
+    $resData = collect($data->items())->map(function ($it) use ($tahun, $bulan, $week) {
+        $targetTimeline = null;
+        $cache = \App\Models\RencanaInvestasiTimelineYear::where('erkap_id', $it->erkap_id)
+            ->where('year', $tahun)
+            ->first();
+
+        if ($cache && is_array($cache->timeline_json)) {
+            $bulanEntry = collect($cache->timeline_json)->firstWhere('bulan_id', (int)$bulan);
+            if (is_array($bulanEntry)) {
+                $w = max(1, min((int)$week, 4));
+                $colorKey = "week{$w}_color";
+                $labelKey = "week{$w}_label";
+                $color = $bulanEntry[$colorKey] ?? null;
+                $label = $bulanEntry[$labelKey] ?? null;
+                if ($color || $label) {
+                    $targetTimeline = ['color' => $color, 'label' => $label];
+                }
+            }
+        }
+
+        $realisasiTimeline = !empty($it->realisasi_timeline)
+            ? (is_string($it->realisasi_timeline)
+                ? $it->realisasi_timeline
+                : json_encode($it->realisasi_timeline))
+            : null;
+
+        $departmentName = $it->department_name_joined ?? $it->department_name;
+
+        return [
+            'id'                      => $it->id,
+            'erkap_id'                => $it->erkap_id,
+            'department_name'         => $departmentName,
+            'nama_investasi'          => $it->nama_investasi,
+            'kategori_investasi'      => $it->kategori_investasi,
+            'jenis_investasi'         => $it->jenis_investasi,
+            'year'                    => $it->year,
+            'nilai_rkap'              => $it->nilai_rkap,
+            'nilai_revisi'            => $it->nilai_revisi,
+            'nilai_budget_transfer'   => $it->nilai_budget_transfer,
+            'nilai_realisasi'         => $it->nilai_realisasi,
+            'target_timeline'         => $targetTimeline,
+            'realisasi_timeline'      => $realisasiTimeline,
+            'ld_inherent'             => $it->ld_inherent,
+            'dampak_inherent'         => $it->dampak_inherent,
+            'ld_current'              => $it->ld_current,
+            'lk_current'              => $it->lk_current,
+            'level_current'           => $it->level_current,
+            'dampak_current'          => $it->dampak_current,
+            'level_residual'          => $it->level_residual,
+            'dampak_residual'         => $it->dampak_residual,
+            'keterangan'              => $it->keterangan,
+            'status'                  => $it->status,
+            'has_risk_profile'        => (bool) $it->riskInvestasi,
+            'risk_investasi' => $it->riskInvestasi ? [
+                'erkap_id'               => $it->riskInvestasi->erkap_id,
+                'status'                 => $it->riskInvestasi->status,
+                'approved_by'            => $it->riskInvestasi->approved_by,
+                'approved_by_name'       => $it->riskInvestasi->approvedByUser ? get_decrypted_name($it->riskInvestasi->approvedByUser) : null,
+                'approved_at'            => optional($it->riskInvestasi->approved_at)->toISOString(),
+                'dampak_risiko_awal'     => $it->riskInvestasi->dampak_risiko_awal,
+                'kemungkinan_awal'       => $it->riskInvestasi->kemungkinan_awal,
+                'eksposure_level_awal'   => $it->riskInvestasi->eksposure_level_awal,
+                'eksposure_ltmh_awal'    => $it->riskInvestasi->eksposure_ltmh_awal,
+                'dampak_risiko_akhir'    => $it->riskInvestasi->dampak_risiko_akhir,
+                'kemungkinan_akhir'      => $it->riskInvestasi->kemungkinan_akhir,
+                'eksposure_level_akhir'  => $it->riskInvestasi->eksposure_level_akhir,
+                'eksposure_ltmh_akhir'   => $it->riskInvestasi->eksposure_ltmh_akhir,
+                'biaya_mitigasi_risiko'  => $it->riskInvestasi->biaya_mitigasi_risiko,
+            ] : null,
+            'created_at'              => optional($it->created_at)->toISOString(),
+            'updated_at'              => optional($it->updated_at)->toISOString(),
+            'created_by'              => $it->created_by,
+            'created_by_name'         => get_decrypted_name($it->createdBy),
+            'updated_by'              => $it->updated_by,
+            'updated_by_name'         => $it->updatedBy ? get_decrypted_name($it->updatedBy) : null,
+        ];
+    });
+
+    $cleanData = clean_recursive([
+        'current_page' => $data->currentPage(),
+        'per_page'     => $data->perPage(),
+        'total'        => $data->total(),
+        'last_page'    => $data->lastPage(),
+        'from'         => $data->firstItem(),
+        'to'           => $data->lastItem(),
+        'data'         => $resData,
+    ]);
+
+    return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
+}
+
 
 
 

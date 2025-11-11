@@ -34,11 +34,9 @@ class RencanaInvestasiController extends Controller
     $bulan = (int) ($request->integer('bulan') ?: $now->month);
     $week  = (int) ($request->integer('week')  ?: ceil($now->day / 7));
 
-    // === Normalisasi filter ===
     $filterTahun = $request->filled('tahun') ? (int)$request->get('tahun') : null;
     $filterJenis = $request->filled('jenis_investasi') ? trim((string)$request->get('jenis_investasi')) : null;
 
-    // unit/divisi/risk owner: terima banyak alias; angka dianggap ID, teks dianggap nama
     $unitParam = $request->get('unit')
         ?? $request->get('divisi')
         ?? $request->get('risk_owner')
@@ -315,10 +313,10 @@ class RencanaInvestasiController extends Controller
             return json(404, false, 'Tidak Ditemukan', 'Rencana investasi tidak ditemukan.', null);
         }
 
-        $locked = TrRiskInvestasi::where('erkap_id', $item->erkap_id)->exists();
-        if ($locked) {
-            return json(403, false, 'Terkunci', 'Risk Profile Investasi sudah dibuat. Rencana Investasi tidak dapat diupdate.', null);
-        }
+        // $locked = TrRiskInvestasi::where('erkap_id', $item->erkap_id)->exists();
+        // if ($locked) {
+        //     return json(403, false, 'Terkunci', 'Risk Profile Investasi sudah dibuat. Rencana Investasi tidak dapat diupdate.', null);
+        // }
 
         $validator = Validator::make($request->all(), [
             'ld_current'         => 'nullable|integer',

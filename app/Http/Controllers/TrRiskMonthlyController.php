@@ -79,7 +79,7 @@ class TrRiskMonthlyController extends Controller
                 $arr['header']['target_quantitative_satu_tahun'] = format_target_quantitative($arr['header']['target_quantitative_satu_tahun']);
             }
             if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
-                $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 0, ',', '.');
+                $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 2, ',', '.');
             }
             $arr['header']['target_satu_tahun_type'] = $item->header->optionTargetSatuTahun->type ?? '';
         }
@@ -221,7 +221,7 @@ public function show($id)
             $arr['header']['target_quantitative_satu_tahun'] = format_target_quantitative($arr['header']['target_quantitative_satu_tahun']);
         }
         if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
-            $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 0, ',', '.');
+            $arr['header']['biaya_perlakuan_risiko'] = number_format((float)$arr['header']['biaya_perlakuan_risiko'], 2, ',', '.');
         }
         $arr['header']['target_satu_tahun_type'] = $data->header->optionTargetSatuTahun->type ?? '';
     }
@@ -307,7 +307,7 @@ public function getByHeader($headerId)
                 $arr['header']['target_quantitative_satu_tahun'] = format_target_quantitative($arr['header']['target_quantitative_satu_tahun']);
             }
             if (isset($arr['header']['biaya_perlakuan_risiko']) && $arr['header']['biaya_perlakuan_risiko']) {
-                $arr['header']['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $arr['header']['biaya_perlakuan_risiko']), 0, ',', '.');
+                $arr['header']['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $arr['header']['biaya_perlakuan_risiko']), 2, ',', '.');
             }
             $arr['header']['target_satu_tahun_type'] = $item->header->optionTargetSatuTahun->type ?? '';
         }
@@ -400,7 +400,7 @@ public function getByHeader($headerId)
         $headerArray['target_quantitative_satu_tahun'] = format_target_quantitative($headerArray['target_quantitative_satu_tahun']);
     }
     if (isset($headerArray['biaya_perlakuan_risiko']) && $headerArray['biaya_perlakuan_risiko']) {
-        $headerArray['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $headerArray['biaya_perlakuan_risiko']), 0, ',', '.');
+        $headerArray['biaya_perlakuan_risiko'] = number_format((float)str_replace(',', '', $headerArray['biaya_perlakuan_risiko']), 2, ',', '.');
     }
     $headerArray['target_satu_tahun_type'] = $header->optionTargetSatuTahun->type ?? '';
 
@@ -1237,7 +1237,7 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
                     }
                     if (isset($item['header']['biaya_perlakuan_risiko'])) {
                         $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko']
-                            ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.')
+                            ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 2, ',', '.')
                             : '0';
                     }
                 }
@@ -1287,7 +1287,7 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
                     }
                     if (isset($item['header']['biaya_perlakuan_risiko'])) {
                         $item['header']['biaya_perlakuan_risiko'] = $item['header']['biaya_perlakuan_risiko']
-                            ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 0, ',', '.')
+                            ? number_format((float)$item['header']['biaya_perlakuan_risiko'], 2, ',', '.')
                             : '0';
                     }
                 }

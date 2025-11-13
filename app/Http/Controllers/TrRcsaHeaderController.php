@@ -961,7 +961,7 @@ class TrRcsaHeaderController extends Controller
         {
             $currentUser = auth()->user();
 
-            $roleCheck = check_role($currentUser, [1, 2, 3]);
+            $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5]);
             if ($roleCheck !== true) {
                 return $roleCheck;
             }
@@ -1183,7 +1183,7 @@ class TrRcsaHeaderController extends Controller
             $currentUser = auth()->user();
             $roleId = $currentUser->role_id ?? null;
 
-            if (!in_array($roleId, [1, 2])) {
+            if (!in_array($roleId, [1, 2, 4])) {
                 return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
             }
 

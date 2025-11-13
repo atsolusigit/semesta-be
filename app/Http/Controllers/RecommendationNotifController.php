@@ -27,9 +27,10 @@ class RecommendationNotifController extends Controller
 
     public function sendRecommendationEmails(Request $request) {
 
-        $result = check_role(auth()->user(), [1,2]);
+        $result = check_role(auth()->user(), [1,2,4,5]);
         if ($result !== true) return $result;
 
+        $user = auth()->user();
         $validator = Validator::make($request->all(), [
             'erkap_id' =>'required|integer',
             'nama_investasi' => 'required|string',
@@ -42,6 +43,7 @@ class RecommendationNotifController extends Controller
         if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
 
         $email_user = MstEmailRiskOwner::where('unit_kerja_id', $request->risk_owner_id)->value('unit_kerja_email');
+        $email_str = $email_user;
         $email_user = explode(",", $email_user);
         if (empty($email_user)) {
              return json(404, false, 'Email Tidak Ditemukan', 'Email '.$request->risk_owner.' tidak ditemukan, harap tambahkan di master email.', null);
@@ -65,13 +67,13 @@ class RecommendationNotifController extends Controller
 
             DB::beginTransaction();
 
-            $currentUser = get_decrypted_name(auth()->user());
+            $currentUser = get_decrypted_name($user->id);
 
-            $myRequest['created_by'] = auth()->id();
-            $myRequest['kirim_ke'] = 'atsolusigit@gmail.com';
+            $myRequest['created_by'] = $user->id;
+            $myRequest['kirim_ke'] = $email_str;
             $myRequest['dikirim_oleh'] = $currentUser;
             $myRequest['status'] = 'Terkirim';
-
+      
             $item = RecommendationInvestasiNotif::create($myRequest);
             
             $responseData = [

@@ -30,6 +30,7 @@
 
         <h1>Rekomendasi:</h1> {{ $data->rekomendasi }}
 
+        <hr>
         <p>
             Apabila terdapat pertanyaan lebih lanjut terkait rekomendasi yang diberikan, 
             Anda dapat menghubungi kami melalui Tim IT dan Tim MR.<br/>

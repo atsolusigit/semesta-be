@@ -427,7 +427,7 @@ public function getByHeader($headerId)
 {
     // Check user role authorization
     $user = auth()->user();
-    $roleCheck = check_role($user, [1, 2, 3]);
+    $roleCheck = check_role($user, [1, 2, 3, 4, 5]);
 
     if ($roleCheck !== true) {
         return $roleCheck;
@@ -719,7 +719,7 @@ if ($validator->fails()) {
 {
     // Check user role authorization
      $user = auth()->user();
-    $roleCheck = check_role($user, [1, 2, 3]);
+    $roleCheck = check_role($user, [1, 2, 3, 4, 5]);
 
     if ($roleCheck !== true) {
         return $roleCheck;
@@ -1016,7 +1016,7 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
 {
     // Check user role authorization
     $user = auth()->user();
-    $roleCheck = check_role($user, [1, 2, 3]);
+    $roleCheck = check_role($user, [1, 2, 3, 4, 5]);
 
     if ($roleCheck !== true) {
         return $roleCheck;
@@ -1650,7 +1650,7 @@ public function saveNoteRecommendation(Request $request, $id)
     $user = Auth::user();
 
     // hanya role 1 dan 5 yang boleh simpan note rekomendasi
-    $roleCheck = check_role($user, [1,5]);
+    $roleCheck = check_role($user, [1,4,5]);
 
     if ($roleCheck !== true) {
         return $roleCheck;
@@ -1723,7 +1723,7 @@ public function submitRecommendation(Request $request, $id)
     $user = Auth::user();
 
     // Hanya role 1 dan 5 yang boleh submit rekomendasi
-    $roleCheck = check_role($user, [1,5]);
+    $roleCheck = check_role($user, [1,4,5]);
     if ($roleCheck !== true) {
         return $roleCheck;
     }
@@ -1780,7 +1780,7 @@ public function approveRecommendation(Request $request, $id)
     $user = Auth::user();
 
     // Hanya role 1,4 yang boleh approve (role 2,3,5 tidak boleh)
-    $roleCheck = check_role($user, [1, 4]);
+    $roleCheck = check_role($user, [1, 4, 5]);
 
     if ($roleCheck !== true) {
         return $roleCheck;
@@ -1822,7 +1822,7 @@ public function rejectRecommendation(Request $request, $id)
     $user = Auth::user();
 
     // Hanya role 1,4 yang boleh reject (role 2,3,5 tidak boleh)
-    $roleCheck = check_role($user, [1,4]);
+    $roleCheck = check_role($user, [1, 4, 5]);
 
     if ($roleCheck !== true) {
         return $roleCheck;

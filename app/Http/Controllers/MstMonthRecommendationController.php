@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 class MstMonthRecommendationController extends Controller
 {
-     public function index(Request $request)
+    public function index(Request $request)
     {
         // Role-based access control - hanya role 1 dan 2 yang bisa melihat data
         $user = auth()->user();
@@ -49,7 +49,7 @@ class MstMonthRecommendationController extends Controller
         return json(200, true, 'Berhasil', 'List data month recommendation', $mappedData);
     }
 
-     public function store(Request $request)
+    public function store(Request $request)
     {
         $user = Auth::user();
         $roleCheck = check_role($user, [1, 2]);
@@ -58,10 +58,14 @@ class MstMonthRecommendationController extends Controller
             return $roleCheck;
         }
 
-        $request->validate([
+        $validation = check_validation($request->all(), [
             'name' => 'required|string|max:255',
             'required' => 'nullable|string|in:Rekomendasi,Tidak Rekomendasi'
         ]);
+
+        if ($validation[0] == 1) {
+            return $validation[1];
+        }
 
         // Konversi string ke boolean
         $requiredValue = ($request->required === 'Rekomendasi') ? 1 : 0;
@@ -90,10 +94,14 @@ class MstMonthRecommendationController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'Month recommendation tidak ditemukan.', null);
         }
 
-        $request->validate([
+        $validation = check_validation($request->all(), [
             'name' => 'required|string|max:255',
             'required' => 'nullable|string|in:Rekomendasi,Tidak Rekomendasi'
         ]);
+
+        if ($validation[0] == 1) {
+            return $validation[1];
+        }
 
         // Konversi string ke boolean
         $requiredValue = ($request->required === 'Rekomendasi') ? 1 : 0;

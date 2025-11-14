@@ -286,7 +286,7 @@ Route::middleware(['auth:api'])->group(function () {
     // Export Lost Event (hanya role 1, 4, dan 5)
     Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])
         ->where(['format' => 'pdf|excel'])
-        ->middleware(RoleAccessMiddleware::class . ':1,4,5');
+        ->middleware(RoleAccessMiddleware::class . ':1,2,3,4,5');
 });
 
 // ===================== RISK TIMELINE PDF =====================
@@ -381,7 +381,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
     Route::get('/export-rencana-investasi/{format}', [RencanaInvestasiController::class, 'export'])
         ->where(['format' => 'pdf|excel']);
-    
+
     Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
     Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);
     Route::post('/risk-investasi', [TrRiskInvestasiController::class, 'store']);

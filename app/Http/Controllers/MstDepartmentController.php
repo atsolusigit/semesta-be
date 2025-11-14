@@ -24,7 +24,7 @@ class MstDepartmentController extends Controller
 
     if ($user) {
         // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
-        if (!in_array($user->role->id, [1, 2])) {
+        if (!in_array($user->role->id, [1, 2, 5])) {
             $query->where('id', $user->department_id);
         }
     }
@@ -97,7 +97,7 @@ public function show($id)
 
     if ($user) {
         // Hanya role selain 1 & 2 yang dibatasi
-        if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
+        if (!in_array($user->role->id, [1, 2, 5]) && $user->department_id != $id) {
             return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
         }
     }

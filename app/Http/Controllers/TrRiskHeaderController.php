@@ -830,7 +830,7 @@ public function store(Request $request)
         'mitigasi' => 'nullable|string',
         'biaya_perlakuan_risiko' => 'nullable|numeric',
         // 4 field tambahan (opsional saat store)
-        'internal_control' => 'nullable|string',
+        'internal_control' => 'required|string',
         'target_satu_tahun_option' => 'nullable|exists:mst_option,id',
         'target_satu_tahun_notes' => 'nullable|string',
         'target_quantitative_satu_tahun' => 'nullable|string|max:500'

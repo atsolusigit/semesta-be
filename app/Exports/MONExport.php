@@ -63,11 +63,11 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         'J' => 12,  // % TAHUNAN
         'K' => 12,  // BIAYA
         'L' => 25,  // EVALUASI PERLAKUAN RISIKO - KEMBALI KE POSISI ASLI
-        'M' => 18,  // LEVEL DAMPAK
-        'N' => 15,  // LEVEL KEMUNGKINAN
-        'O' => 15,  // POSISI RISIKO
+        'M' => 12,  // LEVEL DAMPAK
+        'N' => 12,  // LEVEL KEMUNGKINAN
+        'O' => 12,  // POSISI RISIKO
         'P' => 12,  // LEVEL RISIKO
-        'Q' => 25   // EVALUASI PERLAKUAN RISIKO - POSISI BARU
+        'Q' => 12   // EVALUASI PERLAKUAN RISIKO - POSISI BARU
     ];
 
     /**
@@ -551,131 +551,141 @@ private function buildDataRows(): array
     /**
      * Merge cells for headers - Update range ke Q untuk menampung kolom baru
      */
-    private function mergeCells(Worksheet $sheet): void
-    {
-        $mergeRanges = [
-            'A1:Q1', // KERTAS KERJA MONITORING RISIKO
-            'A2:Q2', // PT. KAWASAN BERIKAT NUSANTARA
-            'A3:Q3', // UNIT KERJA
-            'A4:Q4', // PERIODE
-        ];
+    /**
+ * Merge cells for headers - Update range ke Q untuk menampung kolom baru
+ */
+private function mergeCells(Worksheet $sheet): void
+{
+    $mergeRanges = [
+        'A1:Q1', // KERTAS KERJA MONITORING RISIKO
+        'A2:Q2', // PT. KAWASAN BERIKAT NUSANTARA
+        'A3:Q3', // UNIT KERJA
+        'A4:Q4', // PERIODE
+    ];
 
-        foreach ($mergeRanges as $range) {
-            $sheet->mergeCells($range);
-        }
-
-        //merge header horizontal (for inherent risk, residual risk and residual target)
-        $mergeHorizontal = array(
-            [
-                "range_start" => "F6",
-                "range_end" => "I6",
-                "name" => "WAKTU PELAKSANAAN"
-            ],
-            [
-                "range_start" => "F7",
-                "range_end" => "I7",
-                "name" => "TAHUN ".$this->year
-            ],
-            [
-                "range_start" => "F8",
-                "range_end" => "I8",
-                "name" => "TRIWULAN ".$this->triwulan
-            ],
-            [
-                "range_start" => "F9",
-                "range_end" => "I9",
-                "name" => "BULAN ".$this->monthName
-            ],
-            [
-                "range_start" => "M6",
-                "range_end" => "P7", // RESIDUAL TARGET RISK hanya M-P (tidak termasuk Q)
-                "name" => "RESIDUAL TARGET RISK"
-            ],
-        );
-
-        foreach ($mergeHorizontal as $value) {
-            $sheet->mergeCells($value['range_start'].':'.$value['range_end']);
-            $sheet->setCellValue($value['range_start'], $value['name']);
-
-            $this->setHeaderHorizontalStyle($sheet, $value['range_start'].':'.$value['range_end'], 'FFd8e4bc', 8, true);
-        }
-
-        //merge header vertical
-        $mergeVertical = array(
-            [
-                "column" => "A",
-                "name" => "NO",
-                "start_row" => "6"
-            ],
-            [
-                "column" => "B",
-                "name" => "KODE RISIKO",
-                "start_row" => "6"
-            ],
-            [
-                "column" => "C",
-                "name" => "JENIS RISIKO",
-                "start_row" => "6"
-            ],
-            [
-                "column" => "D",
-                "name" => "PERISTIWA RISIKO",
-                "start_row" => "6"
-            ],
-            [
-                "column" => "E",
-                "name" => "PENYEBAB RISIKO",
-                "start_row" => "6"
-            ],
-            [
-                "column" => "J",
-                "name" => " % s/d BULAN ".$this->monthName,
-                "start_row" => "6"
-            ],
-            [
-                "column" => "K",
-                "name" => "% TARGET TAHUN ".$this->year,
-                "start_row" => "6"
-            ],
-            [
-                "column" => "L",
-                "name" => "BIAYA PERLAKUAN RISIKO",
-                "start_row" => "6"
-            ],
-            [
-                "column" => "M",
-                "name" => "LEVEL DAMPAK",
-                "start_row" => "8"
-            ],
-            [
-                "column" => "N",
-                "name" => "LEVEL KEMUNGKINAN",
-                "start_row" => "8"
-            ],
-            [
-                "column" => "O",
-                "name" => "POSISI RISIKO",
-                "start_row" => "8"
-            ],
-            [
-                "column" => "P",
-                "name" => "LEVEL RISIKO",
-                "start_row" => "8"
-            ],
-            [
-                "column" => "Q",
-                "name" => "EVALUASI PERLAKUAN RISIKO", // KOLOM Q TERPISAH
-                "start_row" => "6"
-            ],
-        );
-
-        foreach ($mergeVertical as $value) {
-            $sheet->mergeCells($value['column'].$value['start_row'].':'.$value['column'].'10');
-            $sheet->setCellValue($value['column'].$value['start_row'], $value['name']);
-
-            $this->setHeaderHorizontalStyle($sheet, $value['column'].$value['start_row'].':'.$value['column'].'10', 'FFd8e4bc', 8, true);
-        }
+    foreach ($mergeRanges as $range) {
+        $sheet->mergeCells($range);
     }
+
+    //merge header horizontal (for inherent risk, residual risk and residual target)
+    $mergeHorizontal = array(
+        [
+            "range_start" => "F6",
+            "range_end" => "I6",
+            "name" => "WAKTU PELAKSANAAN"
+        ],
+        [
+            "range_start" => "F7",
+            "range_end" => "I7",
+            "name" => "TAHUN ".$this->year
+        ],
+        [
+            "range_start" => "F8",
+            "range_end" => "I8",
+            "name" => "TRIWULAN ".$this->triwulan
+        ],
+        [
+            "range_start" => "F9",
+            "range_end" => "I9",
+            "name" => "BULAN ".$this->monthName
+        ],
+        [
+            "range_start" => "M6",
+            "range_end" => "P7", // RESIDUAL TARGET RISK hanya M-P (tidak termasuk Q)
+            "name" => "RESIDUAL TARGET RISK"
+        ],
+    );
+
+    foreach ($mergeHorizontal as $value) {
+        $sheet->mergeCells($value['range_start'].':'.$value['range_end']);
+        $sheet->setCellValue($value['range_start'], $value['name']);
+
+        $this->setHeaderHorizontalStyle($sheet, $value['range_start'].':'.$value['range_end'], 'FFd8e4bc', 8, true);
+    }
+
+    //merge header vertical
+$mergeVertical = array(
+    [
+        "column" => "A",
+        "name" => "NO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "B",
+        "name" => "KODE RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "C",
+        "name" => "JENIS RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "D",
+        "name" => "PERISTIWA RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "E",
+        "name" => "PENYEBAB RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "J",
+        "name" => " % s/d BULAN ".$this->monthName,
+        "start_row" => "6"
+    ],
+    [
+        "column" => "K",
+        "name" => "% TARGET TAHUN ".$this->year,
+        "start_row" => "6"
+    ],
+    [
+        "column" => "L",
+        "name" => "BIAYA PERLAKUAN RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "M",
+        "name" => "LEVEL DAMPAK",
+        "start_row" => "8",
+        "vertical" => true
+    ],
+    [
+        "column" => "N",
+        "name" => "LEVEL KEMUNGKINAN",
+        "start_row" => "8",
+        "vertical" => true
+    ],
+    [
+        "column" => "O",
+        "name" => "POSISI RISIKO",
+        "start_row" => "8",
+        "vertical" => true
+    ],
+    [
+        "column" => "P",
+        "name" => "LEVEL RISIKO",
+        "start_row" => "8",
+        "vertical" => true
+    ],
+    [
+        "column" => "Q",
+        "name" => "EVALUASI PERLAKUAN RISIKO",
+        "start_row" => "6",
+        "vertical" => true  // Tambah flag vertical
+    ],
+);
+
+    foreach ($mergeVertical as $value) {
+        $sheet->mergeCells($value['column'].$value['start_row'].':'.$value['column'].'10');
+        $sheet->setCellValue($value['column'].$value['start_row'], $value['name']);
+
+        // Cek apakah perlu vertical alignment
+        $isVertical = isset($value['vertical']) && $value['vertical'] === true;
+        $this->setHeaderHorizontalStyle($sheet, $value['column'].$value['start_row'].':'.$value['column'].'10', 'FFd8e4bc', 8, true, $isVertical);
+    }
+}
 
     /**
      * Set column widths
@@ -809,11 +819,12 @@ private function applyRiskLevelColors(Worksheet $sheet): void
         }
     }
 
-    function setHeaderHorizontalStyle($sheet, $range, $bgColor = '4472C4', $fontSize = 8, $bold = true)
+        function setHeaderHorizontalStyle($sheet, $range, $bgColor = '4472C4', $fontSize = 8, $bold = true, $vertical = false)
     {
-        $sheet->getStyle($range)->applyFromArray([
+        $styleArray = [
             'font' => [
-                'bold' => $bold
+                'bold' => $bold,
+                'size' => $fontSize
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -830,6 +841,13 @@ private function applyRiskLevelColors(Worksheet $sheet): void
                     'color' => ['rgb' => '000000']
                 ]
             ]
-        ]);
+        ];
+
+        // Tambahkan textRotation untuk vertical text
+        if ($vertical) {
+            $styleArray['alignment']['textRotation'] = 90;
+        }
+
+        $sheet->getStyle($range)->applyFromArray($styleArray);
     }
 }

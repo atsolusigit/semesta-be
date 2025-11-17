@@ -277,11 +277,11 @@ Route::middleware(['auth:api'])->group(function () {
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/export-risk/{format}', [ExportRiskController::class, 'export'])
         ->where(['format' => 'pdf|excel'])
-        ->middleware(RoleAccessMiddleware::class . ':1,2,3'); // Export risk file (role 1,2,3)
+        ->middleware(RoleAccessMiddleware::class . ':1,2,3,4,5'); // Export risk file (role 1,2,3)
 
     Route::get('/export-risk/{id}/preview', [ExportRiskController::class, 'preview'])
         ->where('id', '[0-9]+')
-        ->middleware(RoleAccessMiddleware::class . ':1,2,3'); // Preview export risk (role 1,2,3)
+        ->middleware(RoleAccessMiddleware::class . ':1,2,3,4,5'); // Preview export risk (role 1,2,3)
 
     // Export Lost Event (hanya role 1, 4, dan 5)
     Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])
@@ -323,11 +323,15 @@ Route::middleware(['auth:api'])->group(function () {
 
 // ===================== LOST EVENT =====================
 Route::middleware(['auth:api'])->group(function () {
-    Route::get('/lost-events', [LostEventController::class, 'index']); // List header < 50%
+    Route::get('/lost-events', [LostEventController::class, 'index']); // List header berdasarkan treshold
+    Route::get('/lost-events/pending', [LostEventController::class, 'getPending']); // Get pending submissions
     Route::get('/lost-events/{id}', [LostEventController::class, 'show']);
     Route::get('/lost-events/detail/{id}', [LostEventController::class, 'detail']); // Detail by lost_event_id
     Route::post('/lost-events', [LostEventController::class, 'store']); // Create new lost event
     Route::put('/lost-events/{id}', [LostEventController::class, 'update']); // Update by lost_event_id
+    Route::patch('/lost-events/{id}/submit', [LostEventController::class, 'submit']); // Submit lost event
+    Route::patch('/lost-events/{id}/approve', [LostEventController::class, 'approve']); // Approve lost event
+    Route::patch('/lost-events/{id}/reject', [LostEventController::class, 'reject']); // Reject lost event
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
 });
 

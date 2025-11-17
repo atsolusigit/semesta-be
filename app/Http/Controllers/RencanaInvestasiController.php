@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http; 
 use App\Models\RencanaInvestasi;
 use App\Models\TrRiskInvestasi;
 use App\Models\RencanaInvestasiTimelineYear;
@@ -528,6 +529,53 @@ class RencanaInvestasiController extends Controller
     {
 
         return false;
+    }
+
+
+    public function timeline(Request $request)
+    {
+        $tahun   = (int) $request->query('tahun');
+        $capexId = (int) $request->query('capex_id');
+
+        if (!$tahun || !$capexId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter tahun dan capex_id wajib diisi',
+            ], 400);
+        }
+
+        $base = rtrim(config('services.erkap.base_url', env('ERKAP_BASE_URL', '')), '/');
+        $auth = config('services.erkap.basic_auth', env('ERKAP_BASIC_AUTH', ''));
+
+        if (!$base || !$auth) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ERKAP_BASE_URL / ERKAP_BASIC_AUTH belum diset di .env',
+            ], 500);
+        }
+
+        try {
+            $resp = Http::retry(3, 300)
+                ->timeout(25)
+                ->withHeaders([
+                    'Authorization' => $auth,
+                ])
+                ->get($base . '/api/semesta/capex-timeline', [
+                    'tahun'    => $tahun,
+                    'capex_id' => $capexId,
+                ])
+                ->throw()
+                ->json();
+
+            return response()->json($resp, 200);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memanggil API ERKAP capex-timeline',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
     }
 
 }

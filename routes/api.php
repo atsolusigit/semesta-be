@@ -370,6 +370,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
     Route::get('/export-rencana-investasi/{format}', [RencanaInvestasiController::class, 'export'])
         ->where(['format' => 'pdf|excel']);
+    Route::get('/investasi/timeline', [RencanaInvestasiController::class, 'timeline']);
     
     Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
     Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);

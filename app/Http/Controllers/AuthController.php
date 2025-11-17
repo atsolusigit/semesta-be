@@ -43,21 +43,47 @@ public function register(Request $request)
             return response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
-                'message' => 'error validation. [400 - bad request]',
+                'message' => 'The username has already been taken.',
                 'data' => [
                     'username' => ['The username has already been taken.']
                 ]
             ], 200);
         }
 
-        // Validasi domain email agar hanya @kbn.co.id atau @gmail.com
-        if (!preg_match('/^[\w\-\.]+@(kbn\.co\.id|gmail\.com)$/i', $request->email)) {
+        // Get active email domains from database
+        $activeDomains = \App\Models\MstEmailDomain::getActiveDomains();
+
+        if (empty($activeDomains)) {
+            return response()->json([
+                'code' => 500,
+                'status' => 'error',
+                'message' => 'Tidak ada domain email yang aktif. Hubungi administrator.',
+                'data' => []
+            ], 200);
+        }
+
+        // Create domain pattern for validation (e.g., @kbn.co.id|@gmail.com)
+        $domainPattern = implode('|', array_map(function($domain) {
+            return preg_quote($domain, '/');
+        }, $activeDomains));
+
+        // Validate email domain dynamically
+        $emailDomain = null;
+        if ($request->has('email')) {
+            $emailParts = explode('@', $request->email);
+            if (count($emailParts) === 2) {
+                $emailDomain = strtolower($emailParts[1]);
+            }
+        }
+
+        if (!in_array($emailDomain, $activeDomains)) {
+            $allowedDomainsStr = implode(', @', $activeDomains);
             return response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
-                'message' => 'error validation. [400 - bad request]',
+                'message' => 'Domain email tidak diizinkan.',
                 'data' => [
-                    'email' => ['Maaf, gunakan email @kbn.co.id atau @gmail.com untuk proses register.']
+                    'email' => ["Maaf, gunakan email dengan domain: @{$allowedDomainsStr} untuk proses register."]
                 ]
             ], 200);
         }
@@ -278,7 +304,7 @@ public function register(Request $request)
                 return response()->json([
                     'code' => 400,
                     'status' => 'error_validation',
-                    'message' => 'error validation. [400 - bad request]',
+                    'message' => 'Password lama salah.',
                     'data' => [
                         'old_password' => ['Password lama salah.']
                     ]

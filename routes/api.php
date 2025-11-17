@@ -37,6 +37,7 @@ use App\Http\Controllers\TrRiskInvestasiController;
 use App\Http\Controllers\MstRcsaController;
 use App\Http\Controllers\RecommendationNotifController;
 use App\Http\Controllers\MstEmailRiskOwnerController;
+use App\Http\Controllers\MstEmailDomainController;
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -180,6 +181,16 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/option/{id}', [MstOptionController::class, 'destroy']);                     // Hapus option (role 1)
 });
 
+// API Email Domain Management
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('/email-domains', [MstEmailDomainController::class, 'index']);       // List semua email domain (role 1 & 2)
+    Route::get('/email-domains/active', [MstEmailDomainController::class, 'getActiveDomains']); // List domain aktif saja
+    Route::get('/email-domains/{id}', [MstEmailDomainController::class, 'show']);   // Detail email domain
+    Route::post('/email-domains', [MstEmailDomainController::class, 'store']);      // Tambah email domain
+    Route::put('/email-domains/{id}', [MstEmailDomainController::class, 'update']); // Update email domain
+    Route::delete('/email-domains/{id}', [MstEmailDomainController::class, 'destroy']); // Hapus email domain
+});
+
 // ===================== RISK HEADER =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/risk-header', [TrRiskHeaderController::class, 'index']);                            // List all risk headers (semua role)
@@ -275,7 +286,7 @@ Route::middleware(['auth:api'])->group(function () {
     // Export Lost Event (hanya role 1, 4, dan 5)
     Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])
         ->where(['format' => 'pdf|excel'])
-        ->middleware(RoleAccessMiddleware::class . ':1,4,5');
+        ->middleware(RoleAccessMiddleware::class . ':1,2,3,4,5');
 });
 
 // ===================== RISK TIMELINE PDF =====================

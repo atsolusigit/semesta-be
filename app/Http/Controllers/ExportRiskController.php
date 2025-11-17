@@ -686,13 +686,23 @@ private function formatTarget($quantitative, $qualitative)
     }
 
     private function shouldFilterByUserDepartment()
-    {
-        $user = Auth::user();
+{
+    $user = Auth::user();
 
-        return $user &&
-               !in_array($user->role, ['admin', 'super_admin']) &&
-               $user->department_id;
+    // Jika user tidak ada, tidak perlu filter
+    if (!$user) {
+        return false;
     }
+
+    // Role ID 1 = Admin/Super Admin (tidak perlu filter)
+    // Role ID 2, 3 = User department (perlu filter)
+    // Sesuaikan dengan role_id di sistem Anda
+    if (in_array($user->role_id, [2, 3]) && !empty($user->department_id)) {
+        return true;
+    }
+
+    return false;
+}
 
     public function preview(Request $request, $id)
     {

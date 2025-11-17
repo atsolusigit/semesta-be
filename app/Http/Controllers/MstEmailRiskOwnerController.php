@@ -7,6 +7,7 @@ use App\Models\MstEmailRiskOwner;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Models\RencanaInvestasi;
+use Illuminate\Support\Facades\Http;
 
 class MstEmailRiskOwnerController extends Controller
 {
@@ -15,6 +16,36 @@ class MstEmailRiskOwnerController extends Controller
      */
     public function index(Request $request)
    {
+
+        $user = auth()->user();
+        $base = rtrim(config('services.erkap.base_url', env('ERKAP_BASE_URL', '')), '/');
+        $auth = config('services.erkap.basic_auth', env('ERKAP_BASIC_AUTH', ''));
+
+        if (!$base || !$auth) {
+            throw new \RuntimeException('ERKAP_BASE_URL / ERKAP_BASIC_AUTH belum diset.');
+        }
+
+        $result = Http::withHeaders(['Authorization' => $auth])
+            ->get("$base/api/semesta/master-unit-kerja")
+            ->throw()
+            ->json();
+
+        if (!is_array($result) || ($result['success'] ?? false) !== true) {
+        } else{
+            DB::beginTransaction();
+                foreach($result['result'] as $item){
+                    $resUpdate = MstEmailRiskOwner::updateOrCreate(
+                        ['unit_kerja_id' => $item['unit_kerja_id']], // Match condition
+                        [ 
+                            'unit_kerja_nama' => $item['unit_kerja_nama'],
+                            'created_by' =>  $user->id,
+                        ]
+                    );
+                }
+                
+            DB::commit();
+        }
+    
         $perPage = $request->input('per_page', 10);
 
         $query = MstEmailRiskOwner::query()->orderBy('id', 'asc');

@@ -196,6 +196,7 @@ public function index(Request $request)
         ->keyBy('header_id');
 
     // Ambil lost events yang independen (tanpa header_id)
+    // TAMBAHAN: Filter berdasarkan type untuk independent lost events
     $independentLostEvents = LostEvent::whereNull('header_id')
         ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
             $query->where('risk_owner_department_id', $user->department_id);
@@ -208,6 +209,9 @@ public function index(Request $request)
         })
         ->when($request->jenis_risiko_id, function ($query) use ($request) {
             $query->where('jenis_risiko_id', $request->jenis_risiko_id);
+        })
+        ->when($filterType, function ($query) use ($filterType) {
+            $query->where('type', $filterType);
         })
         ->when($search, function ($query) use ($search) {
             $query->where(function ($q) use ($search) {
@@ -299,7 +303,7 @@ public function index(Request $request)
         ]);
     }
 
-    // Data dari independent lost events (tanpa header)
+    // Data dari lost events (tanpa header)
     foreach ($independentLostEvents as $lostEvent) {
         // Format uploaded files
         $uploadedFiles = [];
@@ -753,7 +757,7 @@ public function detail($id)
         })->toArray();
     }
 
-    // Jika lost event independen (tanpa header)
+    // Jika lost event (tanpa header)
     if (!$header) {
         $data = [
             'lost_event_id' => $lostEvent->id,
@@ -800,7 +804,7 @@ public function detail($id)
         ];
 
         $cleanData = clean_recursive($data);
-        return json(200, true, 'Data Ditemukan', 'Detail lost event independen berhasil diambil.', $cleanData);
+        return json(200, true, 'Data Ditemukan', 'Detail lost event berhasil diambil.', $cleanData);
     }
 
     // Jika lost event terkait dengan header
@@ -943,9 +947,19 @@ public function store(Request $request)
 
     // Validasi type hanya boleh kuantitatif atau kualitatif
     if (!in_array($typeParam, ['kuantitatif', 'kualitatif'])) {
-        return json(422, false, 'Validasi Gagal', 'Parameter type harus diisi dengan nilai kuantitatif atau kualitatif.', [
+        return json(403, false, 'Validasi Gagal', 'Parameter type harus diisi dengan nilai kuantitatif atau kualitatif.', [
             'type' => ['Parameter type harus berisi kuantitatif atau kualitatif']
         ]);
+    }
+
+    // TAMBAHAN: Validasi risk_owner_department_id untuk role 2 dan 3
+    if (in_array($user->role_id, [2, 3])) {
+        // Jika role 2 atau 3, risk_owner_department_id harus sesuai dengan department user
+        if ($request->has('risk_owner_department_id') && $request->risk_owner_department_id != $user->department_id) {
+            return json(403, false, 'Forbidden', 'Anda hanya dapat membuat lost event untuk department Anda sendiri.', null);
+        }
+        // Force set risk_owner_department_id ke department user
+        $request->merge(['risk_owner_department_id' => $user->department_id]);
     }
 
     // Validasi input - header_id opsional
@@ -978,7 +992,7 @@ public function store(Request $request)
     ]);
 
     if ($validator->fails()) {
-        return json(422, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
+        return json(403, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
     }
 
     // Jika ada header_id, ambil data dari header
@@ -1014,7 +1028,7 @@ public function store(Request $request)
         $existingLostEvent = LostEvent::where('header_id', $headerId)->first();
 
         if ($existingLostEvent) {
-            return json(409, false, 'Conflict', 'Lost event untuk header ini sudah ada.', null);
+            return json(403, false, 'Conflict', 'Lost event untuk header ini sudah ada.', null);
         }
 
         // Override dengan data dari header
@@ -1188,6 +1202,11 @@ public function update(Request $request, $id)
         if ($lostEvent->risk_owner_department_id !== $user->department_id) {
             return json(403, false, 'Forbidden', 'Anda hanya dapat mengubah data untuk department Anda sendiri.', null);
         }
+
+        // TAMBAHAN: Validasi jika mencoba mengubah risk_owner_department_id
+        if ($request->has('risk_owner_department_id') && $request->risk_owner_department_id != $user->department_id) {
+            return json(403, false, 'Forbidden', 'Anda tidak dapat mengubah department ke department lain.', null);
+        }
     }
 
     $validator = Validator::make($request->all(), [
@@ -1217,7 +1236,7 @@ public function update(Request $request, $id)
     ]);
 
     if ($validator->fails()) {
-        return json(422, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
+        return json(403, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
     }
 
     try {
@@ -1239,13 +1258,6 @@ public function update(Request $request, $id)
                 if ($request->has($field)) {
                     $request->request->remove($field);
                 }
-            }
-        }
-
-        if ($user->role_id === 2) {
-            if ($request->has('risk_owner_department_id') && $request->risk_owner_department_id !== $user->department_id) {
-                DB::rollBack();
-                return json(403, false, 'Forbidden', 'Anda tidak dapat mengubah department ke department lain.', null);
             }
         }
 
@@ -1584,7 +1596,7 @@ public function submit($id)
     }
 
     if (!empty($missingFields)) {
-        return json(422, false, 'Validasi Gagal', 'Field berikut harus diisi sebelum submit: ' . implode(', ', $missingFields), [
+        return json(403, false, 'Validasi Gagal', 'Field berikut harus diisi sebelum submit: ' . implode(', ', $missingFields), [
             'missing_fields' => $missingFields
         ]);
     }
@@ -1655,7 +1667,7 @@ public function approve(Request $request, $id)
     ]);
 
     if ($validator->fails()) {
-        return json(422, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
+        return json(403, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
     }
 
     try {
@@ -1725,7 +1737,7 @@ public function reject(Request $request, $id)
     ]);
 
     if ($validator->fails()) {
-        return json(422, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
+        return json(403, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
     }
 
     try {

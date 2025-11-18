@@ -918,6 +918,7 @@ public function exportLostEvent(Request $request, $format)
         'jenisRisikoRelation:id,nama_jenis_risiko'
     ])
     ->where('status', 'approved')
+    // Filter berdasarkan department user jika perlu
     ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
         $query->where('risk_owner_department_id', $user->department_id);
     })
@@ -1047,8 +1048,21 @@ public function exportLostEvent(Request $request, $format)
         ], 404);
     }
 
-    $departmentName = $filterDepartment ?? 'SEMUA_DEPARTEMEN';
-    $yearName = $filterYear ?? 'SEMUA_TAHUN';
+    // MODIFIKASI: Ambil nama department yang sebenarnya
+        $departmentName = 'SEMUA_DEPARTEMEN';
+
+        // Jika user role 2 atau 3, ambil dari department user
+        if (in_array($user->role_id, [2, 3]) && $user->department_id) {
+            $dept = \App\Models\MstDepartment::find($user->department_id);
+            $departmentName = $dept ? $dept->name : 'SEMUA_DEPARTEMEN';
+        }
+        // Jika ada filter department dari parameter request (untuk role 1, 4, 5)
+        elseif ($filterDepartment) {
+            $dept = \App\Models\MstDepartment::find($filterDepartment);
+            $departmentName = $dept ? $dept->name : 'SEMUA_DEPARTEMEN';
+        }
+
+        $yearName = $filterYear ?? 'SEMUA_TAHUN';
 
     try {
         if ($format === 'excel') {

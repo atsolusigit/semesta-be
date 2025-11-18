@@ -61,9 +61,11 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
     public function headings(): array
     {
         $tanggalCetak = now()->format('d/m/Y');
+        $departmentDisplay = str_replace('_', ' ', $this->departmentName);
 
         return [
             ["LAPORAN LOST EVENT"],
+            [$departmentDisplay],
             ["Tanggal Cetak: {$tanggalCetak}"],
             [],
             [
@@ -98,17 +100,21 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
 
     public function styles(Worksheet $sheet)
     {
-        $headerRow = 4;
+        $headerRow = 5; // Berubah dari 4 menjadi 5 karena ada tambahan baris department
         $lastRow = $this->data->count() + $headerRow;
+        $departmentDisplay = str_replace('_', ' ', $this->departmentName);
 
         // Merge dan isi header
         $sheet->mergeCells('A1:Y1');
         $sheet->mergeCells('A2:Y2');
+        $sheet->mergeCells('A3:Y3');
 
         $sheet->setCellValue('A1', 'LAPORAN LOST EVENT');
-        $sheet->setCellValue('A2', 'Tanggal Cetak: ' . now()->format('d/m/Y'));
+        $sheet->setCellValue('A2', $departmentDisplay);
+        $sheet->setCellValue('A3', 'Tanggal Cetak: ' . now()->format('d/m/Y'));
 
-        $sheet->getStyle('A1:A2')->applyFromArray([
+        // Style untuk baris 1, 2, 3
+        $sheet->getStyle('A1:A3')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'size' => 12,
@@ -149,18 +155,18 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
         ]);
 
         // Wrap text untuk SEMUA kolom data (kecuali No)
-        $sheet->getStyle("B5:Y{$lastRow}")->getAlignment()->setWrapText(true);
+        $sheet->getStyle("B6:Y{$lastRow}")->getAlignment()->setWrapText(true);
 
         // Vertical alignment untuk semua data
-        $sheet->getStyle("A5:Y{$lastRow}")->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+        $sheet->getStyle("A6:Y{$lastRow}")->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
 
         // Center alignment untuk kolom tertentu
-        $sheet->getStyle("A5:A{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle("B5:B{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle("Y5:Y{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("A6:A{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("B6:B{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("Y6:Y{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         // Set minimum row height untuk setiap baris data agar text tidak terpotong
-        for ($row = 5; $row <= $lastRow; $row++) {
+        for ($row = 6; $row <= $lastRow; $row++) {
             $sheet->getRowDimension($row)->setRowHeight(-1); // Auto height
         }
 

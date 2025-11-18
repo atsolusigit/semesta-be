@@ -72,6 +72,10 @@ class TrRiskMonthlyController extends Controller
                 $arr['target_quantitative'] = number_format((float)$arr['target_quantitative'], 0, ',', '.');
             }
         }
+        // Pastikan penjelasan_realisasi ter-clean
+        if (isset($arr['penjelasan_realisasi'])) {
+            $arr['penjelasan_realisasi'] = clean_string($arr['penjelasan_realisasi']);
+        }
 
         // Format angka pada header
         if (isset($arr['header'])) {
@@ -215,6 +219,10 @@ public function show($id)
         }
     }
 
+    // Pastikan penjelasan_realisasi ter-clean
+    if (isset($arr['penjelasan_realisasi'])) {
+        $arr['penjelasan_realisasi'] = clean_string($arr['penjelasan_realisasi']);
+    }
     // Format angka pada header jika ada
     if (isset($arr['header'])) {
         if (isset($arr['header']['target_quantitative_satu_tahun']) && $arr['header']['target_quantitative_satu_tahun']) {
@@ -316,6 +324,11 @@ public function getByHeader($headerId)
             if (is_numeric(str_replace(',', '', $arr['realization_quantitative']))) {
                 $arr['realization_quantitative'] = number_format((float)str_replace(',', '', $arr['realization_quantitative']), 0, ',', '.');
             }
+        }
+
+        // Pastikan penjelasan_realisasi ter-clean
+        if (isset($arr['penjelasan_realisasi'])) {
+            $arr['penjelasan_realisasi'] = clean_string($arr['penjelasan_realisasi']);
         }
 
         if (isset($arr['target_quantitative']) && $arr['target_quantitative'] !== null && $arr['target_quantitative'] !== '') {
@@ -490,6 +503,7 @@ public function getByHeader($headerId)
     'realization_option' => 'nullable|numeric|exists:mst_option,id',
     'realization_notes' => 'nullable|string',
     'realization_option_position' => 'nullable|string',
+    'penjelasan_realisasi' => 'nullable|string',
     'target_option' => 'nullable|numeric|exists:mst_option,id',
     'target_option_position' => 'nullable|string',
     'residual_risk_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
@@ -593,6 +607,7 @@ if ($validator->fails()) {
             'realization_option' => $request->realization_option,
             'realization_note' => $realizationNoteFinal,
             'realization_option_position' => $request->realization_option_position,
+            'penjelasan_realisasi' => $request->penjelasan_realisasi,
             'target_option' => $request->target_option,
             'target_option_position' => $request->target_option_position,
             'residual_risk_level_dampak' => $request->residual_risk_level_dampak,
@@ -677,6 +692,7 @@ if ($validator->fails()) {
             'realization_quantitative' => $formattedRealizationQuantitative, // Tampilkan sesuai format
             'realization_kualitatif' => $displayRealizationKualitatif !== null ? clean_string($displayRealizationKualitatif) : null, // Pastikan tampil persen
             'realization_note' => clean_string($data->realization_note),
+            'penjelasan_realisasi' => clean_string($data->penjelasan_realisasi),
             'target_quantitative' => $formattedTargetQuantitative,
             'target_notes' => clean_string($data->target_notes),
             'residual_risk_level_dampak' => $data->residual_risk_level_dampak,
@@ -780,6 +796,7 @@ if ($validator->fails()) {
     'realization_option' => 'nullable|numeric|exists:mst_option,id',
     'realization_notes' => 'nullable|string',
     'realization_option_position' => 'nullable|string',
+    'penjelasan_realisasi' => 'nullable|string',
     'target_option' => 'nullable|numeric|exists:mst_option,id',
     'target_option_position' => 'nullable|string',
     'residual_risk_level_dampak' => 'required|exists:mst_heatmap_dampak,id',
@@ -848,6 +865,7 @@ if ($validator->fails()) {
                 ? trim(($request->realization_notes ? $request->realization_notes . ' | ' : '') . 'Tindak lanjut di tahun berikutnya.')
                 : $request->realization_notes,
             'realization_option_position' => $request->realization_option_position,
+            'penjelasan_realisasi' => $request->penjelasan_realisasi,
             'target_option' => $request->target_option,
             'target_option_position' => $request->target_option_position,
             'residual_risk_level_dampak' => $request->residual_risk_level_dampak,
@@ -899,6 +917,7 @@ if ($validator->fails()) {
             'realization_quantitative' => $formattedRealizationQuantitative,
             'realization_kualitatif' => clean_string($data->realization_kualitatif),
             'realization_note' => clean_string($data->realization_note),
+            'penjelasan_realisasi' => clean_string($data->penjelasan_realisasi),
             'target_quantitative' => $data->target_quantitative ? number_format((float)$data->target_quantitative, 0, ',', '.') : '0',
             'target_notes' => clean_string($data->target_notes),
             'residual_risk_level_dampak' => $data->residual_risk_level_dampak,

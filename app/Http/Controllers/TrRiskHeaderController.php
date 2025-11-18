@@ -342,7 +342,6 @@ public function index(Request $request)
             'residual_target_posisi_risiko' => $item->residual_target_posisi_risiko ?? '',
             'residual_target_level_risiko' => $item->residual_target_level_risiko ?? 0,
             'residual_target_posisi_risiko_color' => $residualTargetColor,
-            'penjelasan_realisasi' => $item->penjelasan_realisasi ?? '',
 
             'year' => $item->year,
             'created_at' => $item->created_at ? $item->created_at->toISOString() : null,
@@ -382,6 +381,7 @@ public function index(Request $request)
                     'realization_quantitative' => $dataBulanan->realization_quantitative,
                     'realization_kualitatif' => $dataBulanan->realization_kualitatif,
                     'realization_note' => $dataBulanan->realization_note,
+                    'penjelasan_realisasi' => $dataBulanan->penjelasan_realisasi,
                     'target_quantitative' => $dataBulanan->target_quantitative,
                     'target_kualitatif' => $dataBulanan->target_kualitatif,
                     'target_notes' => $dataBulanan->target_notes,
@@ -714,7 +714,6 @@ public function show($id)
         'target_satu_tahun_position' => $data->optionTargetSatuTahun->position ?? 0,
         "target_satu_tahun_type" => $data->optionTargetSatuTahun->type ?? '',
         'target_quantitative_satu_tahun' => $data->target_quantitative_satu_tahun ?? '',
-        'penjelasan_realisasi' => $data->penjelasan_realisasi ?? '',
 
         'biaya_perlakuan_risiko' => number_format($data->biaya_perlakuan_risiko, 2, ',', '.'),
         'mitigasi' => $data->mitigasi ?? '',
@@ -830,7 +829,7 @@ public function store(Request $request)
         'mitigasi' => 'nullable|string',
         'biaya_perlakuan_risiko' => 'nullable|numeric',
         // 4 field tambahan (opsional saat store)
-        'internal_control' => 'nullable|string',
+        'internal_control' => 'required|string',
         'target_satu_tahun_option' => 'nullable|exists:mst_option,id',
         'target_satu_tahun_notes' => 'nullable|string',
         'target_quantitative_satu_tahun' => 'nullable|string|max:500'
@@ -1020,7 +1019,6 @@ public function store(Request $request)
             'target_quantitative_satu_tahun' => $formattedTarget,
             'target_satu_tahun_position' => clean_string($riskHeader->target_satu_tahun_position),
             'target_satu_tahun_name' => $riskHeader->optionTargetSatuTahun ? $riskHeader->optionTargetSatuTahun->name : null,
-            'penjelasan_realisasi' => clean_string($riskHeader->penjelasan_realisasi),
             'approval_notes' => null,
             'approved_by' => null,
             'approved_at' => null,
@@ -1434,7 +1432,6 @@ private function buildResponse($riskHeader)
         'inherent_risk_level_risiko' => clean_string($riskHeader->inherent_risk_level_risiko),
         'residual_target_posisi_risiko' => $riskHeader->residual_target_posisi_risiko,
         'residual_target_level_risiko' => clean_string($riskHeader->residual_target_level_risiko),
-        'penjelasan_realisasi' => clean_string($riskHeader->penjelasan_realisasi),
         'process_code' => $riskHeader->process_code ?? null,
         'status' => $riskHeader->status,
         'is_complete' => $riskHeader->is_complete ?? false,
@@ -1812,7 +1809,6 @@ public function monitoring(Request $request)
             'target_satu_tahun_position' => $item->optionTargetSatuTahun->position ?? 0,
             // 'target_quantitative_satu_tahun' => number_format($item->target_quantitative_satu_tahun, 0, ',', '.'),
             'target_quantitative_satu_tahun' => format_target_quantitative($item->target_quantitative_satu_tahun),
-            'penjelasan_realisasi' => $item->penjelasan_realisasi ?? '', // PERBAIKAN: Field ini sekarang akan muncul
 
             'biaya_perlakuan_risiko' => number_format($item->biaya_perlakuan_risiko, 2, ',', '.'),
             'residual_target_level_dampak' => $item->residual_target_level_dampak ?? 0,
@@ -1857,6 +1853,7 @@ public function monitoring(Request $request)
                     'realization_quantitative' => $realization,
                     'realization_kualitatif' => $realizationKualitatif,
                     'realization_note' => $dataBulanan->realization_note,
+                    'penjelasan_realisasi' => $dataBulanan->penjelasan_realisasi,
                     'target_quantitative' => $formatTargetQuantitative($target), // PERBAIKAN: Format target sesuai jenis data
                     'target_kualitatif' => $dataBulanan->target_kualitatif ?? null,
                     'target_notes' => $dataBulanan->target_notes,
@@ -1962,7 +1959,6 @@ public function getPendingApproval(Request $request)
                     ->orWhere('dampak_risiko', 'like', '%' . $searchTerm . '%')
                     ->orWhere('internal_control', 'like', '%' . $searchTerm . '%')
                     ->orWhere('mitigasi', 'like', '%' . $searchTerm . '%')
-                    ->orWhere('penjelasan_realisasi', 'like', '%' . $searchTerm . '%')
                     ->orWhereHas('department', function ($q) use ($searchTerm) {
                         $q->where('name', 'like', '%' . $searchTerm . '%');
                     })
@@ -2028,7 +2024,6 @@ public function getPendingApproval(Request $request)
                 'jenis_risiko' => $riskHeader->jenisRisiko->nama_jenis_risiko ?? null,
                 'sasaran' => clean_string($riskHeader->sasaran),
                 'peristiwa_risiko' => clean_string($riskHeader->peristiwa_risiko),
-                'penjelasan_realisasi' => clean_string($riskHeader->penjelasan_realisasi),
                 'penyebab_risiko' => clean_string($riskHeader->penyebab_risiko),
                 'dampak_risiko' => clean_string($riskHeader->dampak_risiko),
                 'internal_control' => clean_string($riskHeader->internal_control),

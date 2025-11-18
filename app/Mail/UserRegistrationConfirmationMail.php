@@ -19,7 +19,7 @@ class UserRegistrationConfirmationMail extends Mailable
 
     public function build()
     {
-        return $this->subject('Registrasi Berhasil - Menunggu Persetujuan Admin')
+        return $this->subject('Registrasi ke Aplikasi Manajemen Risiko Berhasil - Menunggu Persetujuan Admin')
                     ->view('emails.user-registration-confirmation');
     }
 }

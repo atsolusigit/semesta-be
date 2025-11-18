@@ -333,6 +333,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/lost-events/{id}/approve', [LostEventController::class, 'approve']); // Approve lost event
     Route::patch('/lost-events/{id}/reject', [LostEventController::class, 'reject']); // Reject lost event
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
+    Route::delete('/lost-event-uploads/{fileId}', [LostEventController::class, 'deleteUploadedFile']); // Delete uploaded file by fileId
 });
 
 // ===================== JENIS RISIKO =====================
@@ -386,7 +387,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/export-rencana-investasi/{format}', [RencanaInvestasiController::class, 'export'])
         ->where(['format' => 'pdf|excel']);
     Route::get('/investasi/timeline', [RencanaInvestasiController::class, 'timeline']);
-    
+
     Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
     Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);
     Route::post('/risk-investasi', [TrRiskInvestasiController::class, 'store']);

@@ -1324,3 +1324,126 @@ if (!function_exists('check_role')) {
         return true;
     }
 }
+
+if (!function_exists('detect_storage_disk')) {
+    /**
+     * Detect storage disk based on file URL
+     *
+     * @param string $filepath
+     * @return string
+     */
+    function detect_storage_disk($filepath)
+    {
+        // DigitalOcean Spaces
+        if (str_contains($filepath, 'digitaloceanspaces.com')) {
+            return 'do_spaces';
+        }
+
+        // AWS S3
+        if (str_contains($filepath, 's3.amazonaws.com') || str_contains($filepath, '.s3.')) {
+            return 's3';
+        }
+
+        // Google Cloud Storage
+        if (str_contains($filepath, 'storage.googleapis.com') || str_contains($filepath, 'storage.cloud.google.com')) {
+            return 'gcs';
+        }
+
+        // Local storage
+        if (str_contains($filepath, '/storage/') || !str_contains($filepath, 'http')) {
+            return 'public';
+        }
+
+        // Default fallback
+        return config('filesystems.default', 'public');
+    }
+}
+
+if (!function_exists('extract_storage_path')) {
+    /**
+     * Extract relative storage path from full URL
+     *
+     * @param string $filepath
+     * @param string|null $disk
+     * @return string
+     */
+    function extract_storage_path($filepath, $disk = null)
+    {
+        // Auto-detect disk if not provided
+        if ($disk === null) {
+            $disk = detect_storage_disk($filepath);
+        }
+
+        // Jika sudah relative path (tidak ada http/https), return as is
+        if (!str_contains($filepath, 'http://') && !str_contains($filepath, 'https://')) {
+            return $filepath;
+        }
+
+        switch ($disk) {
+            case 'do_spaces':
+                // Extract path dari DigitalOcean Spaces URL
+                // Format: https://fortisid.sgp1.digitaloceanspaces.com/semesta/filename.pdf
+                $pattern = '/https?:\/\/[^\/]+\/([^?]+)/';
+                if (preg_match($pattern, $filepath, $matches)) {
+                    return $matches[1];
+                }
+                break;
+
+            case 's3':
+                // Extract path dari AWS S3 URL
+                $parsed = parse_url($filepath);
+                return ltrim($parsed['path'] ?? '', '/');
+
+            case 'gcs':
+                // Extract path dari Google Cloud Storage URL
+                $parsed = parse_url($filepath);
+                $path = ltrim($parsed['path'] ?? '', '/');
+                $parts = explode('/', $path, 2);
+                return $parts[1] ?? $path;
+
+            case 'public':
+                // Extract path dari local storage URL
+                return str_replace([
+                    config('app.url') . '/storage/',
+                    url('/storage/'),
+                    '/storage/'
+                ], '', $filepath);
+
+            default:
+                // Fallback: try to extract anything after last domain/bucket part
+                $parsed = parse_url($filepath);
+                return ltrim($parsed['path'] ?? $filepath, '/');
+        }
+
+        // Fallback: return original if extraction failed
+        return $filepath;
+    }
+}
+
+if (!function_exists('delete_file_from_storage')) {
+    /**
+     * Delete file from storage safely (supports multiple storage providers)
+     *
+     * @param string $filepath
+     * @return bool
+     */
+    function delete_file_from_storage($filepath)
+    {
+        try {
+            $disk = detect_storage_disk($filepath);
+            $path = extract_storage_path($filepath, $disk);
+
+            if (Storage::disk($disk)->exists($path)) {
+                return Storage::disk($disk)->delete($path);
+            }
+
+            // File not exists, consider as success
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to delete file from storage: ' . $e->getMessage(), [
+                'filepath' => $filepath
+            ]);
+            return false;
+        }
+    }
+}

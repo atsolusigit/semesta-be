@@ -1115,22 +1115,26 @@ public function update(Request $request, $id)
 
     $currentStatus = $riskHeader->status;
 
-    // Status 'submit' - tidak boleh diedit sama sekali
-    if ($currentStatus === 'submit') {
-        return json(403, false, 'Akses Ditolak', 'Data sudah disubmit dan menunggu persetujuan. Data tidak dapat diubah.', null);
+    // Role 1, 4, 5 bisa edit data meskipun status submit, close, atau approved
+    // Role 2, 3 tetap mengikuti aturan status
+    if (!in_array($currentUser->role_id, [1, 4, 5])) {
+        // Status 'submit' - tidak boleh diedit sama sekali
+        if ($currentStatus === 'submit') {
+            return json(403, false, 'Akses Ditolak', 'Data sudah disubmit dan menunggu persetujuan. Data tidak dapat diubah.', null);
+        }
+
+        // Status 'close' - tidak boleh diedit sama sekali
+        if ($currentStatus === 'close') {
+            return json(403, false, 'Akses Ditolak', 'Data sudah ditutup dan tidak dapat diubah lagi.', null);
+        }
+
+        // Status 'approved' dengan is_complete true - tidak boleh diedit
+        if ($currentStatus === 'approved' && $riskHeader->is_complete) {
+            return json(403, false, 'Akses Ditolak', 'Data sudah disetujui dan lengkap, tidak dapat diubah lagi.', null);
+        }
     }
 
-    // Status 'close' - tidak boleh diedit sama sekali
-    if ($currentStatus === 'close') {
-        return json(403, false, 'Akses Ditolak', 'Data sudah ditutup dan tidak dapat diubah lagi.', null);
-    }
-
-    // Status 'approved' dengan is_complete true - tidak boleh diedit
-    if ($currentStatus === 'approved' && $riskHeader->is_complete) {
-        return json(403, false, 'Akses Ditolak', 'Data sudah disetujui dan lengkap, tidak dapat diubah lagi.', null);
-    }
-
-    // Untuk status draft, rejected, atau approved yang belum complete - boleh edit semua field
+    // Untuk role 1, 4, 5 atau status draft, rejected, atau approved yang belum complete - boleh edit semua field
     return $this->handleGeneralUpdate($request, $riskHeader);
 }
 
@@ -1250,6 +1254,7 @@ private function handleGeneralUpdate(Request $request, $riskHeader)
     $currentUser = auth()->user();
 
     // Role 2 & 3 tidak boleh mengubah department_id, harus sesuai department mereka
+    // Role 1, 4, 5 bebas mengubah department_id
     if (in_array($currentUser->role_id, [2, 3])) {
         if ($request->has('department_id') && $request->input('department_id') != $currentUser->department_id) {
             return json(403, false, 'Akses Ditolak', 'Anda tidak dapat mengubah department_id ke department lain.', null);
@@ -1275,8 +1280,8 @@ private function handleGeneralUpdate(Request $request, $riskHeader)
         // SET DEPARTMENT SESUAI ROLE
         // ============================================
 
-        // Superadmin (role 1) boleh ubah departemen dari request
-        if ($currentUser->role_id == 1) {
+        // Superadmin (role 1, 4, 5) boleh ubah departemen dari request
+        if (in_array($currentUser->role_id, [1, 4, 5])) {
             if ($request->has('department_id')) {
                 $updateData['department_id'] = $request->input('department_id');
             }
@@ -1307,8 +1312,10 @@ private function handleGeneralUpdate(Request $request, $riskHeader)
         }
 
         // Set status dan is_complete
-        if ($riskHeader->status === 'rejected') {
-            // Jika sebelumnya rejected, set kembali ke draft
+        // Untuk role 1, 4, 5: status tidak berubah otomatis, tetap sesuai status saat ini
+        // Untuk role 2, 3: jika sebelumnya rejected, set kembali ke draft
+        if ($riskHeader->status === 'rejected' && !in_array($currentUser->role_id, [1, 4, 5])) {
+            // Jika sebelumnya rejected dan bukan role 1, 4, 5, set kembali ke draft
             $updateData['status'] = 'draft';
             $updateData['approval_notes'] = null;
             $updateData['approved_by'] = null;

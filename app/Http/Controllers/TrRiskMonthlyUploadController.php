@@ -99,9 +99,10 @@ class TrRiskMonthlyUploadController extends Controller
 
     public function destroy($id)
     {
-        // Check authorization: only role 1 can delete
         $user = auth()->user();
-        $roleCheck = check_role($user, 1);
+
+        // Check authorization: roles 1,2,3,4,5 can delete
+        $roleCheck = check_role($user, [1, 2, 3, 4, 5]);
 
         if ($roleCheck !== true) {
             return $roleCheck;
@@ -111,6 +112,13 @@ class TrRiskMonthlyUploadController extends Controller
 
         if (!$data) {
             return json(404, false, 'Data Tidak Ditemukan', 'Data tidak ditemukan.', null);
+        }
+
+        // Role 2 dan 3 hanya bisa delete berdasarkan department_id mereka
+        if (in_array($user->role_id, [2, 3])) {
+            if ($data->department_id != $user->department_id) {
+                return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menghapus data dari department Anda sendiri.', null);
+            }
         }
 
         $filePath = $data->filepath;
@@ -137,15 +145,14 @@ class TrRiskMonthlyUploadController extends Controller
 
     public function deleteTempFile(Request $request)
     {
-        // Check authorization: only role 1 and 2 can delete temp files
         $user = auth()->user();
-        $roleCheck = check_role($user, [1, 2]);
+
+        // Check authorization: roles 1,2,3,4,5 can delete temp files
+        $roleCheck = check_role($user, [1, 2, 3, 4, 5]);
 
         if ($roleCheck !== true) {
             return $roleCheck;
         }
-
-        // dd(Storage::disk('s3')->files('semesta'));
 
         $filename = $request->get('filename');
 

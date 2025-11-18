@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LostEvent;
 use App\Models\TrRiskHeader;
 use App\Models\MstRcsa;
+use App\Models\LostEventUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -1443,6 +1444,64 @@ public function destroy($id)
         ]);
     }
 }
+
+    /**
+     * Delete uploaded file from lost event
+     */
+    public function deleteUploadedFile($fileId)
+    {
+        $user = auth()->user();
+
+        if (!in_array($user->role_id, [1, 2, 3, 4, 5])) {
+            return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk menghapus file.', null);
+        }
+
+        $upload = LostEventUpload::with('lostEvent')->find($fileId);
+
+        if (!$upload) {
+            return json(404, false, 'File Tidak Ditemukan', 'File yang ingin dihapus tidak ditemukan.', null);
+        }
+
+        $lostEvent = $upload->lostEvent;
+
+        if (!$lostEvent) {
+            return json(404, false, 'Data Tidak Ditemukan', 'Lost event tidak ditemukan.', null);
+        }
+
+        if (!in_array($lostEvent->status, ['draft', 'rejected'])) {
+            return json(400, false, 'Gagal', 'File hanya dapat dihapus jika lost event berstatus draft atau rejected.', null);
+        }
+
+        // Role 2 dan 3 hanya boleh hapus file dari department sendiri
+        if (in_array($user->role_id, [2, 3])) {
+            if ($lostEvent->risk_owner_department_id !== $user->department_id) {
+                return json(403, false, 'Forbidden', 'Anda hanya dapat menghapus file untuk department Anda sendiri.', null);
+            }
+        }
+
+        DB::beginTransaction();
+        try {
+            // Hapus file dari storage menggunakan helper
+            delete_file_from_storage($upload->filepath);
+
+            $lostEventId = $upload->lost_event_id;
+
+            // Hapus record dari database
+            $upload->delete();
+
+            DB::commit();
+
+            return json(200, true, 'Berhasil', 'File berhasil dihapus.', [
+                'deleted_file_id' => $fileId,
+                'lost_event_id' => $lostEventId
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return json(500, false, 'Gagal', 'Terjadi kesalahan saat menghapus file.', [
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
 
 //=====================================
 // GET PENDING LOST EVENTS

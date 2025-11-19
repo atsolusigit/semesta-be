@@ -674,32 +674,35 @@ if (!function_exists('validate_bulk_monthly_constraints')) {
      * @param object $existingMonthly
      * @param bool $requireAllMonths
      * @param int $headerId
+     * @param bool $bypassFinalization - parameter baru untuk bypass pengecekan finalisasi
      * @return array
      */
-    function validate_bulk_monthly_constraints($processedMonthlyData, $existingMonthly, $requireAllMonths, $headerId)
+    function validate_bulk_monthly_constraints($processedMonthlyData, $existingMonthly, $requireAllMonths, $headerId, $bypassFinalization = false)
     {
         $requestedMonths = collect($processedMonthlyData)->pluck('month')->toArray();
         $warnings = [];
 
-        // Check finalization
-        $finalizedMonths = [];
-        foreach ($processedMonthlyData as $monthData) {
-            $month = $monthData['month'];
-            if (isset($existingMonthly[$month]) && $existingMonthly[$month]->is_finalize) {
-                $finalizedMonths[] = $month;
+        // Check finalization - bisa di-bypass oleh role tertentu
+        if (!$bypassFinalization) {
+            $finalizedMonths = [];
+            foreach ($processedMonthlyData as $monthData) {
+                $month = $monthData['month'];
+                if (isset($existingMonthly[$month]) && $existingMonthly[$month]->is_finalize) {
+                    $finalizedMonths[] = $month;
+                }
             }
-        }
 
-        if (!empty($finalizedMonths)) {
-            return [
-                'valid' => false,
-                'title' => 'Data Sudah Difinalisasi',
-                'message' => 'Bulan berikut sudah difinalisasi dan tidak bisa diubah: ' . implode(', ', $finalizedMonths),
-                'data' => [
-                    'header_id' => $headerId,
-                    'finalized_months' => $finalizedMonths
-                ]
-            ];
+            if (!empty($finalizedMonths)) {
+                return [
+                    'valid' => false,
+                    'title' => 'Data Sudah Difinalisasi',
+                    'message' => 'Bulan berikut sudah difinalisasi dan tidak bisa diubah: ' . implode(', ', $finalizedMonths),
+                    'data' => [
+                        'header_id' => $headerId,
+                        'finalized_months' => $finalizedMonths
+                    ]
+                ];
+            }
         }
 
         // Check for duplicate months

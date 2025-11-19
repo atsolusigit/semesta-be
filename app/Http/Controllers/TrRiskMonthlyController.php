@@ -451,8 +451,14 @@ public function getByHeader($headerId)
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
     }
 
-    if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
-        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
+    // Cek apakah user memiliki privilege untuk edit data yang sudah finalisasi
+    $canEditFinalized = in_array($user->role_id, [1, 4, 5]);
+
+    // Validasi finalisasi hanya untuk role yang tidak punya privilege
+    if (!$canEditFinalized) {
+        if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
+            return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
+        }
     }
 
     // Validasi semua bulan sebelumnya harus sudah difinalisasi
@@ -470,7 +476,7 @@ public function getByHeader($headerId)
         }
     }
 
-        // ======= NEW: cek mst_month_recommendation apakah bulan ini butuh rekomendasi =======
+    // ======= NEW: cek mst_month_recommendation apakah bulan ini butuh rekomendasi =======
     $mst = \App\Models\MstMonthRecommendation::find($data->month);
 
     $requiresRecommendation = false;
@@ -479,7 +485,8 @@ public function getByHeader($headerId)
     }
 
     // Jika membutuhkan rekomendasi, pastikan data tr_risk_monthly sudah diapprove rekomendasinya
-    if ($requiresRecommendation) {
+    // Role 1, 4, 5 bisa bypass requirement ini
+    if ($requiresRecommendation && !$canEditFinalized) {
         if ($data->approval_status !== 'approved') {
             $monthName = $mst->name ?? $data->month;
             return json(400, false, 'Terkunci', "Bulan {$monthName} membutuhkan rekomendasi yang belum disetujui. Silakan tunggu persetujuan rekomendasi terlebih dahulu sebelum mengisi data.", [
@@ -731,10 +738,10 @@ if ($validator->fails()) {
     }
 }
 
-  public function updateResidual(Request $request, $id)
+ public function updateResidual(Request $request, $id)
 {
     // Check user role authorization
-     $user = auth()->user();
+    $user = auth()->user();
     $roleCheck = check_role($user, [1, 2, 3, 4, 5]);
 
     if ($roleCheck !== true) {
@@ -746,10 +753,17 @@ if ($validator->fails()) {
         return json(404, false, 'Data Tidak Ditemukan', 'Data risk monthly tidak ditemukan.', ['id' => $id]);
     }
 
-    if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
-        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', ['id' => $id]);
+    // Cek apakah user memiliki privilege untuk edit data yang sudah finalisasi
+    $canEditFinalized = in_array($user->role_id, [1, 4, 5]);
+
+    // Validasi finalisasi hanya untuk role yang tidak punya privilege
+    if (!$canEditFinalized) {
+        if ($data->is_finalize || $data->entries()->where('is_finalize', true)->exists()) {
+            return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', ['id' => $id]);
+        }
     }
 
+    // Validasi semua bulan sebelumnya harus sudah difinalisasi (berlaku untuk semua role)
     if ($data->month > 1) {
         $unfinalized = TrRiskMonthly::where('header_id', $data->header_id)
             ->where('month', '<', $data->month)
@@ -773,7 +787,8 @@ if ($validator->fails()) {
     }
 
     // Jika membutuhkan rekomendasi, pastikan data tr_risk_monthly sudah diapprove rekomendasinya
-    if ($requiresRecommendation) {
+    // Role 1, 4, 5 bisa bypass requirement ini
+    if ($requiresRecommendation && !$canEditFinalized) {
         if ($data->approval_status !== 'approved') {
             $monthName = $mst->name ?? $data->month;
             return json(400, false, 'Terkunci', "Bulan {$monthName} membutuhkan rekomendasi yang belum disetujui. Silakan tunggu persetujuan rekomendasi terlebih dahulu sebelum mengisi residual.", [
@@ -1050,15 +1065,19 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
         return json(400, false, 'Data Kosong', 'Data perbulan tidak boleh kosong.', ['header_id' => $headerId]);
     }
 
-    $finalized = $header->monthly()->where(function ($query) {
-        $query->where('is_finalize', true)
-              ->orWhereHas('entries', function ($q) {
-                  $q->where('is_finalize', true);
-              });
-    })->exists();
+    // Role 1, 4, 5 bisa update meskipun sudah finalisasi
+    // Role 2, 3 tidak bisa update jika sudah finalisasi
+    if (!in_array($user->role_id, [1, 4, 5])) {
+        $finalized = $header->monthly()->where(function ($query) {
+            $query->where('is_finalize', true)
+                  ->orWhereHas('entries', function ($q) {
+                      $q->where('is_finalize', true);
+                  });
+        })->exists();
 
-    if ($finalized) {
-        return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
+        if ($finalized) {
+            return json(400, false, 'Finalisasi', 'Data sudah difinalisasi dan tidak bisa diubah lagi.', null);
+        }
     }
 
     $hasMonthField = collect($request->monthly_data)->first() && isset(collect($request->monthly_data)->first()['month']);
@@ -1164,12 +1183,18 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
     $processedData = process_bulk_monthly_data($dataForProcessing, $hasMonthField);
     $existingMonthly = TrRiskMonthly::where('header_id', $headerId)->get()->keyBy('month');
 
+    // Tentukan apakah bypass finalization check berdasarkan role
+    $bypassFinalization = in_array($user->role_id, [1, 4, 5]);
+
+    // Panggil validasi dengan parameter bypass
     $bulkValidationResult = validate_bulk_monthly_constraints(
         $processedData['monthly_data'],
         $existingMonthly,
         $request->require_all_months,
-        $headerId
+        $headerId,
+        $bypassFinalization  // Parameter baru
     );
+
     if (!$bulkValidationResult['valid']) {
         return json(400, false, $bulkValidationResult['title'], $bulkValidationResult['message'], $bulkValidationResult['data']);
     }

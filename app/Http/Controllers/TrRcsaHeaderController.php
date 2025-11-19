@@ -199,6 +199,11 @@ class TrRcsaHeaderController extends Controller
             return $result;
         }
 
+        $roleId = $currentUser->role_id ?? null;
+         if (!in_array($roleId, [1, 4, 5, 6])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk membuat data ini.', null);
+        }
+
         $allowedFields = [
             'asumsi_perhitungan_dampak',
             'deskripsi_dampak',
@@ -539,6 +544,7 @@ class TrRcsaHeaderController extends Controller
     public function update(Request $request, string $id)
     {
         $currentUser = auth()->user();
+        $roleId = $currentUser->role_id ?? null;
 
         // Validasi role: hanya role 1, 2, 3 yang diizinkan
         $roleCheck = check_role($currentUser, [1, 2, 3]);
@@ -546,8 +552,8 @@ class TrRcsaHeaderController extends Controller
             return $roleCheck;
         }
 
-        $RcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
-        // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+        $RcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3, 4, 5, 6]), function ($query) use ($currentUser) {
+        // Jika role_id 2 s/d 6, batasi department yang terlihat sesuai department user
         $query->where('unit_kerja_id', $currentUser->department_id);
         })->find($id);
 
@@ -555,11 +561,17 @@ class TrRcsaHeaderController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'RCSA tidak ditemukan.', null);
         }
 
-        if ($RcsaHeader->status === 'approved') {
-            return json(403, false, 'Akses Ditolak', 'Semua data sudah terisi dan di-approve, tidak bisa dirubah lagi.', null);
+        if (!in_array($roleId, [1, 4, 5, 6])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk update data ini.', null);
         }
 
-        if (in_array($currentUser->role_id, [2, 3])) {
+        if ($RcsaHeader->status === 'approved') {
+            if (!in_array($roleId, [1, 5])) {
+                return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk update data ini.', null);
+            }
+        }
+
+        if (in_array($currentUser->role_id, [2, 3, 4, 5, 6])) {
             if ($request->has('unit_kerja_id') && $request->input('unit_kerja_id') != $currentUser->department_id) {
                 return json(403, false, 'Akses Ditolak', 'Anda tidak dapat mengubah department_id ke department lain.', null);
             }
@@ -966,6 +978,11 @@ class TrRcsaHeaderController extends Controller
                 return $roleCheck;
             }
 
+            $roleId = $currentUser->role_id ?? null;
+            if (!in_array($roleId, [1, 4, 5, 6])) {
+                return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk submit data ini.', null);
+            }
+
             // Load by id (and restrict by department for role 2/3)
             $rcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
                 $query->where('unit_kerja_id', $currentUser->department_id);
@@ -1361,6 +1378,11 @@ class TrRcsaHeaderController extends Controller
         $result = check_role(auth()->user(), [1, 2, 3]);
         if ($result !== true) {
             return $result;
+        }
+
+        $roleId = $currentUser->role_id ?? null;
+        if (!in_array($roleId, [1, 4, 5, 6])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak main risk.', null);
         }
 
         $validator = Validator::make($request->all(), [

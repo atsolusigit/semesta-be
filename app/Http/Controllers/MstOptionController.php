@@ -9,29 +9,54 @@ use Illuminate\Support\Facades\Validator;
 class MstOptionController extends Controller
 {
     public function index(Request $request)
-    {
-        $query = MstOption::query()->orderBy('id', 'asc');
+{
+    $perPage = $request->input('per_page', 10);
 
-        // Search filter
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('position', 'like', "%{$search}%")
-                  ->orWhere('type', 'like', "%{$search}%");
-            });
-        }
+    $query = MstOption::query()->orderBy('id', 'asc');
 
-        // Filter berdasarkan type
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
-        }
-
-        $data = $query->get();
-
-        return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $data);
+    // Search filter
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('position', 'like', "%{$search}%")
+              ->orWhere('type', 'like', "%{$search}%");
+        });
     }
 
+    // Filter berdasarkan type
+    if ($request->filled('type')) {
+        $query->where('type', $request->type);
+    }
+
+    // Pagination
+    $data = $query->paginate($perPage);
+
+    // Mapping data
+    $mappedData = $data->getCollection()->map(function ($item) {
+        return [
+            'id' => $item->id,
+            'name' => $item->name,
+            'position' => $item->position,
+            'type' => $item->type,
+            'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+            'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+        ];
+    });
+
+    // Prepare response dengan pagination
+    $responseData = [
+        'current_page' => $data->currentPage(),
+        'per_page' => $data->perPage(),
+        'total' => $data->total(),
+        'last_page' => $data->lastPage(),
+        'from' => $data->firstItem(),
+        'to' => $data->lastItem(),
+        'data' => $mappedData,
+    ];
+
+    return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $responseData);
+}
     public function store(Request $request)
     {
         // Check authorization: only role 1 and 2 can store

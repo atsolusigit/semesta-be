@@ -1312,10 +1312,10 @@ private function handleGeneralUpdate(Request $request, $riskHeader)
         }
 
         // Set status dan is_complete
-        // Untuk role 1, 4, 5: status tidak berubah otomatis, tetap sesuai status saat ini
-        // Untuk role 2, 3: jika sebelumnya rejected, set kembali ke draft
-        if ($riskHeader->status === 'rejected' && !in_array($currentUser->role_id, [1, 4, 5])) {
-            // Jika sebelumnya rejected dan bukan role 1, 4, 5, set kembali ke draft
+        // Untuk semua role: jika status rejected, set kembali ke draft
+        // Untuk role 1, 4, 5: jika status approved/close, status tidak berubah otomatis
+        if ($riskHeader->status === 'rejected') {
+            // Semua role (termasuk 1, 4, 5) yang update data rejected akan set kembali ke draft
             $updateData['status'] = 'draft';
             $updateData['approval_notes'] = null;
             $updateData['approved_by'] = null;

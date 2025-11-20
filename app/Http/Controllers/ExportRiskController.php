@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TrRiskHeader;
 use App\Models\LostEvent;
+use App\Models\MstDepartment;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\MultiSheetRiskExport;
@@ -675,7 +676,7 @@ private function formatTarget($quantitative, $qualitative)
             return 'SEMUA_DEPT';
         }
 
-        $department = \App\Models\Department::find($departmentId);
+        $department = \App\Models\MstDepartment::find($departmentId);
         return $department ? strtoupper(str_replace(' ', '_', $department->name)) : 'DEPT_' . $departmentId;
     }
 

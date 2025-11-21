@@ -9,6 +9,7 @@ use App\Models\MstRcsa;
 use App\Models\LostEventUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -1503,6 +1504,59 @@ public function destroy($id)
         }
     }
 
+   public function uploadFile(Request $request, $lostEventId = null)
+{
+    $user = auth()->user();
+
+    if (!in_array($user->role_id, [1, 2, 3, 4, 5])) {
+        return json(403, false, 'Forbidden', 'Anda tidak memiliki akses upload file.', null);
+    }
+
+    // FILE OPSIONAL
+    $validator = Validator::make($request->all(), [
+        'file'   => 'array',           // tidak wajib
+        'file.*' => 'file|max:10240',  // validasi hanya jika file dikirim
+    ]);
+
+    if ($validator->fails()) {
+        return json(400, false, 'Validasi Gagal', 'File tidak valid.', $validator->errors());
+    }
+
+    // Jika tidak ada file → tetap sukses
+    if (!$request->hasFile('file')) {
+        return json(200, true, 'Tidak Ada File', 'Tidak ada file yang diupload.', []);
+    }
+
+    $uploadedList = [];
+
+    foreach ($request->file('file') as $file) {
+
+        // Convert file → base64
+        $fileContent = file_get_contents($file->getRealPath());
+        $base64      = base64_encode($fileContent);
+        $mime        = $file->getMimeType();
+
+        $base64Format = "data:{$mime};base64,{$base64}";
+
+        // Simpan ke database
+        $upload = LostEventUpload::create([
+            'lost_event_id' => $lostEventId,
+            'filepath'      => $base64Format,              // langsung ke DB
+            'domain'        => $file->getClientOriginalName(),
+            'is_confirmed'  => 1,
+        ]);
+
+        $uploadedList[] = [
+            'upload_id' => $upload->id,
+            'filename'  => $file->getClientOriginalName(),
+            'filepath'  => $upload->filepath,
+        ];
+    }
+
+    return json(200, true, 'Berhasil', 'Upload berhasil disimpan ke database.', $uploadedList);
+}
+
+
 //=====================================
 // GET PENDING LOST EVENTS
 //=====================================
@@ -1532,6 +1586,11 @@ public function getPending(Request $request)
             ]);
         }
     ])
+    // Filter berdasarkan type dari kolom 'type' di tabel lost_events
+    ->when($type, function ($query) use ($type) {
+        $typeNormalized = strtolower(trim($type));
+        $query->whereRaw('LOWER(type) = ?', [$typeNormalized]);
+    })
     // Role 2 dan 3 hanya bisa melihat department mereka
     ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
         $query->where('risk_owner_department_id', $user->department_id);
@@ -1548,15 +1607,6 @@ public function getPending(Request $request)
     // Filter berdasarkan status jika dikirim
     ->when($request->status, function ($query) use ($request) {
         $query->where('status', $request->status);
-    })
-    ->when($type, function ($query) use ($type) {
-        if (strtolower($type) === 'kualitatif') {
-            // Lost Event Kualitatif: Tidak memiliki 'header' (data finansial/kuantitatif)
-            $query->whereDoesntHave('header');
-        } elseif (strtolower($type) === 'kuantitatif') {
-            // Lost Event Kuantitatif: Memiliki 'header' (data finansial/kuantitatif)
-            $query->whereHas('header');
-        }
     })
     ->when($search, function ($query) use ($search) {
         $query->where(function ($q) use ($search) {

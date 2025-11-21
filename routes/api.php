@@ -88,13 +88,14 @@ Route::middleware(['auth:api'])->group(function () {
         Route::put('{id}', [UserController::class, 'update']);      // Update user
         Route::delete('{id}', [UserController::class, 'destroy']);  // Hapus user
 
-        Route::post('{id}/approve', [UserController::class, 'approveUser']);
-        Route::post('{id}/reject', [UserController::class, 'rejectUser']);
+        Route::post('{id}/approve', [UserController::class, 'approveUser']); // Approve user
+        Route::post('{id}/reject', [UserController::class, 'rejectUser']); // Reject user
     });
 
     // Profile endpoints
     Route::get('/my-profile', [UserController::class, 'getProfile']);
     Route::post('/profile/update', [UserController::class, 'updateProfile']);
+     Route::post('/profile/photo/upload', [UserController::class, 'uploadPhoto']);
 });
 
 // API Knowledge Base Management
@@ -334,6 +335,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/lost-events/{id}/reject', [LostEventController::class, 'reject']); // Reject lost event
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
     Route::delete('/lost-event-uploads/{fileId}', [LostEventController::class, 'deleteUploadedFile']); // Delete uploaded file by fileId
+    Route::post('/lost-events/{id}/upload', [LostEventController::class, 'uploadFile']);
 });
 
 // ===================== JENIS RISIKO =====================

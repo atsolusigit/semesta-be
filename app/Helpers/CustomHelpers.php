@@ -479,8 +479,9 @@ if (!function_exists('process_yearly_residual_risk')) {
 }
 
 if (!function_exists('process_lost_event_file_uploads')) {
+
     /**
-     * Proses file uploads untuk lost event
+     * Simpan file yang sudah diupload ke tabel lost_event_uploads
      *
      * @param array $uploadedFiles
      * @param object $lostEvent
@@ -493,28 +494,28 @@ if (!function_exists('process_lost_event_file_uploads')) {
         }
 
         foreach ($uploadedFiles as $file) {
-            if (!isset($file['filepath']) || empty($file['filepath'])) {
+
+            // Pastikan format benar
+            if (
+                !isset($file['filepath']) ||
+                empty($file['filepath'])
+            ) {
                 continue;
             }
 
             \App\Models\LostEventUpload::create([
                 'lost_event_id' => $lostEvent->id,
                 'filepath' => $file['filepath'],
-                'domain' => $file['domain'] ?? basename($file['filepath']),
-                'is_confirmed' => true,
+                'domain' => $file['domain'] ?? 'Lost_Event_Report_SEMUA_DEPARTMENT',
+                'is_confirmed' => 1,
             ]);
         }
     }
 }
 
+
 if (!function_exists('process_risk_monthly_file_uploads')) {
-    /**
-     * Proses file uploads untuk risk monthly
-     *
-     * @param array $uploadedFiles
-     * @param object $monthly
-     * @return void
-     */
+
     function process_risk_monthly_file_uploads($uploadedFiles, $monthly)
     {
         if (!is_array($uploadedFiles)) {
@@ -522,16 +523,17 @@ if (!function_exists('process_risk_monthly_file_uploads')) {
         }
 
         foreach ($uploadedFiles as $file) {
+
             if (!isset($file['filepath']) || empty($file['filepath'])) {
                 continue;
             }
 
             TrRiskMonthlyUpload::create([
-                'header_id' => $monthly->header_id,
-                'risk_monthly_id' => $monthly->id,
-                'filepath' => $file['filepath'],
-                'domain' => $file['domain'] ?? basename($file['filepath']),
-                'is_confirmed' => true,
+                'header_id'        => $monthly->header_id,
+                'risk_monthly_id'  => $monthly->id,
+                'filepath'         => $file['filepath'],  // base64 tersimpan
+                'domain'           => $file['domain'] ?? 'dokumen',
+                'is_confirmed'     => true,
             ]);
         }
     }

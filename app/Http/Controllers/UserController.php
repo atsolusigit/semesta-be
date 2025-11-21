@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use App\Mail\UserApprovedMail;
 use App\Mail\UserRejectedMail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
 
 class UserController extends Controller
@@ -624,7 +625,7 @@ public function rejectUser($id)
     return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $result);
 }
 
-    public function updateProfile(Request $request)
+   public function updateProfile(Request $request)
 {
     $user = auth()->user();
 
@@ -635,7 +636,7 @@ public function rejectUser($id)
         'nip' => 'nullable|string|max:100',
         'phone_number' => 'nullable|string|max:100',
         'gender' => 'nullable|in:male,female,other',
-        'profile_img' => 'nullable|url',
+        'profile_img' => 'nullable|string', // Ubah dari 'url' karena sekarang bisa base64
     ]);
 
     if ($validation[0] !== 0) return $validation[1];
@@ -646,6 +647,7 @@ public function rejectUser($id)
         // Update data biasa (tidak terenkripsi)
         $user->gender = $request->gender;
 
+        // Update profile_img jika ada (bisa URL atau base64)
         if ($request->filled('profile_img')) {
             $user->profile_img = $request->profile_img;
         }
@@ -712,6 +714,7 @@ public function rejectUser($id)
             });
 
             if ($duplicate) {
+                DB::rollBack();
                 return json(400, 'false', 'duplicate_nip', 'NIP sudah digunakan oleh pengguna lain.', null);
             }
 
@@ -837,13 +840,13 @@ public function rejectUser($id)
     }
 }
 
-    public function getProfile()
+   public function getProfile()
 {
     try {
-        $user = auth()->user();
-        $user = User::with('role', 'department')->find($user->id);
+        $authUser = auth()->user();
+        $user = User::with('role', 'department')->find($authUser->id);
 
-        // Decrypt data dengan error handling menggunakan encrypt_decrypt_db
+        // Decrypt data
         $nameDecrypted = null;
         $usernameDecrypted = null;
         $emailDecrypted = null;
@@ -851,52 +854,52 @@ public function rejectUser($id)
         $phoneDecrypted = null;
 
         if ($user->name) {
-            try {
-                $nameDecrypted = encrypt_decrypt_db('dec', $user->name, $user->id);
-            } catch (\Exception $e) {
-                logger("Name decryption error in getProfile: " . $e->getMessage());
-            }
+            try { $nameDecrypted = encrypt_decrypt_db('dec', $user->name, $user->id); }
+            catch (\Exception $e) { logger("Name decryption error: " . $e->getMessage()); }
         }
 
         if ($user->username) {
-            try {
-                $usernameDecrypted = encrypt_decrypt_db('dec', $user->username, $user->id);
-            } catch (\Exception $e) {
-                logger("Username decryption error in getProfile: " . $e->getMessage());
-            }
+            try { $usernameDecrypted = encrypt_decrypt_db('dec', $user->username, $user->id); }
+            catch (\Exception $e) { logger("Username decryption error: " . $e->getMessage()); }
         }
 
         if ($user->email) {
-            try {
-                $emailDecrypted = encrypt_decrypt_db('dec', $user->email, $user->id);
-            } catch (\Exception $e) {
-                logger("Email decryption error in getProfile: " . $e->getMessage());
-            }
+            try { $emailDecrypted = encrypt_decrypt_db('dec', $user->email, $user->id); }
+            catch (\Exception $e) { logger("Email decryption error: " . $e->getMessage()); }
         }
 
         if ($user->nip) {
-            try {
-                $nipDecrypted = encrypt_decrypt_db('dec', $user->nip, $user->id);
-            } catch (\Exception $e) {
-                logger("NIP decryption error in getProfile: " . $e->getMessage());
-            }
+            try { $nipDecrypted = encrypt_decrypt_db('dec', $user->nip, $user->id); }
+            catch (\Exception $e) { logger("NIP decryption error: " . $e->getMessage()); }
         }
 
         if ($user->phone_number) {
             try {
-                logger("Getting phone from DB: " . $user->phone_number);
+                logger("Getting phone raw: " . $user->phone_number);
+
                 $phoneDecrypted = encrypt_decrypt_db('dec', $user->phone_number, $user->id);
 
                 if (empty($phoneDecrypted)) {
-                    logger("Phone decryption returned empty result, setting to null");
+                    logger("Phone decryption empty");
                     $phoneDecrypted = null;
-                } else {
-                    logger("Decrypted phone in getProfile: " . $phoneDecrypted);
                 }
             } catch (\Exception $e) {
-                logger("Phone number decryption error in getProfile: " . $e->getMessage());
+                logger("Phone decryption error: " . $e->getMessage());
                 logger("Stack trace: " . $e->getTraceAsString());
                 $phoneDecrypted = null;
+            }
+        }
+
+        // FOTO PROFIL — sekarang langsung kembalikan base64
+        $profileImg = null;
+
+        if (!empty($user->profile_img)) {
+            // Jika sudah URL (misal dari DigitalOcean), tetap pakai.
+            if (filter_var($user->profile_img, FILTER_VALIDATE_URL)) {
+                $profileImg = $user->profile_img;
+            } else {
+                // Jika base64 → return langsung base64
+                $profileImg = $user->profile_img;
             }
         }
 
@@ -907,7 +910,7 @@ public function rejectUser($id)
             'message' => 'Data profil berhasil diambil.',
             'data' => [
                 'user' => [
-                    'id' => encrypt_decrypt_md5('enc', $user->id), //  dienkripsi
+                    'id' => encrypt_decrypt_md5('enc', $user->id),
                     'name' => $nameDecrypted,
                     'username' => $usernameDecrypted,
                     'email' => $emailDecrypted,
@@ -919,12 +922,14 @@ public function rejectUser($id)
                     'role_id' => $user->role_id,
                     'role_name' => optional($user->role)->name,
                     'status' => $user->status,
-                    'profile_img' => $user->profile_img,
+                    'profile_img' => $profileImg, // base64 langsung / atau URL DO
                 ]
             ]
         ]);
+
     } catch (\Exception $e) {
-        logger("Error in getProfile: " . $e->getMessage());
+        logger("getProfile error: " . $e->getMessage());
+
         return response()->json([
             'code' => 500,
             'status' => false,
@@ -932,6 +937,65 @@ public function rejectUser($id)
             'message' => 'Terjadi kesalahan saat mengambil data profil.',
             'data' => null
         ], 500);
+    }
+}
+
+public function uploadPhoto(Request $request)
+{
+    try {
+        $user = auth()->user();
+
+        if (!$request->hasFile('photo')) {
+            return json(400, 'false', 'no_file', 'File foto tidak ditemukan.', null);
+        }
+
+        $file = $request->file('photo');
+
+        if (!$file->isValid()) {
+            return json(400, 'false', 'invalid_file', 'File tidak valid.', null);
+        }
+
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+        $maxSize = 2048 * 1024;
+
+        if (!in_array($file->getMimeType(), $allowedMimes)) {
+            return json(400, 'false', 'invalid_type', 'Tipe file harus jpeg, png, jpg, atau gif.', null);
+        }
+
+        if ($file->getSize() > $maxSize) {
+            return json(400, 'false', 'file_too_large', 'Ukuran file maksimal 2MB.', null);
+        }
+
+        DB::beginTransaction();
+
+        // CONVERT FILE → BASE64
+        $imageData = file_get_contents($file->getRealPath());
+        $base64Image = base64_encode($imageData);
+        $mimeType = $file->getMimeType();
+        $photoData = 'data:' . $mimeType . ';base64,' . $base64Image;
+
+        // SIMPAN KE DATABASE
+        User::where('id', $user->id)->update([
+            'profile_img' => $photoData
+        ]);
+
+        DB::commit();
+
+        $updatedUser = User::find($user->id);
+        $encryptedUserId = encrypt_decrypt_md5('enc', $updatedUser->id);
+
+        // RESULT TANPA URL
+        $result = [
+            'id' => $encryptedUserId,
+            'profile_img' => $updatedUser->profile_img,
+            'message' => 'Foto profil berhasil diupload.'
+        ];
+
+        return json(200, 'success', 'upload_success', 'Foto profil berhasil diupload.', $result);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return json(500, 'false', 'upload_failed', $e->getMessage(), null);
     }
 }
 

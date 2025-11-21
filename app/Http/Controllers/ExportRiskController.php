@@ -902,6 +902,7 @@ public function exportLostEvent(Request $request, $format)
     $filterYear = $request->get('year');
     $filterType = strtolower($request->get('type', ''));
     $filterDepartment = $request->get('department_id');
+    $filterJenisRisiko = $request->get('jenis_risiko_id');
     $search = $request->get('search');
 
     // Ambil data dari LostEvent HANYA yang sudah approved
@@ -923,11 +924,18 @@ public function exportLostEvent(Request $request, $format)
     ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
         $query->where('risk_owner_department_id', $user->department_id);
     })
+    ->when($filterJenisRisiko, function ($query) use ($filterJenisRisiko) {
+    $query->where('jenis_risiko_id', $filterJenisRisiko);
+    })
     ->when($filterYear, function ($query) use ($filterYear) {
         $query->where('tahun', $filterYear);
     })
     ->when($filterDepartment, function ($query) use ($filterDepartment) {
         $query->where('risk_owner_department_id', $filterDepartment);
+    })
+    // Filter berdasarkan type dari kolom 'type' di tabel lost_events
+    ->when($filterType, function ($query) use ($filterType) {
+        $query->whereRaw('LOWER(type) = ?', [$filterType]);
     })
     ->when($search, function ($query) use ($search) {
         $query->where(function ($q) use ($search) {
@@ -1020,23 +1028,6 @@ public function exportLostEvent(Request $request, $format)
 
         $lostEvent->calculated_percentage = $percentage;
         $lostEvent->detected_type = $detectedType;
-    }
-
-    // Filter berdasarkan type jika diberikan
-    // Filter hanya berdasarkan detected_type yang sudah dihitung
-    if (!empty($filterType)) {
-        $lostEvents = $lostEvents->filter(function ($lostEvent) use ($filterType) {
-            $detectedType = strtolower($lostEvent->detected_type ?? '');
-            return $detectedType === $filterType;
-        })->values();
-
-        if ($lostEvents->isEmpty()) {
-            return response()->json([
-                'status' => 404,
-                'success' => false,
-                'message' => 'Data Lost Event tidak ditemukan untuk filter type tersebut.',
-            ], 404);
-        }
     }
 
     // Siapkan data export

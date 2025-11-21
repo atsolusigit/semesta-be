@@ -140,13 +140,25 @@ public function register(Request $request)
 
         Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
 
+      // Kirim email ke semua admin (role_id 1 dan 2)
         $admins = User::whereIn('role_id', [1, 2])
-                     ->where('status', 1)
-                     ->get();
+                    ->where('status', 1)
+                    ->get();
 
         foreach ($admins as $admin) {
-            $adminEmail = encrypt_decrypt_db('dec', $admin->email, $admin->id);
-            Mail::to($adminEmail)->send(new UserRegisteredMail($userDataForEmail));
+            try {
+                $adminEmail = encrypt_decrypt_db('dec', $admin->email, $admin->id);
+
+                // Validasi email admin sebelum mengirim
+                if (!empty($adminEmail) && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+                    Mail::to($adminEmail)->send(new UserRegisteredMail($userDataForEmail));
+                } else {
+                    \Log::warning("Invalid admin email for user ID: {$admin->id}");
+                }
+            } catch (\Throwable $e) {
+                // Log error tapi jangan stop proses registrasi
+                \Log::error("Failed to send email to admin ID {$admin->id}: " . $e->getMessage());
+            }
         }
 
         DB::commit();

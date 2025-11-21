@@ -2820,6 +2820,7 @@ public function destroy($id)
 public function getTaskRealisasiMonitoring(Request $request)
 {
     try {
+
         $user = \Auth::user();
 
         $query = TrRiskHeader::with([
@@ -2830,21 +2831,28 @@ public function getTaskRealisasiMonitoring(Request $request)
             'createdBy:id,name'
         ]);
 
-        // Filter berdasarkan role
         if (in_array($user->role_id, [2, 3])) {
             $query->where('department_id', $user->department_id);
         }
-        // Filter pencarian
+
         if ($request->has('search') && $request->search) {
+
             $searchTerm = $request->search;
+
             $query->where(function ($q) use ($searchTerm) {
-                $q->where('peristiwa_risiko', 'like', '%' . $searchTerm . '%')
-                    ->orWhere('mitigasi', 'like', '%' . $searchTerm . '%')
+
+                $q->where('peristiwa_risiko', 'like', "%$searchTerm%")
+                    ->orWhere('mitigasi', 'like', "%$searchTerm%")
+
                     ->orWhereHas('department', function ($q) use ($searchTerm) {
-                        $q->where('name', 'like', '%' . $searchTerm . '%');
+                        $q->where('name', 'like', "%$searchTerm%");
                     })
+
                     ->orWhereHas('createdBy', function ($q) use ($searchTerm) {
-                        $q->whereRaw("CAST(AES_DECRYPT(name, CONCAT('SM', id)) AS CHAR) LIKE ?", ['%' . $searchTerm . '%']);
+                        $q->whereRaw(
+                            "CAST(AES_DECRYPT(name, CONCAT('SM', id)) AS CHAR) LIKE ?",
+                            ["%$searchTerm%"]
+                        );
                     });
             });
         }
@@ -2853,22 +2861,25 @@ public function getTaskRealisasiMonitoring(Request $request)
             $query->where('year', $request->year);
         }
 
-        $perPage = $request->has('per_page') ? (int)$request->per_page : 10;
+        $query->orderBy('id', 'desc');
+
+        $perPage = $request->per_page ?? 10;
         $headers = $query->paginate($perPage);
 
         $result = [];
         $no = ($headers->currentPage() - 1) * $headers->perPage() + 1;
 
         foreach ($headers as $header) {
+
             $riskOwner = $header->department->name ?? '-';
             $peristiwa = $header->peristiwa_risiko ?? '-';
-            $rencana = $header->mitigasi ?? '-';
+            $rencana   = $header->mitigasi ?? '-';
 
-            // ==================== WAKTU PELAKSANAAN =====================
             $finalizedMonths = $header->monthlyData->pluck('month')->toArray();
             $waktuPelaksanaan = '-';
 
             if (!empty($finalizedMonths)) {
+
                 $startMonth = min($finalizedMonths);
                 $endMonth   = max($finalizedMonths);
 
@@ -2878,36 +2889,54 @@ public function getTaskRealisasiMonitoring(Request $request)
                 $waktuPelaksanaan = $startDate->format('Y-m-d') . ' s/d ' . $endDate->format('Y-m-d');
             }
 
+            // PIC = decrypted name + department
             $pic = get_decrypted_name((object)['id' => $header->created_by]) .
                 ' - ' . ($header->department->name ?? '');
 
-            // ==================== KUANTITATIF =====================
+            // ============================================================
+            // HITUNG KUANTITATIF
+            // ============================================================
+
+            // Target Satu Tahun → ambil angka saja
             $targetText = $header->target_quantitative_satu_tahun ?? '';
             preg_match('/\d+/', str_replace('.', '', $targetText), $matches);
             $targetValue = isset($matches[0]) ? (float)$matches[0] : 0;
 
+            // Total realisasi quantitative
             $totalRealisasiQuant = $header->monthlyData->sum(function ($m) {
                 return (float) str_replace(',', '', $m->realization_quantitative ?? 0);
             });
 
             $realisasiPercent = 0;
+
             if ($targetValue > 0 && $totalRealisasiQuant > 0) {
                 $realisasiPercent = round(($totalRealisasiQuant / $targetValue) * 100, 2);
+
+                // =========================================
+                // BATASI AGAR MAKSIMAL 100%
+                // =========================================
+                $realisasiPercent = min($realisasiPercent, 100);
             }
 
-            // ==================== KUALITATIF =====================
+            // ============================================================
+            // FALLBACK KE KUALITATIF
+            // ============================================================
             if ($realisasiPercent === 0) {
-                // Cek data bulan Desember (12) yang finalize
-                $desemberMonthly = $header->monthlyData->firstWhere('month', 12);
-                if ($desemberMonthly && $desemberMonthly->realization_kualitatif) {
-                    $qualVal = (float) str_replace('%', '', $desemberMonthly->realization_kualitatif);
-                    $realisasiPercent = $qualVal;
+
+                // PRIORITAS: Desember
+                $des = $header->monthlyData->firstWhere('month', 12);
+
+                if ($des && $des->realization_kualitatif) {
+
+                    $realisasiPercent = (float) str_replace('%', '', $des->realization_kualitatif);
+
                 } else {
-                    // Jika tidak ada Desember, ambil bulan terakhir finalize
+
+                    // Fallback bulan finalize terakhir
                     $lastMonthly = $header->monthlyData->sortByDesc('month')->first();
+
                     if ($lastMonthly && $lastMonthly->realization_kualitatif) {
-                        $qualVal = (float) str_replace('%', '', $lastMonthly->realization_kualitatif);
-                        $realisasiPercent = $qualVal;
+                        $realisasiPercent = (float) str_replace('%', '', $lastMonthly->realization_kualitatif);
                     }
                 }
             }
@@ -2923,17 +2952,21 @@ public function getTaskRealisasiMonitoring(Request $request)
             ];
         }
 
-        $paginationData = [
-            'data' => $result,
-            'current_page' => $headers->currentPage(),
-            'last_page' => $headers->lastPage(),
-            'per_page' => $headers->perPage(),
-            'total' => $headers->total(),
-            'from' => $headers->firstItem(),
-            'to' => $headers->lastItem(),
-        ];
-
-        return json(200, true, 'Task Realisasi Monitoring Mitigasi berhasil diambil', null, $paginationData);
+        return json(
+            200,
+            true,
+            'Task Realisasi Monitoring Mitigasi berhasil diambil',
+            null,
+            [
+                'data' => $result,
+                'current_page' => $headers->currentPage(),
+                'last_page' => $headers->lastPage(),
+                'per_page' => $headers->perPage(),
+                'total' => $headers->total(),
+                'from' => $headers->firstItem(),
+                'to' => $headers->lastItem(),
+            ]
+        );
 
     } catch (\Exception $e) {
         return json(500, false, 'Terjadi kesalahan', $e->getMessage(), null);

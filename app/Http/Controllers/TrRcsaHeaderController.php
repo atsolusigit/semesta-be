@@ -1135,7 +1135,7 @@ class TrRcsaHeaderController extends Controller
                 'unit_kerja_id'                          => 'required|numeric',
                 'year'                                   => 'required|numeric',
 
-                // VALIDASI REQUIRED dataResidual
+                // dataResidual required
                 'dataResidual'                                      => 'required|array|min:1',
                 'dataResidual.*.kuartal'                            => 'required|integer|in:1,2,3,4',
                 'dataResidual.*.residual_nilai_dampak'              => 'required|numeric',
@@ -1143,11 +1143,12 @@ class TrRcsaHeaderController extends Controller
                 'dataResidual.*.residual_nilai_probabilitas'        => 'required|numeric',
                 'dataResidual.*.residual_skala_probabilitas'        => 'required|numeric',
                 'dataResidual.*.residual_eksposur_risiko_kuantitatif' => 'required|numeric',
-                'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'required|string',
+                // reuired jika kategori_dampak === 1
+                'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'required_if:kategori_dampak,1|string',
                 'dataResidual.*.residual_skala_risiko'              => 'required|numeric',
                 'dataResidual.*.residual_level_risiko'              => 'required|string',
 
-                // VALIDASI REQUIRED dataRisikoList
+                // dataRisikoList required
                 'dataRisikoList'                                   => 'required|array|min:1',
                 'dataRisikoList.*.jenis_rencana_perlakuan_risiko'  => 'required|string',
             ];
@@ -1236,6 +1237,7 @@ class TrRcsaHeaderController extends Controller
                 return json(500, false, 'Gagal Submit', 'Terjadi kesalahan sistem.', $e->getMessage());
             }
         }
+
 
 
     // Approve RCSA Header oleh SPV Unit (role 1 dan 2)

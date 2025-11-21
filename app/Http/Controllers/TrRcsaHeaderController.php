@@ -248,6 +248,7 @@ class TrRcsaHeaderController extends Controller
             'unit_kerja_id',
             'year',
             'isMainRisk',
+            'existing_control',
         ];
 
         $validator = Validator::make($request->all(), [
@@ -357,9 +358,7 @@ class TrRcsaHeaderController extends Controller
 
             $rcsaHeader = TrRcsaHeader::create($data);
 
-            // =======================
             //  INSERT RCSA RESIDUAL
-            // =======================
             if (!empty($dataResidual)) {
                 $mergedResidual = [];
 
@@ -383,9 +382,7 @@ class TrRcsaHeaderController extends Controller
                 }
             }
 
-            // ==========================
             //  INSERT RENCANA RISIKO LIST
-            // ==========================
             if (!empty($dataRisikoList)) {
                 $mergedRList = [];
                 foreach ($dataRisikoList as $itemList) {
@@ -446,6 +443,7 @@ class TrRcsaHeaderController extends Controller
             );
         }
     }
+
 
     /**
      * Display the specified resource.

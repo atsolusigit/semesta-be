@@ -24,7 +24,7 @@ class TrRcsaHeaderController extends Controller
 
         $perPage = $request->input('per_page', 10);
 
-        $sortBy = $request->input('sortBy', 'updated_at');
+        $sortBy = $request->input('sortBy', 'id');
         $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $query = TrRcsaHeader::with([
@@ -70,7 +70,7 @@ class TrRcsaHeaderController extends Controller
             }
         })
         ->when($request->filled('kategori_risiko_bumn'), function ($q) use ($request) {
-            $q->where('kategori_risiko_bumn', 'like', '%'.$request->kategori_risiko_bumn.'%');
+        $q->where('kategori_risiko_bumn', 'like', '%'.$request->kategori_risiko_bumn.'%');
         })
         ->when($request->filled('kategori_risiko_t2_t3_kbumn'), function ($q) use ($request) {
             $q->where('kategori_risiko_t2_t3_kbumn', 'like', '%'.$request->kategori_risiko_t2_t3_kbumn.'%');
@@ -79,41 +79,22 @@ class TrRcsaHeaderController extends Controller
             $s = $request->search;
             $q->where(function ($qq) use ($s) {
                 $qq->whereHas('department', function ($d) use ($s) {
-                        $d->where('name', 'like', "%{$s}%");
-                    })
-                    ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
-                    ->orWhere('status', 'like', "%{$s}%")
-                    ->orWhere('kategori_risiko_bumn', 'like', "%{$s}%")
-                    ->orWhere('kategori_risiko_t2_t3_kbumn', 'like', "%{$s}%")
-                    // tambahan: search by created_by_name (via username)
-                    ->orWhereHas('createdBy', function ($u) use ($s) {
-                        $u->where('username', 'like', "%{$s}%");
-                    });
+                    $d->where('name', 'like', "%{$s}%");
+                })
+                ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
+                ->orWhere('status', 'like', "%{$s}%")
+                ->orWhere('kategori_risiko_bumn', 'like', "%{$s}%")
+                ->orWhere('kategori_risiko_t2_t3_kbumn', 'like', "%{$s}%");
             });
         });
 
         $sortMap = [
-            'tahun'      => 'year',
-            'id'         => 'id',
-            'status'     => 'status',
-            'updated_at' => 'updated_at',
+            'tahun' => 'year',
+            'id' => 'id',
+            'status' => 'status',
         ];
 
-        $sortColumn = $sortMap[$sortBy] ?? 'updated_at';
-
-        if ($sortColumn === 'year') {
-            if ($sortOrder === 'desc') {
-                $query->orderByRaw('year IS NULL ASC')
-                    ->orderBy('year', 'desc');
-            } else {
-                $query->orderByRaw('year IS NULL ASC')
-                    ->orderBy('year', 'asc');
-            }
-        } else {
-            $query->orderBy($sortColumn, $sortOrder);
-        }
-
-        // baris ini tetap (existing), hasilnya hanya menambah order yang sama untuk non-year
+        $sortColumn = $sortMap[$sortBy] ?? 'id';
         $query->orderBy($sortColumn, $sortOrder);
 
         $data = $query->paginate($perPage);
@@ -146,7 +127,7 @@ class TrRcsaHeaderController extends Controller
                 ];
             });
 
-            return [
+             return [
                 'id' => $item->id,
                 'department_id' => $item->unit_kerja_id,
                 'department_name' => $item->department->name ?? '',
@@ -180,7 +161,8 @@ class TrRcsaHeaderController extends Controller
                 'kategori_threshold_kri_aman' => $item->kategori_threshold_kri_aman,
                 'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
                 'kategori_risiko_bumn' => $item->kategori_risiko_bumn,
-            ];    
+
+             ];    
         });
 
         $cleanData = clean_recursive([
@@ -192,9 +174,8 @@ class TrRcsaHeaderController extends Controller
             'to' => $data->lastItem(),
             'data' => $resData,
         ]);
-        return json(200, true, 'Data Ditemukan', 'Data rcsa header berhasil diambil.', $cleanData);
+        return json(200, true, 'Data Ditemukan', 'Data rcsa header berhasil diambil.',$cleanData);
     }
-
 
     /**
      * Show the form for creating a new resource.
@@ -326,21 +307,19 @@ class TrRcsaHeaderController extends Controller
 
             'isMainRisk'                        => 'sometimes|nullable|boolean',
 
-            // dataResidual 
-            'dataResidual'                                      => 'required|array|min:1',
-            'dataResidual.*.kuartal'                            => 'required|integer|in:1,2,3,4',
-            'dataResidual.*.residual_nilai_dampak'              => 'required|numeric',
-            'dataResidual.*.residual_skala_dampak'              => 'required|numeric',
-            'dataResidual.*.residual_nilai_probabilitas'        => 'required|numeric',
-            'dataResidual.*.residual_skala_probabilitas'        => 'required|numeric',
-            'dataResidual.*.residual_eksposur_risiko_kuantitatif' => 'required|numeric',
-            'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'required|string',
-            'dataResidual.*.residual_skala_risiko'              => 'required|numeric',
-            'dataResidual.*.residual_level_risiko'              => 'required|string',
+            'dataResidual'                                      => 'sometimes|array',
+            'dataResidual.*.kuartal'                            => 'sometimes|integer|in:1,2,3,4',
+            'dataResidual.*.residual_nilai_dampak'              => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_skala_dampak'              => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_nilai_probabilitas'        => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_skala_probabilitas'        => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_eksposur_risiko_kuantitatif' => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'sometimes|nullable|string',
+            'dataResidual.*.residual_skala_risiko'              => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_level_risiko'              => 'sometimes|nullable|string',
 
-            // dataRisikoList 
-            'dataRisikoList'                                   => 'required|array|min:1',
-            'dataRisikoList.*.jenis_rencana_perlakuan_risiko'  => 'required|string',
+            'dataRisikoList'                                   => 'sometimes|array',
+            'dataRisikoList.*.jenis_rencana_perlakuan_risiko'  => 'sometimes|nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -467,7 +446,6 @@ class TrRcsaHeaderController extends Controller
             );
         }
     }
-
 
     /**
      * Display the specified resource.
@@ -1017,7 +995,6 @@ class TrRcsaHeaderController extends Controller
                 return $roleCheck;
             }
 
-            // Load by id (and restrict by department for role 2/3)
             $rcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
                 $query->where('unit_kerja_id', $currentUser->department_id);
             })->find($id);
@@ -1029,6 +1006,42 @@ class TrRcsaHeaderController extends Controller
             if (!in_array($rcsaHeader->status, ['draft', 'rejected'])) {
                 return json(403, false, 'Akses Ditolak', 'Hanya data dengan status draft atau rejected yang dapat disubmit.', null);
             }
+
+            $dataResidual = TrRcsaResidual::where('rcsa_id', $rcsaHeader->id)
+                ->get([
+                    'kuartal',
+                    'residual_nilai_dampak',
+                    'residual_skala_dampak',
+                    'residual_nilai_probabilitas',
+                    'residual_skala_probabilitas',
+                    'residual_eksposur_risiko_kuantitatif',
+                    'residual_eksposur_risiko_kualitatif',
+                    'residual_skala_risiko',
+                    'residual_level_risiko',
+                ])
+                ->map(function ($item) {
+                    return [
+                        'kuartal'                              => $item->kuartal,
+                        'residual_nilai_dampak'                => $item->residual_nilai_dampak,
+                        'residual_skala_dampak'                => $item->residual_skala_dampak,
+                        'residual_nilai_probabilitas'          => $item->residual_nilai_probabilitas,
+                        'residual_skala_probabilitas'          => $item->residual_skala_probabilitas,
+                        'residual_eksposur_risiko_kuantitatif' => $item->residual_eksposur_risiko_kuantitatif,
+                        'residual_eksposur_risiko_kualitatif'  => $item->residual_eksposur_risiko_kualitatif,
+                        'residual_skala_risiko'                => $item->residual_skala_risiko,
+                        'residual_level_risiko'                => $item->residual_level_risiko,
+                    ];
+                })
+                ->toArray();
+
+            $dataRisikoList = TrRcsaRencanaRisikoList::where('rcsa_id', $rcsaHeader->id)
+                ->get(['jenis_rencana_perlakuan_risiko'])
+                ->map(function ($item) {
+                    return [
+                        'jenis_rencana_perlakuan_risiko' => $item->jenis_rencana_perlakuan_risiko,
+                    ];
+                })
+                ->toArray();
 
             $payload = [
                 'asumsi_perhitungan_dampak'            => $rcsaHeader->asumsi_perhitungan_dampak,
@@ -1073,6 +1086,9 @@ class TrRcsaHeaderController extends Controller
                 'timeline_bulan_akhir'                 => $rcsaHeader->timeline_bulan_akhir,
                 'unit_kerja_id'                        => $rcsaHeader->unit_kerja_id,
                 'year'                                 => $rcsaHeader->year,
+
+                'dataResidual'                         => $dataResidual,
+                'dataRisikoList'                       => $dataRisikoList,
             ];
 
             $rules = [
@@ -1118,6 +1134,22 @@ class TrRcsaHeaderController extends Controller
                 'timeline_bulan_akhir'                   => 'required|date',
                 'unit_kerja_id'                          => 'required|numeric',
                 'year'                                   => 'required|numeric',
+
+                // VALIDASI REQUIRED dataResidual
+                'dataResidual'                                      => 'required|array|min:1',
+                'dataResidual.*.kuartal'                            => 'required|integer|in:1,2,3,4',
+                'dataResidual.*.residual_nilai_dampak'              => 'required|numeric',
+                'dataResidual.*.residual_skala_dampak'              => 'required|numeric',
+                'dataResidual.*.residual_nilai_probabilitas'        => 'required|numeric',
+                'dataResidual.*.residual_skala_probabilitas'        => 'required|numeric',
+                'dataResidual.*.residual_eksposur_risiko_kuantitatif' => 'required|numeric',
+                'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'required|string',
+                'dataResidual.*.residual_skala_risiko'              => 'required|numeric',
+                'dataResidual.*.residual_level_risiko'              => 'required|string',
+
+                // VALIDASI REQUIRED dataRisikoList
+                'dataRisikoList'                                   => 'required|array|min:1',
+                'dataRisikoList.*.jenis_rencana_perlakuan_risiko'  => 'required|string',
             ];
 
             $validator = Validator::make($payload, $rules);
@@ -1204,10 +1236,6 @@ class TrRcsaHeaderController extends Controller
                 return json(500, false, 'Gagal Submit', 'Terjadi kesalahan sistem.', $e->getMessage());
             }
         }
-
-
-
-
 
 
     // Approve RCSA Header oleh SPV Unit (role 1 dan 2)

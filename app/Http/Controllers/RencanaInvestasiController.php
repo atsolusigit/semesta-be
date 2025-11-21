@@ -59,15 +59,10 @@ class RencanaInvestasiController extends Controller
                       ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
                 },
             ])
-            // Filter TAHUN (opsional)
             ->when(!is_null($filterTahun), fn($q) => $q->where('rencana_investasi.year', $filterTahun))
-
-            // Filter JENIS INVESTASI (opsional)
             ->when($filterJenis, fn($q) =>
                 $q->where('rencana_investasi.jenis_investasi', 'like', '%'.$filterJenis.'%')
             )
-
-            // Filter UNIT/DIVISI/RISK OWNER (opsional, angka=id; teks=nama)
             ->when(!is_null($unitParam), function ($q) use ($unitParam) {
                 if (is_numeric($unitParam)) {
                     $id = (int)$unitParam;
@@ -85,8 +80,6 @@ class RencanaInvestasiController extends Controller
                     }
                 }
             })
-
-            // Backward-compat: tetap hormati parameter lama 'department_name'
             ->when($request->filled('department_name'), function ($q) use ($request) {
                 $name = trim($request->department_name);
                 if ($name !== '') {
@@ -96,11 +89,17 @@ class RencanaInvestasiController extends Controller
                     });
                 }
             })
-
-            // Filter erkap id (tetap ada)
             ->when($request->filled('erkap_id'), fn($q) => $q->where('rencana_investasi.erkap_id', (int)$request->erkap_id))
-
-            // Filter periods jika bulan/week diberikan
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $s = trim((string)$request->search);
+                if ($s !== '') {
+                    $q->where(function ($qq) use ($s) {
+                        $qq->where('rencana_investasi.nama_investasi', 'like', "%{$s}%")
+                        ->orWhere('rencana_investasi.kategori_investasi', 'like', "%{$s}%")
+                        ->orWhere('rencana_investasi.keterangan', 'like', "%{$s}%");
+                    });
+                }
+            })
             ->when($request->filled('bulan') || $request->filled('week'), function ($q) use ($tahun, $bulan, $week, $request) {
                 $q->whereHas('periods', function ($qq) use ($tahun, $bulan, $week, $request) {
                     $qq->where('year', $tahun)

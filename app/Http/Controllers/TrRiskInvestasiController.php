@@ -37,14 +37,17 @@ class TrRiskInvestasiController extends Controller
             $s = $request->search;
             $query->where(function ($qq) use ($s) {
                 $qq->where('kategori_risiko', 'like', "%{$s}%")
-                   ->orWhere('sub_kategori_risiko', 'like', "%{$s}%")
-                   ->orWhere('sasaran', 'like', "%{$s}%")
-                   ->orWhereHas('investasi', function ($qh) use ($s) {
-                       $qh->where('nama_investasi', 'like', "%{$s}%")
-                          ->orWhere('department_name', 'like', "%{$s}%");
-                   });
+                ->orWhere('sub_kategori_risiko', 'like', "%{$s}%")
+                ->orWhere('sasaran', 'like', "%{$s}%")
+                ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
+                ->orWhere('penyebab_risiko', 'like', "%{$s}%")
+                ->orWhereHas('investasi', function ($qh) use ($s) {
+                    $qh->where('nama_investasi', 'like', "%{$s}%")
+                        ->orWhere('department_name', 'like', "%{$s}%");
+                });
             });
         }
+
 
         $sortMap = [
             'tahun'        => 'ri.year',

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http; 
 use App\Models\RencanaInvestasi;
 use App\Models\TrRiskInvestasi;
 use App\Models\RencanaInvestasiTimelineYear;
@@ -34,6 +35,16 @@ class RencanaInvestasiController extends Controller
         $bulan = (int) ($request->integer('bulan') ?: $now->month);
         $week  = (int) ($request->integer('week')  ?: ceil($now->day / 7));
 
+        $filterTahun = $request->filled('tahun') ? (int)$request->get('tahun') : null;
+        $filterJenis = $request->filled('jenis_investasi') ? trim((string)$request->get('jenis_investasi')) : null;
+
+        $unitParam = $request->get('unit')
+            ?? $request->get('divisi')
+            ?? $request->get('risk_owner')
+            ?? $request->get('department_id')
+            ?? $request->get('unit_kerja_id')
+            ?? $request->get('department_name');
+
         $query = RencanaInvestasi::query()
             ->select('rencana_investasi.*', 'mst_email_unit_kerja.unit_kerja_nama as department_name_joined')
             ->leftJoin('mst_email_unit_kerja', 'rencana_investasi.unit_kerja_id', '=', 'mst_email_unit_kerja.unit_kerja_id')
@@ -44,24 +55,56 @@ class RencanaInvestasiController extends Controller
                 'riskInvestasi.approvedByUser:id,username,name',
                 'periods' => function ($q) use ($tahun, $bulan, $week, $request) {
                     $q->where('year', $tahun)
-                    ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
-                    ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
+                      ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
+                      ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
                 },
             ])
-            ->when($request->filled('tahun'), fn($q) => $q->where('rencana_investasi.year', (int)$request->tahun))
-            ->when($request->filled('jenis_investasi'), fn($q) => $q->where('rencana_investasi.jenis_investasi', 'like', '%'.$request->jenis_investasi.'%'))
+            ->when(!is_null($filterTahun), fn($q) => $q->where('rencana_investasi.year', $filterTahun))
+            ->when($filterJenis, fn($q) =>
+                $q->where('rencana_investasi.jenis_investasi', 'like', '%'.$filterJenis.'%')
+            )
+            ->when(!is_null($unitParam), function ($q) use ($unitParam) {
+                if (is_numeric($unitParam)) {
+                    $id = (int)$unitParam;
+                    $q->where(function ($qq) use ($id) {
+                        $qq->where('rencana_investasi.department_id', $id)
+                           ->orWhere('rencana_investasi.unit_kerja_id', $id);
+                    });
+                } else {
+                    $name = trim((string)$unitParam);
+                    if ($name !== '') {
+                        $q->where(function ($qq) use ($name) {
+                            $qq->where('rencana_investasi.department_name', 'like', '%'.$name.'%')
+                               ->orWhere('mst_email_unit_kerja.unit_kerja_nama', 'like', '%'.$name.'%');
+                        });
+                    }
+                }
+            })
             ->when($request->filled('department_name'), function ($q) use ($request) {
-                $q->where(function ($qq) use ($request) {
-                    $qq->where('rencana_investasi.department_name', 'like', '%'.$request->department_name.'%')
-                    ->orWhere('mst_email_unit_kerja.unit_kerja_nama', 'like', '%'.$request->department_name.'%');
-                });
+                $name = trim($request->department_name);
+                if ($name !== '') {
+                    $q->where(function ($qq) use ($name) {
+                        $qq->where('rencana_investasi.department_name', 'like', '%'.$name.'%')
+                           ->orWhere('mst_email_unit_kerja.unit_kerja_nama', 'like', '%'.$name.'%');
+                    });
+                }
             })
             ->when($request->filled('erkap_id'), fn($q) => $q->where('rencana_investasi.erkap_id', (int)$request->erkap_id))
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $s = trim((string)$request->search);
+                if ($s !== '') {
+                    $q->where(function ($qq) use ($s) {
+                        $qq->where('rencana_investasi.nama_investasi', 'like', "%{$s}%")
+                        ->orWhere('rencana_investasi.kategori_investasi', 'like', "%{$s}%")
+                        ->orWhere('rencana_investasi.keterangan', 'like', "%{$s}%");
+                    });
+                }
+            })
             ->when($request->filled('bulan') || $request->filled('week'), function ($q) use ($tahun, $bulan, $week, $request) {
                 $q->whereHas('periods', function ($qq) use ($tahun, $bulan, $week, $request) {
                     $qq->where('year', $tahun)
-                    ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
-                    ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
+                       ->where('month', $request->filled('bulan') ? (int)$request->bulan : $bulan)
+                       ->where('week',  $request->filled('week')  ? (int)$request->week  : $week);
                 });
             })
             ->orderBy($sortColumn, $sortOrder);
@@ -73,23 +116,7 @@ class RencanaInvestasiController extends Controller
         }
 
         $resData = collect($data->items())->map(function ($it) use ($tahun, $bulan, $week) {
-            $period = $it->periods->first();
-
             $targetTimeline = null;
-            if ($period && is_array($period->detail_json)) {
-                $firstDetail = $period->detail_json[0] ?? null;
-                if (is_array($firstDetail) && !empty($firstDetail['timeline_target'])) {
-                    $firstTl = $firstDetail['timeline_target'][0] ?? null;
-                    if (is_array($firstTl)) {
-                        $targetTimeline = [
-                            'color' => $firstTl['color'] ?? null,
-                            'label' => $firstTl['label'] ?? null,
-                        ];
-                    }
-                }
-            }
-
-            $realisasiTimeline = null;
             $cache = \App\Models\RencanaInvestasiTimelineYear::where('erkap_id', $it->erkap_id)
                 ->where('year', $tahun)
                 ->first();
@@ -103,10 +130,16 @@ class RencanaInvestasiController extends Controller
                     $color = $bulanEntry[$colorKey] ?? null;
                     $label = $bulanEntry[$labelKey] ?? null;
                     if ($color || $label) {
-                        $realisasiTimeline = ['color' => $color, 'label' => $label];
+                        $targetTimeline = ['color' => $color, 'label' => $label];
                     }
                 }
             }
+
+            $realisasiTimeline = !empty($it->realisasi_timeline)
+                ? (is_string($it->realisasi_timeline)
+                    ? $it->realisasi_timeline
+                    : json_encode($it->realisasi_timeline))
+                : null;
 
             $departmentName = $it->department_name_joined ?? $it->department_name;
 
@@ -172,9 +205,6 @@ class RencanaInvestasiController extends Controller
 
         return json(200, true, 'Data Ditemukan', 'Data rencana investasi berhasil diambil.', $cleanData);
     }
-
-
-
 
     public function store(Request $request)
     {
@@ -270,64 +300,103 @@ class RencanaInvestasiController extends Controller
 
     public function update(Request $request, $id)
     {
-        $result = check_role(auth()->user(), [1,2,3]);
+        // 🔐 REVISI ROLE:
+        // - update current risk investasi => manrisk (1,4,5,6)
+        // - update realisasi timeline => user unit + manrisk (1,3,4,5,6)
+        $result = check_role(auth()->user(), [1, 3, 4, 5, 6]);
         if ($result !== true) return $result;
 
         $item = RencanaInvestasi::find($id);
-        if (!$item) return json(404,false,'Tidak Ditemukan','Rencana investasi tidak ditemukan.',null);
+        if (!$item) {
+            return json(404, false, 'Tidak Ditemukan', 'Rencana investasi tidak ditemukan.', null);
+        }
 
-        $locked = TrRiskInvestasi::where('erkap_id', $item->erkap_id)->exists();
-        if ($locked) return json(403,false,'Terkunci','Risk Profile Investasi sudah dibuat. Rencana Investasi tidak dapat diupdate.',null);
+        // $locked = TrRiskInvestasi::where('erkap_id', $item->erkap_id)->exists();
+        // if ($locked) {
+        //     return json(403, false, 'Terkunci', 'Risk Profile Investasi sudah dibuat. Rencana Investasi tidak dapat diupdate.', null);
+        // }
 
         $validator = Validator::make($request->all(), [
-            'department_name'     => 'nullable|string',
-            'nama_investasi'      => 'nullable|string',
-            'kategori_investasi'  => 'nullable|string',
-            'jenis_investasi'     => 'nullable|string',
-            'year'                => 'nullable|numeric',
-            'nilai_rkap'          => 'nullable|numeric',
-            'nilai_revisi'        => 'nullable|numeric',
-            'keterangan'          => 'nullable|string',
-            'status'              => 'nullable|string',
-            'nilai_budget_transfer' => 'nullable|integer',
-            'nilai_realisasi'       => 'nullable|integer',
-            'target_timeline'       => 'nullable|string',
-            'realisasi_timeline'    => 'nullable|string',
-            'ld_inherent'           => 'nullable|integer',
-            'dampak_inherent'       => 'nullable|string',
-            'ld_current'            => 'nullable|integer',
-            'lk_current'            => 'nullable|integer',
-            'level_current'         => 'nullable|integer',
-            'dampak_current'        => 'nullable|string',
-            'level_residual'        => 'nullable|string',
-            'dampak_residual'       => 'nullable|string',
+            'ld_current'         => 'nullable|integer',
+            'lk_current'         => 'nullable|integer',
+            'level_current'      => 'nullable|integer',
+            'dampak_residual'    => 'nullable|string',
+            'realisasi_timeline' => 'nullable|string',
         ]);
-        if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
+
+        if ($validator->fails()) {
+            return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
+        }
+
+        $currentUser = auth()->user();
+        $roleId = $currentUser->role_id ?? null;
+
+        // Role yang boleh update current risk investasi
+        $riskRoles = [1, 4, 5, 6];
+        // Role yang boleh update realisasi timeline
+        $timelineRoles = [1, 3, 4, 5, 6];
+
+        // Bangun payload sesuai role
+        $payload = [];
+
+        if (in_array($roleId, $riskRoles, true)) {
+            $riskPayload = $request->only([
+                'ld_current',
+                'lk_current',
+                'level_current',
+                'dampak_residual',
+            ]);
+            $payload = array_filter(
+                $riskPayload,
+                fn($v) => !is_null($v)
+            ) + $payload;
+        }
+
+        if (in_array($roleId, $timelineRoles, true)) {
+            $timelinePayload = $request->only([
+                'realisasi_timeline',
+            ]);
+            $payload = $payload + array_filter(
+                $timelinePayload,
+                fn($v) => !is_null($v)
+            );
+        }
+
+        // Jika setelah filter role tidak ada field yang boleh diupdate
+        if (empty($payload)) {
+            return json(
+                403,
+                false,
+                'Akses Ditolak',
+                'Anda tidak memiliki hak untuk mengubah field yang diminta.',
+                null
+            );
+        }
 
         try {
             DB::beginTransaction();
 
-            $payload = $request->only([
-                'department_name','nama_investasi','kategori_investasi','jenis_investasi',
-                'year','nilai_rkap','nilai_revisi','keterangan','status'
-            ]);
-            if (!empty($payload)) {
-                $payload['updated_by'] = auth()->id();
-                $item->update($payload);
-            }
+            $payload['updated_by'] = auth()->id();
+            $item->update($payload);
 
             DB::commit();
 
-            return json(200,true,'Berhasil Diperbarui','Rencana investasi berhasil diupdate.',$item->only([
-                'id','erkap_id','nama_investasi','kategori_investasi','jenis_investasi','year','nilai_rkap','nilai_revisi','status'
+            return json(200, true, 'Berhasil Diperbarui', 'Rencana investasi berhasil diupdate.', $item->only([
+                'id',
+                'erkap_id',
+                'ld_current',
+                'lk_current',
+                'level_current',
+                'dampak_residual',
+                'realisasi_timeline',
+                'updated_by',
+                'updated_at',
             ]));
-
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(500,false,'Gagal Update','Terjadi kesalahan sistem.',$th->getMessage());
+            return json(500, false, 'Gagal Update', 'Terjadi kesalahan sistem.', $th->getMessage());
         }
     }
-
 
     public function export(Request $request, string $format)
     {
@@ -435,8 +504,6 @@ class RencanaInvestasiController extends Controller
         }
     }
 
-
-
     private function extractTargetTimeline($it): array
     {
         $period = $it->periods->first();
@@ -491,6 +558,52 @@ class RencanaInvestasiController extends Controller
     {
 
         return false;
+    }
+
+    public function timeline(Request $request)
+    {
+        $tahun   = (int) $request->query('tahun');
+        $capexId = (int) $request->query('capex_id');
+
+        if (!$tahun || !$capexId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter tahun dan capex_id wajib diisi',
+            ], 400);
+        }
+
+        $base = rtrim(config('services.erkap.base_url', env('ERKAP_BASE_URL', '')), '/');
+        $auth = config('services.erkap.basic_auth', env('ERKAP_BASIC_AUTH', ''));
+
+        if (!$base || !$auth) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ERKAP_BASE_URL / ERKAP_BASIC_AUTH belum diset di .env',
+            ], 500);
+        }
+
+        try {
+            $resp = Http::retry(3, 300)
+                ->timeout(25)
+                ->withHeaders([
+                    'Authorization' => $auth,
+                ])
+                ->get($base . '/api/semesta/capex-timeline', [
+                    'tahun'    => $tahun,
+                    'capex_id' => $capexId,
+                ])
+                ->throw()
+                ->json();
+
+            return response()->json($resp, 200);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memanggil API ERKAP capex-timeline',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
     }
 
 }

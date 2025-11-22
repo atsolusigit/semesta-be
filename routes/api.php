@@ -368,6 +368,10 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/investasi', [RencanaInvestasiController::class, 'index']);
     Route::post('/investasi', [RencanaInvestasiController::class, 'store']);
     Route::put('/investasi/{id}', [RencanaInvestasiController::class, 'update']);
+    Route::get('/export-rencana-investasi/{format}', [RencanaInvestasiController::class, 'export'])
+        ->where(['format' => 'pdf|excel']);
+    Route::get('/investasi/timeline', [RencanaInvestasiController::class, 'timeline']);
+    
 
     Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
     Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);
@@ -377,6 +381,8 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/risk-investasi/{id}/approve', [TrRiskInvestasiController::class, 'approve']);
     Route::patch('/risk-investasi/{id}/reject', [TrRiskInvestasiController::class, 'reject']);
     Route::get('/risk-investasi/erkap/{erkap_id}', [TrRiskInvestasiController::class, 'getByErkapID']);
+    Route::get('/export-risk-investasi/{format}', [TrRiskInvestasiController::class, 'export'])
+        ->where(['format' => 'pdf|excel']);
 });
 
 // ===================== MASTER UNTUK KEPERLUAN OPSI RCSA =====================

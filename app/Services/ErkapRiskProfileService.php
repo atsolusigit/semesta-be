@@ -67,6 +67,7 @@ class ErkapRiskProfileService
                     'nama_sub_pekerjaan' => $first['nama_sub_pekerjaan'] ?? null,
 
                     'erkap_list_risk_json'=> $listRisk ?: null,
+                    'synced_at'            => now(),
                 ];
 
                 $record = TrRiskInvestasi::query()

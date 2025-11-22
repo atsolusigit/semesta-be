@@ -548,7 +548,7 @@ class TrRcsaHeaderController extends Controller
         $roleId = $currentUser->role_id ?? null;
 
         // Validasi role: hanya role 1, 2, 3 yang diizinkan
-        $roleCheck = check_role($currentUser, [1, 2, 3]);
+        $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5, 6]);
         if ($roleCheck !== true) {
             return $roleCheck;
         }
@@ -562,7 +562,7 @@ class TrRcsaHeaderController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'RCSA tidak ditemukan.', null);
         }
 
-        if (!in_array($roleId, [1, 4, 5, 6])) {
+        if (!in_array($roleId, [1, 2, 3, 4, 5])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk update data ini.', null);
         }
 

@@ -258,6 +258,7 @@ class TrRcsaHeaderController extends Controller
             'unit_kerja_id',
             'year',
             'isMainRisk',
+            'existing_control',
         ];
 
         $validator = Validator::make($request->all(), [
@@ -420,9 +421,16 @@ class TrRcsaHeaderController extends Controller
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $th->getMessage());
+            return json(
+                500,
+                false,
+                'Gagal Disimpan',
+                'Terjadi kesalahan sistem.',
+                $th->getMessage()
+            );
         }
     }
+
 
     /**
      * Display the specified resource.
@@ -997,6 +1005,42 @@ class TrRcsaHeaderController extends Controller
                 return json(403, false, 'Akses Ditolak', 'Hanya data dengan status draft atau rejected yang dapat disubmit.', null);
             }
 
+            $dataResidual = TrRcsaResidual::where('rcsa_id', $rcsaHeader->id)
+                ->get([
+                    'kuartal',
+                    'residual_nilai_dampak',
+                    'residual_skala_dampak',
+                    'residual_nilai_probabilitas',
+                    'residual_skala_probabilitas',
+                    'residual_eksposur_risiko_kuantitatif',
+                    'residual_eksposur_risiko_kualitatif',
+                    'residual_skala_risiko',
+                    'residual_level_risiko',
+                ])
+                ->map(function ($item) {
+                    return [
+                        'kuartal'                              => $item->kuartal,
+                        'residual_nilai_dampak'                => $item->residual_nilai_dampak,
+                        'residual_skala_dampak'                => $item->residual_skala_dampak,
+                        'residual_nilai_probabilitas'          => $item->residual_nilai_probabilitas,
+                        'residual_skala_probabilitas'          => $item->residual_skala_probabilitas,
+                        'residual_eksposur_risiko_kuantitatif' => $item->residual_eksposur_risiko_kuantitatif,
+                        'residual_eksposur_risiko_kualitatif'  => $item->residual_eksposur_risiko_kualitatif,
+                        'residual_skala_risiko'                => $item->residual_skala_risiko,
+                        'residual_level_risiko'                => $item->residual_level_risiko,
+                    ];
+                })
+                ->toArray();
+
+            $dataRisikoList = TrRcsaRencanaRisikoList::where('rcsa_id', $rcsaHeader->id)
+                ->get(['jenis_rencana_perlakuan_risiko'])
+                ->map(function ($item) {
+                    return [
+                        'jenis_rencana_perlakuan_risiko' => $item->jenis_rencana_perlakuan_risiko,
+                    ];
+                })
+                ->toArray();
+
             $payload = [
                 'asumsi_perhitungan_dampak'            => $rcsaHeader->asumsi_perhitungan_dampak,
                 'deskripsi_dampak'                     => $rcsaHeader->deskripsi_dampak,
@@ -1040,6 +1084,9 @@ class TrRcsaHeaderController extends Controller
                 'timeline_bulan_akhir'                 => $rcsaHeader->timeline_bulan_akhir,
                 'unit_kerja_id'                        => $rcsaHeader->unit_kerja_id,
                 'year'                                 => $rcsaHeader->year,
+
+                'dataResidual'                         => $dataResidual,
+                'dataRisikoList'                       => $dataRisikoList,
             ];
 
             $rules = [
@@ -1085,6 +1132,23 @@ class TrRcsaHeaderController extends Controller
                 'timeline_bulan_akhir'                   => 'required|date',
                 'unit_kerja_id'                          => 'required|numeric',
                 'year'                                   => 'required|numeric',
+
+                // dataResidual required
+                'dataResidual'                                      => 'required|array|min:1',
+                'dataResidual.*.kuartal'                            => 'required|integer|in:1,2,3,4',
+                'dataResidual.*.residual_nilai_dampak'              => 'required|numeric',
+                'dataResidual.*.residual_skala_dampak'              => 'required|numeric',
+                'dataResidual.*.residual_nilai_probabilitas'        => 'required|numeric',
+                'dataResidual.*.residual_skala_probabilitas'        => 'required|numeric',
+                'dataResidual.*.residual_eksposur_risiko_kuantitatif' => 'required|numeric',
+                // reuired jika kategori_dampak === 1
+                'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'required_if:kategori_dampak,1|string',
+                'dataResidual.*.residual_skala_risiko'              => 'required|numeric',
+                'dataResidual.*.residual_level_risiko'              => 'required|string',
+
+                // dataRisikoList required
+                'dataRisikoList'                                   => 'required|array|min:1',
+                'dataRisikoList.*.jenis_rencana_perlakuan_risiko'  => 'required|string',
             ];
 
             $validator = Validator::make($payload, $rules);
@@ -1171,9 +1235,6 @@ class TrRcsaHeaderController extends Controller
                 return json(500, false, 'Gagal Submit', 'Terjadi kesalahan sistem.', $e->getMessage());
             }
         }
-
-
-
 
 
 

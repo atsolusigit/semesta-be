@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Models\TrRiskInvestasi;
+use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class TrRiskInvestasiController extends Controller
 {
@@ -37,14 +39,17 @@ class TrRiskInvestasiController extends Controller
             $s = $request->search;
             $query->where(function ($qq) use ($s) {
                 $qq->where('kategori_risiko', 'like', "%{$s}%")
-                   ->orWhere('sub_kategori_risiko', 'like', "%{$s}%")
-                   ->orWhere('sasaran', 'like', "%{$s}%")
-                   ->orWhereHas('investasi', function ($qh) use ($s) {
-                       $qh->where('nama_investasi', 'like', "%{$s}%")
-                          ->orWhere('department_name', 'like', "%{$s}%");
-                   });
+                ->orWhere('sub_kategori_risiko', 'like', "%{$s}%")
+                ->orWhere('sasaran', 'like', "%{$s}%")
+                ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
+                ->orWhere('penyebab_risiko', 'like', "%{$s}%")
+                ->orWhereHas('investasi', function ($qh) use ($s) {
+                    $qh->where('nama_investasi', 'like', "%{$s}%")
+                        ->orWhere('department_name', 'like', "%{$s}%");
+                });
             });
         }
+
 
         $sortMap = [
             'tahun'        => 'ri.year',
@@ -507,5 +512,141 @@ class TrRiskInvestasiController extends Controller
 
         return json(200, true, 'Data Ditemukan', 'Data risk profile investasi berdasarkan ERKAP ID berhasil diambil.', $resp);
     }
+
+
+
+
+    public function export(Request $request, string $format)
+    {
+        ini_set('memory_limit', '512M');
+        set_time_limit(120);
+        if (!in_array($format, ['excel', 'pdf'])) {
+            return response()->json([
+                'status'  => 400,
+                'success' => false,
+                'message' => 'Format tidak didukung',
+                'data'    => 'Format yang didukung: excel, pdf',
+            ], 400);
+        }
+
+        $query = TrRiskInvestasi::query()
+            ->with([
+                'investasi:erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
+                'approvedByUser:id,username,name'
+            ]);
+
+        if ($request->filled('tahun')) {
+            $query->whereHas('investasi', fn($q) => $q->where('year', (int) $request->tahun));
+        }
+
+        if ($request->filled('jenis_investasi')) {
+            $ji = $request->jenis_investasi;
+            $query->whereHas('investasi', fn($q) => $q->where('jenis_investasi', 'like', "%{$ji}%"));
+        }
+
+        if ($request->filled('department_name')) {
+            $dn = $request->department_name;
+            $query->whereHas('investasi', fn($q) => $q->where('department_name', 'like', "%{$dn}%"));
+        }
+
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $query->where(function ($qq) use ($s) {
+                $qq->where('kategori_risiko', 'like', "%{$s}%")
+                ->orWhere('sub_kategori_risiko', 'like', "%{$s}%")
+                ->orWhere('sasaran', 'like', "%{$s}%")
+                ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
+                ->orWhere('penyebab_risiko', 'like', "%{$s}%")
+                ->orWhereHas('investasi', function ($qh) use ($s) {
+                    $qh->where('nama_investasi', 'like', "%{$s}%")
+                        ->orWhere('department_name', 'like', "%{$s}%");
+                });
+            });
+        }
+
+        $rows = $query
+            ->orderBy('tr_risk_investasi.id', 'asc')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return response()->json([
+                'status'  => 404,
+                'success' => false,
+                'message' => 'Tidak Ada Data',
+                'data'    => 'Risk Profile Investasi tidak ditemukan.',
+            ], 404);
+        }
+
+        $flatRows = $rows->map(function ($it) {
+            $inv = $it->investasi;
+
+            return [
+                'ERKAP ID'                 => $it->erkap_id,
+                'Nama Investasi'           => optional($inv)->nama_investasi,
+                'Department'               => optional($inv)->department_name,
+                'Jenis Investasi'          => optional($inv)->jenis_investasi,
+                'Kategori Investasi'       => optional($inv)->kategori_investasi,
+                'Tahun'                    => optional($inv)->year,
+                'Kategori Risiko'          => $it->kategori_risiko,
+                'Sub Kategori Risiko'      => $it->sub_kategori_risiko,
+                'Sasaran'                  => $it->sasaran,
+                'Peristiwa Risiko'         => $it->peristiwa_risiko,
+                'Penyebab Risiko'          => $it->penyebab_risiko,
+                'Dampak Inherent'          => $it->dampak_inherent,
+                'Dampak Risiko Awal'       => $it->dampak_risiko_awal,
+                'Kemungkinan Awal'         => $it->kemungkinan_awal,
+                'Eksposure Level Awal'     => $it->eksposure_level_awal,
+                'Eksposure LTMH Awal'      => $it->eksposure_ltmh_awal,
+                'Internal / External'      => $it->internal_external,
+                'Mitigasi Risiko'          => $it->mitigasi_risiko,
+                'Dampak Residual'          => $it->dampak_residual,
+                'Dampak Risiko Akhir'      => $it->dampak_risiko_akhir,
+                'Kemungkinan Akhir'        => $it->kemungkinan_akhir,
+                'Eksposure Level Akhir'    => $it->eksposure_level_akhir,
+                'Eksposure LTMH Akhir'     => $it->eksposure_ltmh_akhir,
+                'Biaya Mitigasi Risiko'    => $it->biaya_mitigasi_risiko,
+                'Status'                   => $it->status ?? 'draft',
+                'Approval Notes'           => $it->approval_notes,
+                'Approved By'              => $it->approved_by,
+                'Approved By Name'         => $it->approvedByUser ? get_decrypted_name($it->approvedByUser) : null,
+                'Approved At'              => optional($it->approved_at)->format('Y-m-d H:i:s'),
+                'Created At'               => optional($it->created_at)->format('Y-m-d H:i:s'),
+                'Updated At'               => optional($it->updated_at)->format('Y-m-d H:i:s'),
+            ];
+        })->values();
+
+        try {
+            if ($format === 'excel') {
+                $filename = 'RiskProfileInvestasi_' . now()->format('Ymd_His') . '.xlsx';
+
+                return Excel::download(
+                    new \App\Exports\RiskInvestasi\RiskInvestasiExport($flatRows),
+                    $filename
+                );
+            }
+
+            $filename = 'RiskProfileInvestasi_' . now()->format('Ymd_His') . '.pdf';
+            $departmentName = $rows->first()?->investasi->department_name ?? 'SEMUA UNIT';
+            $year = $request->filled('tahun') ? (int)$request->tahun : null;
+            $pdf = Pdf::loadView('exports.risk_investasi_pdf', [
+                'rows' => $flatRows,
+                'departmentName' => $departmentName,
+                'year' => $year,
+            ])->setPaper('A4', 'landscape');
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 500,
+                'success' => false,
+                'message' => 'Gagal melakukan export',
+                'data'    => ['error' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+
+
 
 }

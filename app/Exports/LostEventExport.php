@@ -64,7 +64,7 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
         $departmentDisplay = str_replace('_', ' ', $this->departmentName);
 
         return [
-            ["LAPORAN LOST EVENT"],
+            ["LAPORAN LOSS EVENT"],
             [$departmentDisplay],
             ["Tanggal Cetak: {$tanggalCetak}"],
             [],
@@ -109,7 +109,7 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
         $sheet->mergeCells('A2:Y2');
         $sheet->mergeCells('A3:Y3');
 
-        $sheet->setCellValue('A1', 'LAPORAN LOST EVENT');
+        $sheet->setCellValue('A1', 'LAPORAN LOSS EVENT');
         $sheet->setCellValue('A2', $departmentDisplay);
         $sheet->setCellValue('A3', 'Tanggal Cetak: ' . now()->format('d/m/Y'));
 
@@ -206,6 +206,6 @@ class LostEventExport implements FromCollection, WithHeadings, WithStyles, WithT
 
     public function title(): string
     {
-        return 'Lost Event Report';
+        return 'Loss Event Report';
     }
 }

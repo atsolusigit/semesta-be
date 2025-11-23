@@ -895,7 +895,7 @@ public function exportLostEvent(Request $request, $format)
         return response()->json([
             'status' => 403,
             'success' => false,
-            'message' => 'Anda tidak memiliki akses untuk export Lost Event.',
+            'message' => 'Anda tidak memiliki akses untuk export Loss Event.',
         ], 403);
     }
 
@@ -958,7 +958,7 @@ public function exportLostEvent(Request $request, $format)
         return response()->json([
             'status' => 404,
             'success' => false,
-            'message' => 'Tidak ada data Lost Event yang sudah approved untuk diexport.',
+            'message' => 'Tidak ada data Loss Event yang sudah approved untuk diexport.',
         ], 404);
     }
 
@@ -1036,7 +1036,7 @@ public function exportLostEvent(Request $request, $format)
         return response()->json([
             'status' => 404,
             'success' => false,
-            'message' => 'Tidak ada data Lost Event untuk diexport.',
+            'message' => 'Tidak ada data Loss Event untuk diexport.',
         ], 404);
     }
 
@@ -1131,7 +1131,7 @@ private function prepareLostEventData($lostEvents)
  */
 private function exportLostEventExcel($data, $year, $departmentName)
 {
-    $filename = "Lost_Event_Report_{$departmentName}_{$year}_" . time() . ".xlsx";
+    $filename = "Loss_Event_Report_{$departmentName}_{$year}_" . time() . ".xlsx";
 
     return Excel::download(
         new \App\Exports\LostEventExport($data, $year, $departmentName),
@@ -1144,7 +1144,7 @@ private function exportLostEventExcel($data, $year, $departmentName)
  */
 private function exportLostEventPdf($data, $year, $departmentName)
 {
-    $filename = "Lost_Event_Report_{$departmentName}_{$year}_" . time() . ".pdf";
+    $filename = "Loss_Event_Report_{$departmentName}_{$year}_" . time() . ".pdf";
 
     $pdf = Pdf::loadView('exports.lost_event_pdf', [
         'data' => $data,

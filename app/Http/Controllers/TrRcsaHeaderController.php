@@ -1050,7 +1050,7 @@ class TrRcsaHeaderController extends Controller
                 'existing_control'                       => 'nullable|string',
                 'hasil_yang_diharapkan_perusahaan'       => 'required|string',
                 'kategori_dampak'                        => 'required|numeric',
-                'inherent_eksposur_risiko_kualitatif'    => 'required_if:kategori_dampak,1',
+                'inherent_eksposur_risiko_kualitatif'    => 'required_if:kategori_dampak,1|nullable|string',
                 'inherent_eksposur_risiko_kuantitatif'   => 'required|numeric',
                 'inherent_level_risiko'                  => 'required|string',
                 'inherent_nilai_dampak'                  => 'required|numeric',
@@ -1085,6 +1085,23 @@ class TrRcsaHeaderController extends Controller
                 'timeline_bulan_akhir'                   => 'required|date',
                 'unit_kerja_id'                          => 'required|numeric',
                 'year'                                   => 'required|numeric',
+
+                // dataResidual required
+                'dataResidual'                                      => 'required|array|min:1',
+                'dataResidual.*.kuartal'                            => 'required|integer|in:1,2,3,4',
+                'dataResidual.*.residual_nilai_dampak'              => 'required|numeric',
+                'dataResidual.*.residual_skala_dampak'              => 'required|numeric',
+                'dataResidual.*.residual_nilai_probabilitas'        => 'required|numeric',
+                'dataResidual.*.residual_skala_probabilitas'        => 'required|numeric',
+                'dataResidual.*.residual_eksposur_risiko_kuantitatif' => 'required|numeric',
+                // reuired jika kategori_dampak === 1
+                'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'required_if:kategori_dampak,1|nullable|string',
+                'dataResidual.*.residual_skala_risiko'              => 'required|numeric',
+                'dataResidual.*.residual_level_risiko'              => 'required|string',
+
+                // dataRisikoList required
+                'dataRisikoList'                                   => 'required|array|min:1',
+                'dataRisikoList.*.jenis_rencana_perlakuan_risiko'  => 'required|string',
             ];
 
             $validator = Validator::make($payload, $rules);

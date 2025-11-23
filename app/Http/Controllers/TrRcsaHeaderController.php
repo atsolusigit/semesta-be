@@ -1097,7 +1097,7 @@ class TrRcsaHeaderController extends Controller
                 'existing_control'                       => 'nullable|string',
                 'hasil_yang_diharapkan_perusahaan'       => 'required|string',
                 'kategori_dampak'                        => 'required|numeric',
-                'inherent_eksposur_risiko_kualitatif'    => 'required_if:kategori_dampak,1',
+                'inherent_eksposur_risiko_kualitatif'    => 'required_if:kategori_dampak,1|nullable|string',
                 'inherent_eksposur_risiko_kuantitatif'   => 'required|numeric',
                 'inherent_level_risiko'                  => 'required|string',
                 'inherent_nilai_dampak'                  => 'required|numeric',
@@ -1142,7 +1142,7 @@ class TrRcsaHeaderController extends Controller
                 'dataResidual.*.residual_skala_probabilitas'        => 'required|numeric',
                 'dataResidual.*.residual_eksposur_risiko_kuantitatif' => 'required|numeric',
                 // reuired jika kategori_dampak === 1
-                'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'required_if:kategori_dampak,1|string',
+                'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'required_if:kategori_dampak,1|nullable|string',
                 'dataResidual.*.residual_skala_risiko'              => 'required|numeric',
                 'dataResidual.*.residual_level_risiko'              => 'required|string',
 

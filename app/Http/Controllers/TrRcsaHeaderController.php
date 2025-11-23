@@ -610,11 +610,11 @@ class TrRcsaHeaderController extends Controller
             $currentUser = auth()->user();
             $currentUserRole = $currentUser->role_id;
 
-            $allowAllRolesToDelete = true;
+            //$allowAllRolesToDelete = true;
 
             // VALIDASI HAK AKSES DELETE
             // semua role bisa delete kecuali VP
-            if (!$allowAllRolesToDelete && !in_array($currentUserRole, [1, 2, 3, 4, 5])) {
+            if (!in_array($currentUserRole, [1,2,3,4,5])) {
                 return json(404, false, 'Akses Ditolak', 'User VP tidak dapat menghapus data RCSA.', null);
             }
 

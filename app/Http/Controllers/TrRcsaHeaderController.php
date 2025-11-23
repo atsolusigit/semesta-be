@@ -161,6 +161,10 @@ class TrRcsaHeaderController extends Controller
                 'kategori_threshold_kri_aman' => $item->kategori_threshold_kri_aman,
                 'kategori_risiko_t2_t3_kbumn' => $item->kategori_risiko_t2_t3_kbumn,
                 'kategori_risiko_bumn' => $item->kategori_risiko_bumn,
+                'opsi_perlakuan_risiko' => $item->opsi_perlakuan_risiko,
+                'rencana_perlakuan_risiko' => $item->rencana_perlakuan_risiko,
+                'output_perlakuan_risiko' => $item->output_perlakuan_risiko,
+                'biaya_perlakuan_risiko' => $item->biaya_perlakuan_risiko,
 
              ];    
         });
@@ -190,9 +194,15 @@ class TrRcsaHeaderController extends Controller
      */
     public function store(Request $request)
     {
-        $result = check_role(auth()->user(), [1, 2, 3]);
+        $result = check_role(auth()->user(), [1, 2, 3, 4, 5, 6]);
         if ($result !== true) {
             return $result;
+        }
+
+        $currentUser = auth()->user();
+        $roleId = $currentUser->role_id ?? null;
+         if (!in_array($roleId, [1, 2, 3, 4, 5])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk membuat data ini.', null);
         }
 
         $allowedFields = [
@@ -248,79 +258,77 @@ class TrRcsaHeaderController extends Controller
             'unit_kerja_id',
             'year',
             'isMainRisk',
-            'existing_control',
         ];
 
         $validator = Validator::make($request->all(), [
-            'asumsi_perhitungan_dampak'          => 'sometimes|nullable|string',
-            'deskripsi_dampak'                   => 'sometimes|nullable|string',
-            'biaya_perlakuan_risiko'             => 'sometimes|nullable|numeric',
-            'deskripsi_peristiwa_risiko'         => 'sometimes|nullable|string',
-            'existing_control'                   => 'sometimes|nullable|string',
-            'hasil_yang_diharapkan_perusahaan'   => 'sometimes|nullable|string',
+            'asumsi_perhitungan_dampak' => 'sometimes|nullable|string',
+            'deskripsi_dampak'          => 'sometimes|nullable|string',
+            'biaya_perlakuan_risiko'    => 'sometimes|nullable|numeric',
+            'deskripsi_peristiwa_risiko'=> 'sometimes|nullable|string',
+            'existing_control'          => 'sometimes|nullable|string',
+            'hasil_yang_diharapkan_perusahaan' => 'sometimes|nullable|string',
 
-            'kategori_dampak'                    => 'sometimes|nullable|numeric',
+            'kategori_dampak' => 'sometimes|nullable|numeric',
 
-            'inherent_eksposur_risiko_kualitatif'   => 'sometimes|nullable',
-            'inherent_eksposur_risiko_kuantitatif'  => 'sometimes|nullable|numeric',
-            'inherent_level_risiko'                 => 'sometimes|nullable|string',
-            'inherent_nilai_dampak'                 => 'sometimes|nullable|numeric',
-            'inherent_nilai_probabilitas'           => 'sometimes|nullable|numeric',
-            'inherent_skala_dampak'                 => 'sometimes|nullable|numeric',
-            'inherent_skala_probabilitas'           => 'sometimes|nullable|numeric',
-            'inherent_skala_risiko'                 => 'sometimes|nullable|numeric',
+            'inherent_eksposur_risiko_kualitatif' => 'sometimes|nullable',
+            'inherent_eksposur_risiko_kuantitatif' => 'sometimes|nullable|numeric',
+            'inherent_level_risiko'   => 'sometimes|nullable|string',
+            'inherent_nilai_dampak'   => 'sometimes|nullable|numeric',
+            'inherent_nilai_probabilitas' => 'sometimes|nullable|numeric',
+            'inherent_skala_dampak'   => 'sometimes|nullable|numeric',
+            'inherent_skala_probabilitas' => 'sometimes|nullable|numeric', // << FIX dari "times"
+            'inherent_skala_risiko'   => 'sometimes|nullable|numeric',
 
-            'jenis_existing_control'             => 'sometimes|nullable|string',
-            'jenis_program_dalam_rkap'          => 'sometimes|nullable|string',
+            'jenis_existing_control'  => 'sometimes|nullable|string',
+            'jenis_program_dalam_rkap'=> 'sometimes|nullable|string',
 
-            'kategori_risiko_bumn'              => 'sometimes|nullable|string',
-            'kategori_risiko_t2_t3_kbumn'       => 'sometimes|nullable|string',
+            'kategori_risiko_bumn'        => 'sometimes|nullable|string',
+            'kategori_risiko_t2_t3_kbumn' => 'sometimes|nullable|string',
 
-            'kategori_threshold_kri_aman'       => 'sometimes|nullable|string',
-            'kategori_threshold_kri_bahaya'     => 'sometimes|nullable|string',
-            'kategori_threshold_kri_hati_hati'  => 'sometimes|nullable|string',
+            'kategori_threshold_kri_aman'     => 'sometimes|nullable|string',
+            'kategori_threshold_kri_bahaya'   => 'sometimes|nullable|string',
+            'kategori_threshold_kri_hati_hati'=> 'sometimes|nullable|string',
 
-            'keputusan_penetapan'               => 'sometimes|nullable|numeric',
-            'key_risk_indicators'               => 'sometimes|nullable|string',
-            'kode_bumn'                         => 'sometimes|nullable|string',
-            'nama_bumn'                         => 'sometimes|nullable|string',
-            'nilai_limit_risiko'                => 'sometimes|nullable|string',
-            'nilai_risiko_yang_akan_timbul'     => 'sometimes|nullable|string',
+            'keputusan_penetapan' => 'sometimes|nullable|numeric',
+            'key_risk_indicators' => 'sometimes|nullable|string',
+            'kode_bumn'           => 'sometimes|nullable|string',
+            'nama_bumn'           => 'sometimes|nullable|string',
+            'nilai_limit_risiko'  => 'sometimes|nullable|string',
+            'nilai_risiko_yang_akan_timbul' => 'sometimes|nullable|string',
 
-            'opsi_perlakuan_risiko'             => 'sometimes|nullable|string',
-            'output_perlakuan_risiko'           => 'sometimes|nullable|string',
-            'penilaian_efektivitas_kontrol'     => 'sometimes|nullable|string',
-            'penyebab_risiko'                   => 'sometimes|nullable|string',
-            'peristiwa_risiko'                  => 'sometimes|nullable|string',
-            'perkiraan_waktu_terpapar_risiko'   => 'sometimes|nullable|string',
-            'pic'                               => 'sometimes|nullable|string',
-            'pilihan_sasaran'                   => 'sometimes|nullable|string',
-            'pilihan_strategi'                  => 'sometimes|nullable|string',
-            'rencana_perlakuan_risiko'          => 'sometimes|nullable|string',
-            'sasaran_kbumn'                     => 'sometimes|nullable|string',
+            'opsi_perlakuan_risiko'      => 'sometimes|nullable|string',
+            'output_perlakuan_risiko'    => 'sometimes|nullable|string',
+            'penilaian_efektivitas_kontrol' => 'sometimes|nullable|string',
+            'penyebab_risiko'            => 'sometimes|nullable|string',
+            'peristiwa_risiko'           => 'sometimes|nullable|string',
+            'perkiraan_waktu_terpapar_risiko' => 'sometimes|nullable|string',
+            'pic'                        => 'sometimes|nullable|string',
+            'pilihan_sasaran'            => 'sometimes|nullable|string',
+            'pilihan_strategi'           => 'sometimes|nullable|string',
+            'rencana_perlakuan_risiko'   => 'sometimes|nullable|string',
+            'sasaran_kbumn'              => 'sometimes|nullable|string',
 
-            'timeline_bulan_akhir'              => 'sometimes|nullable|date',
-            'timeline_bulan_awal'               => 'sometimes|nullable|date',
+            'timeline_bulan_akhir' => 'sometimes|nullable|date',
+            'timeline_bulan_awal'  => 'sometimes|nullable|date',
 
-            'unit_satuan_kri'                   => 'sometimes|nullable|string',
-            'unit_kerja_id'                     => 'sometimes|nullable|numeric',
-            'year'                              => 'sometimes|nullable|numeric',
+            'unit_satuan_kri' => 'sometimes|nullable|string',
+            'unit_kerja_id'   => 'sometimes|nullable|numeric',
+            'year'            => 'sometimes|nullable|numeric',
 
-            'isMainRisk'                        => 'sometimes|nullable|boolean',
-
-            'dataResidual'                                      => 'sometimes|array',
-            'dataResidual.*.kuartal'                            => 'sometimes|integer|in:1,2,3,4',
-            'dataResidual.*.residual_nilai_dampak'              => 'sometimes|numeric|nullable',
-            'dataResidual.*.residual_skala_dampak'              => 'sometimes|numeric|nullable',
-            'dataResidual.*.residual_nilai_probabilitas'        => 'sometimes|numeric|nullable',
-            'dataResidual.*.residual_skala_probabilitas'        => 'sometimes|numeric|nullable',
+            'isMainRisk' => 'sometimes|nullable|boolean',
+            'dataResidual'   => 'sometimes|array',
+            'dataResidual.*.kuartal'                          => 'sometimes|integer|in:1,2,3,4',
+            'dataResidual.*.residual_nilai_dampak'            => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_skala_dampak'            => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_nilai_probabilitas'      => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_skala_probabilitas'      => 'sometimes|numeric|nullable',
             'dataResidual.*.residual_eksposur_risiko_kuantitatif' => 'sometimes|numeric|nullable',
             'dataResidual.*.residual_eksposur_risiko_kualitatif'  => 'sometimes|nullable|string',
-            'dataResidual.*.residual_skala_risiko'              => 'sometimes|numeric|nullable',
-            'dataResidual.*.residual_level_risiko'              => 'sometimes|nullable|string',
+            'dataResidual.*.residual_skala_risiko'            => 'sometimes|numeric|nullable',
+            'dataResidual.*.residual_level_risiko'            => 'sometimes|nullable|string',
 
-            'dataRisikoList'                                   => 'sometimes|array',
-            'dataRisikoList.*.jenis_rencana_perlakuan_risiko'  => 'sometimes|nullable|string',
+            'dataRisikoList' => 'sometimes|array',
+            'dataRisikoList.*.jenis_rencana_perlakuan_risiko' => 'sometimes|nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -358,37 +366,21 @@ class TrRcsaHeaderController extends Controller
 
             $rcsaHeader = TrRcsaHeader::create($data);
 
-            //  INSERT RCSA RESIDUAL
             if (!empty($dataResidual)) {
                 $mergedResidual = [];
-
                 foreach ($dataResidual as $item) {
-                    $mergedResidual[] = [
-                        'rcsa_id'                              => $rcsaHeader->id,
-                        'kuartal'                              => $item['kuartal'] ?? null,
-                        'residual_skala_dampak'                => $item['residual_skala_dampak'] ?? null,
-                        'residual_nilai_dampak'                => $item['residual_nilai_dampak'] ?? 0,
-                        'residual_skala_probabilitas'          => $item['residual_skala_probabilitas'] ?? null,
-                        'residual_nilai_probabilitas'          => $item['residual_nilai_probabilitas'] ?? 0,
-                        'residual_eksposur_risiko_kuantitatif' => $item['residual_eksposur_risiko_kuantitatif'] ?? 0,
-                        'residual_eksposur_risiko_kualitatif'  => $item['residual_eksposur_risiko_kualitatif'] ?? null,
-                        'residual_skala_risiko'                => $item['residual_skala_risiko'] ?? null,
-                        'residual_level_risiko'                => $item['residual_level_risiko'] ?? null,
-                    ];
+                    $mergedResidual[] = array_merge($item, ['rcsa_id' => $rcsaHeader->id]);
                 }
-
                 if (!empty($mergedResidual)) {
                     TrRcsaResidual::insert($mergedResidual);
                 }
             }
 
-            //  INSERT RENCANA RISIKO LIST
             if (!empty($dataRisikoList)) {
                 $mergedRList = [];
                 foreach ($dataRisikoList as $itemList) {
                     $mergedRList[] = array_merge($itemList, ['rcsa_id' => $rcsaHeader->id]);
                 }
-
                 if (!empty($mergedRList)) {
                     TrRcsaRencanaRisikoList::insert($mergedRList);
                 }
@@ -402,48 +394,35 @@ class TrRcsaHeaderController extends Controller
             ]);
 
             $responseData = [
-                'id'                          => $rcsaHeader->id,
-                'pilihan_sasaran'             => clean_string($rcsaHeader->pilihan_sasaran),
-                'pilihan_strategi'            => clean_string($rcsaHeader->pilihan_strategi),
-                'asumsi_perhitungan_dampak'   => clean_string($rcsaHeader->asumsi_perhitungan_dampak),
-                'deskripsi_dampak'            => clean_string($rcsaHeader->deskripsi_dampak),
-                'biaya_perlakuan_risiko'      => $rcsaHeader->biaya_perlakuan_risiko,
-                'deskripsi_peristiwa_risiko'  => clean_string($rcsaHeader->deskripsi_peristiwa_risiko),
-                'existing_control'            => clean_string($rcsaHeader->existing_control),
-                'inherent_nilai_probabilitas' => $rcsaHeader->inherent_nilai_probabilitas,
-                'inherent_skala_dampak'       => $rcsaHeader->inherent_skala_dampak,
-                'inherent_skala_probabilitas' => $rcsaHeader->inherent_skala_probabilitas,
-                'inherent_skala_risiko'       => $rcsaHeader->inherent_skala_risiko,
-                'jenis_existing_control'      => clean_string($rcsaHeader->jenis_existing_control),
-                'department_id'               => $rcsaHeader->unit_kerja_id,
-                'status'                      => $rcsaHeader->status,
-                'year'                        => $rcsaHeader->year,
-                'updated_at'                  => $rcsaHeader->updated_at,
-                'created_at'                  => $rcsaHeader->created_at,
-                'created_by'                  => $rcsaHeader->created_by,
-                'isMainRisk'                  => (bool) $rcsaHeader->isMainRisk,
+                'id'                           => $rcsaHeader->id,
+                'pilihan_sasaran'              => clean_string($rcsaHeader->pilihan_sasaran),
+                'pilihan_strategi'             => clean_string($rcsaHeader->pilihan_strategi),
+                'asumsi_perhitungan_dampak'    => clean_string($rcsaHeader->asumsi_perhitungan_dampak),
+                'deskripsi_dampak'             => clean_string($rcsaHeader->deskripsi_dampak),
+                'biaya_perlakuan_risiko'       => $rcsaHeader->biaya_perlakuan_risiko,
+                'deskripsi_peristiwa_risiko'   => clean_string($rcsaHeader->deskripsi_peristiwa_risiko),
+                'existing_control'             => clean_string($rcsaHeader->existing_control),
+                'inherent_nilai_probabilitas'  => $rcsaHeader->inherent_nilai_probabilitas,
+                'inherent_skala_dampak'        => $rcsaHeader->inherent_skala_dampak,
+                'inherent_skala_probabilitas'  => $rcsaHeader->inherent_skala_probabilitas,
+                'inherent_skala_risiko'        => $rcsaHeader->inherent_skala_risiko,
+                'jenis_existing_control'       => clean_string($rcsaHeader->jenis_existing_control),
+                'department_id'                => $rcsaHeader->unit_kerja_id,
+                'status'                       => $rcsaHeader->status,
+                'year'                         => $rcsaHeader->year,
+                'updated_at'                   => $rcsaHeader->updated_at,
+                'created_at'                   => $rcsaHeader->created_at,
+                'created_by'                   => $rcsaHeader->created_by,
+                'isMainRisk'                   => (bool) $rcsaHeader->isMainRisk,
             ];
 
-            return json(
-                200,
-                true,
-                'Berhasil Disimpan',
-                'RCSA header berhasil disimpan dengan status draft dan menunggu persetujuan.',
-                $responseData
-            );
+            return json(200, true, 'Berhasil Disimpan', 'RCSA header berhasil disimpan dengan status draft dan menunggu persetujuan.', $responseData);
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            return json(
-                500,
-                false,
-                'Gagal Disimpan',
-                'Terjadi kesalahan sistem.',
-                $th->getMessage()
-            );
+            return json(500, false, 'Gagal Disimpan', 'Terjadi kesalahan sistem.', $th->getMessage());
         }
     }
-
 
     /**
      * Display the specified resource.
@@ -566,15 +545,16 @@ class TrRcsaHeaderController extends Controller
     public function update(Request $request, string $id)
     {
         $currentUser = auth()->user();
+        $roleId = $currentUser->role_id ?? null;
 
         // Validasi role: hanya role 1, 2, 3 yang diizinkan
-        $roleCheck = check_role($currentUser, [1, 2, 3]);
+        $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5, 6]);
         if ($roleCheck !== true) {
             return $roleCheck;
         }
 
-        $RcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
-        // Jika role_id = 2 atau 3, batasi department yang terlihat sesuai department user
+        $RcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3, 4, 5, 6]), function ($query) use ($currentUser) {
+        // Jika role_id 2 s/d 6, batasi department yang terlihat sesuai department user
         $query->where('unit_kerja_id', $currentUser->department_id);
         })->find($id);
 
@@ -582,11 +562,17 @@ class TrRcsaHeaderController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'RCSA tidak ditemukan.', null);
         }
 
-        if ($RcsaHeader->status === 'approved') {
-            return json(403, false, 'Akses Ditolak', 'Semua data sudah terisi dan di-approve, tidak bisa dirubah lagi.', null);
+        if (!in_array($roleId, [1, 2, 3, 4, 5])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk update data ini.', null);
         }
 
-        if (in_array($currentUser->role_id, [2, 3])) {
+        if ($RcsaHeader->status === 'approved') {
+            if (!in_array($roleId, [1, 5])) {
+                return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk update data ini.', null);
+            }
+        }
+
+        if (in_array($currentUser->role_id, [2, 3, 4, 5, 6])) {
             if ($request->has('unit_kerja_id') && $request->input('unit_kerja_id') != $currentUser->department_id) {
                 return json(403, false, 'Akses Ditolak', 'Anda tidak dapat mengubah department_id ke department lain.', null);
             }
@@ -624,12 +610,12 @@ class TrRcsaHeaderController extends Controller
             $currentUser = auth()->user();
             $currentUserRole = $currentUser->role_id;
 
-            $allowAllRolesToDelete = true;
+            //$allowAllRolesToDelete = true;
 
             // VALIDASI HAK AKSES DELETE
-            // Hanya Superadmin (role 1) yang bisa delete
-            if (!$allowAllRolesToDelete && $currentUserRole !== 1 ) {
-                return json(404, false, 'Akses Ditolak', 'Hanya Superadmin dan User biasa yang dapat menghapus data RCSA.', null);
+            // semua role bisa delete kecuali VP
+            if (!in_array($currentUserRole, [1,2,3,4,5])) {
+                return json(404, false, 'Akses Ditolak', 'User VP tidak dapat menghapus data RCSA.', null);
             }
 
              // OPTIONAL: Cek apakah sudah approved dan complete
@@ -988,11 +974,17 @@ class TrRcsaHeaderController extends Controller
         {
             $currentUser = auth()->user();
 
-            $roleCheck = check_role($currentUser, [1, 2, 3]);
+            $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5]);
             if ($roleCheck !== true) {
                 return $roleCheck;
             }
 
+            $roleId = $currentUser->role_id ?? null;
+            if (!in_array($roleId, [1, 4, 5, 6])) {
+                return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk submit data ini.', null);
+            }
+
+            // Load by id (and restrict by department for role 2/3)
             $rcsaHeader = TrRcsaHeader::when(in_array($currentUser->role_id, [2, 3]), function ($query) use ($currentUser) {
                 $query->where('unit_kerja_id', $currentUser->department_id);
             })->find($id);
@@ -1004,42 +996,6 @@ class TrRcsaHeaderController extends Controller
             if (!in_array($rcsaHeader->status, ['draft', 'rejected'])) {
                 return json(403, false, 'Akses Ditolak', 'Hanya data dengan status draft atau rejected yang dapat disubmit.', null);
             }
-
-            $dataResidual = TrRcsaResidual::where('rcsa_id', $rcsaHeader->id)
-                ->get([
-                    'kuartal',
-                    'residual_nilai_dampak',
-                    'residual_skala_dampak',
-                    'residual_nilai_probabilitas',
-                    'residual_skala_probabilitas',
-                    'residual_eksposur_risiko_kuantitatif',
-                    'residual_eksposur_risiko_kualitatif',
-                    'residual_skala_risiko',
-                    'residual_level_risiko',
-                ])
-                ->map(function ($item) {
-                    return [
-                        'kuartal'                              => $item->kuartal,
-                        'residual_nilai_dampak'                => $item->residual_nilai_dampak,
-                        'residual_skala_dampak'                => $item->residual_skala_dampak,
-                        'residual_nilai_probabilitas'          => $item->residual_nilai_probabilitas,
-                        'residual_skala_probabilitas'          => $item->residual_skala_probabilitas,
-                        'residual_eksposur_risiko_kuantitatif' => $item->residual_eksposur_risiko_kuantitatif,
-                        'residual_eksposur_risiko_kualitatif'  => $item->residual_eksposur_risiko_kualitatif,
-                        'residual_skala_risiko'                => $item->residual_skala_risiko,
-                        'residual_level_risiko'                => $item->residual_level_risiko,
-                    ];
-                })
-                ->toArray();
-
-            $dataRisikoList = TrRcsaRencanaRisikoList::where('rcsa_id', $rcsaHeader->id)
-                ->get(['jenis_rencana_perlakuan_risiko'])
-                ->map(function ($item) {
-                    return [
-                        'jenis_rencana_perlakuan_risiko' => $item->jenis_rencana_perlakuan_risiko,
-                    ];
-                })
-                ->toArray();
 
             $payload = [
                 'asumsi_perhitungan_dampak'            => $rcsaHeader->asumsi_perhitungan_dampak,
@@ -1084,9 +1040,6 @@ class TrRcsaHeaderController extends Controller
                 'timeline_bulan_akhir'                 => $rcsaHeader->timeline_bulan_akhir,
                 'unit_kerja_id'                        => $rcsaHeader->unit_kerja_id,
                 'year'                                 => $rcsaHeader->year,
-
-                'dataResidual'                         => $dataResidual,
-                'dataRisikoList'                       => $dataRisikoList,
             ];
 
             $rules = [
@@ -1238,6 +1191,9 @@ class TrRcsaHeaderController extends Controller
 
 
 
+
+
+
     // Approve RCSA Header oleh SPV Unit (role 1 dan 2)
     public function approve(Request $request, $id)
     {
@@ -1262,7 +1218,7 @@ class TrRcsaHeaderController extends Controller
             $currentUser = auth()->user();
             $roleId = $currentUser->role_id ?? null;
 
-            if (!in_array($roleId, [1, 2])) {
+            if (!in_array($roleId, [1, 2, 4])) {
                 return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk menyetujui data ini.', null);
             }
 
@@ -1440,6 +1396,11 @@ class TrRcsaHeaderController extends Controller
         $result = check_role(auth()->user(), [1, 2, 3]);
         if ($result !== true) {
             return $result;
+        }
+
+        $roleId = $currentUser->role_id ?? null;
+        if (!in_array($roleId, [1, 4, 5, 6])) {
+            return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak main risk.', null);
         }
 
         $validator = Validator::make($request->all(), [

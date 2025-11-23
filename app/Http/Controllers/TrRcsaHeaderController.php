@@ -194,13 +194,14 @@ class TrRcsaHeaderController extends Controller
      */
     public function store(Request $request)
     {
-        $result = check_role(auth()->user(), [1, 2, 3]);
+        $result = check_role(auth()->user(), [1, 2, 3, 4, 5, 6]);
         if ($result !== true) {
             return $result;
         }
 
+        $currentUser = auth()->user();
         $roleId = $currentUser->role_id ?? null;
-         if (!in_array($roleId, [1, 4, 5, 6])) {
+         if (!in_array($roleId, [1, 2, 3, 4, 5])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk membuat data ini.', null);
         }
 
@@ -547,7 +548,7 @@ class TrRcsaHeaderController extends Controller
         $roleId = $currentUser->role_id ?? null;
 
         // Validasi role: hanya role 1, 2, 3 yang diizinkan
-        $roleCheck = check_role($currentUser, [1, 2, 3]);
+        $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5, 6]);
         if ($roleCheck !== true) {
             return $roleCheck;
         }
@@ -561,7 +562,7 @@ class TrRcsaHeaderController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'RCSA tidak ditemukan.', null);
         }
 
-        if (!in_array($roleId, [1, 4, 5, 6])) {
+        if (!in_array($roleId, [1, 2, 3, 4, 5])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk update data ini.', null);
         }
 
@@ -609,12 +610,12 @@ class TrRcsaHeaderController extends Controller
             $currentUser = auth()->user();
             $currentUserRole = $currentUser->role_id;
 
-            $allowAllRolesToDelete = true;
+            //$allowAllRolesToDelete = true;
 
             // VALIDASI HAK AKSES DELETE
-            // Hanya Superadmin (role 1) yang bisa delete
-            if (!$allowAllRolesToDelete && $currentUserRole !== 1 ) {
-                return json(404, false, 'Akses Ditolak', 'Hanya Superadmin dan User biasa yang dapat menghapus data RCSA.', null);
+            // semua role bisa delete kecuali VP
+            if (!in_array($currentUserRole, [1,2,3,4,5])) {
+                return json(404, false, 'Akses Ditolak', 'User VP tidak dapat menghapus data RCSA.', null);
             }
 
              // OPTIONAL: Cek apakah sudah approved dan complete

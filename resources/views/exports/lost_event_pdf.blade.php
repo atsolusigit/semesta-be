@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Lost Event Report</title>
+    <title>Loss Event Report</title>
     <style>
         @page {
             margin: 15mm 10mm;
@@ -88,7 +88,7 @@
 </head>
 <body>
     <div class="header">
-        <h2>LAPORAN LOST EVENT</h2>
+        <h2>LAPORAN LOSS EVENT</h2>
         <p>{{ str_replace('_', ' ', $departmentName) }}</p>
         <p>Tanggal Cetak: {{ date('d/m/Y') }}</p>
     </div>

@@ -437,7 +437,7 @@ public function getByHeader($headerId)
     ]);
 }
 
-   public function updateResidualAndFinalize(Request $request, $id)
+  public function updateResidualAndFinalize(Request $request, $id)
 {
     // Check user role authorization
     $user = auth()->user();
@@ -510,20 +510,21 @@ public function getByHeader($headerId)
             $previousRealization = (float) $previousMonth->realization_quantitative;
             $currentRealization = (float) $request->realization_quantitative;
 
-            if ($currentRealization != $previousRealization) {
+            // PERUBAHAN: Validasi tidak boleh kurang, tapi boleh lebih atau sama
+            if ($currentRealization < $previousRealization) {
                 // Format angka untuk response
                 $formattedPrevious = number_format($previousRealization, 0, ',', '.');
                 $formattedCurrent = number_format($currentRealization, 0, ',', '.');
 
                 return json(400, false, 'Validasi Realisasi Gagal',
-                    'Realisasi harus sama dengan bulan sebelumnya karena target tidak diisi.',
+                    'Realisasi tidak boleh kurang dari bulan sebelumnya karena target tidak diisi.',
                     [
                         'id' => $id,
                         'current_month' => $data->month,
                         'previous_month' => $previousMonth->month,
-                        'required_value' => $formattedPrevious,
+                        'minimum_value' => $formattedPrevious,
                         'submitted_value' => $formattedCurrent,
-                        'message' => "Realisasi bulan {$data->month} harus sama dengan bulan sebelumnya yaitu {$formattedPrevious} karena target quantitative tidak diisi"
+                        'message' => "Realisasi bulan {$data->month} tidak boleh kurang dari bulan sebelumnya yaitu {$formattedPrevious}. Nilai boleh sama atau lebih besar."
                     ]
                 );
             }
@@ -837,20 +838,21 @@ if ($validator->fails()) {
             $previousRealization = (float) $previousMonth->realization_quantitative;
             $currentRealization = (float) $request->realization_quantitative;
 
-            if ($currentRealization != $previousRealization) {
+            // PERUBAHAN: Validasi tidak boleh kurang, tapi boleh lebih atau sama
+            if ($currentRealization < $previousRealization) {
                 // Format angka untuk response
                 $formattedPrevious = number_format($previousRealization, 0, ',', '.');
                 $formattedCurrent = number_format($currentRealization, 0, ',', '.');
 
                 return json(400, false, 'Validasi Realisasi Gagal',
-                    'Realisasi harus sama dengan bulan sebelumnya karena target tidak diisi.',
+                    'Realisasi tidak boleh kurang dari bulan sebelumnya karena target tidak diisi.',
                     [
                         'id' => $id,
                         'current_month' => $data->month,
                         'previous_month' => $previousMonth->month,
-                        'required_value' => $formattedPrevious,
+                        'minimum_value' => $formattedPrevious,
                         'submitted_value' => $formattedCurrent,
-                        'message' => "Realisasi bulan {$data->month} harus sama dengan bulan sebelumnya yaitu {$formattedPrevious} karena target quantitative tidak diisi"
+                        'message' => "Realisasi bulan {$data->month} tidak boleh kurang dari bulan sebelumnya yaitu {$formattedPrevious}. Nilai boleh sama atau lebih besar."
                     ]
                 );
             }

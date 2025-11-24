@@ -335,7 +335,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/lost-events/{id}/reject', [LostEventController::class, 'reject']); // Reject lost event
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
     Route::delete('/lost-event-uploads/{fileId}', [LostEventController::class, 'deleteUploadedFile']); // Delete uploaded file by fileId
-    Route::post('/lost-events/{id}/upload', [LostEventController::class, 'uploadFile']);
+   Route::post('/lost-events/upload', [LostEventController::class, 'uploadFile']); // Upload file for lost event
 });
 
 // ===================== JENIS RISIKO =====================

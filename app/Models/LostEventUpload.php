@@ -13,6 +13,7 @@ class LostEventUpload extends Model
 
     protected $fillable = [
         'lost_event_id',
+        'user_id',
         'filepath',
         'domain',
         'is_confirmed',

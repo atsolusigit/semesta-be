@@ -1094,6 +1094,11 @@ public function store(Request $request)
             'created_by' => $user->id,
         ]);
 
+        // Update lost_event_id di lost_event_uploads yang belum terkait
+        LostEventUpload::whereNull('lost_event_id')
+            ->where('user_id', $user->id)
+            ->update(['lost_event_id' => $lostEvent->id]);
+
         // Proses file uploads jika ada
         if ($request->has('uploaded_files')) {
             process_lost_event_file_uploads($request->uploaded_files, $lostEvent);
@@ -1319,6 +1324,11 @@ public function update(Request $request, $id)
         $lostEvent->updated_by = $user->id;
         $lostEvent->save();
 
+        // Update lost_event_id di lost_event_uploads yang belum terkait
+         LostEventUpload::whereNull('lost_event_id')
+        ->where('user_id', $user->id)
+        ->update(['lost_event_id' => $lostEvent->id]);
+
         // Proses file uploads jika ada
         if ($request->has('uploaded_files')) {
             process_lost_event_file_uploads($request->uploaded_files, $lostEvent);
@@ -1504,7 +1514,7 @@ public function destroy($id)
         }
     }
 
-   public function uploadFile(Request $request, $lostEventId = null)
+   public function uploadFile(Request $request)
 {
     $user = auth()->user();
 
@@ -1512,38 +1522,29 @@ public function destroy($id)
         return json(403, false, 'Forbidden', 'Anda tidak memiliki akses upload file.', null);
     }
 
-    // FILE OPSIONAL
     $validator = Validator::make($request->all(), [
-        'file'   => 'array',           // tidak wajib
-        'file.*' => 'file|max:10240',  // validasi hanya jika file dikirim
+        'file'   => 'required|array',
+        'file.*' => 'file|max:10240',
     ]);
 
     if ($validator->fails()) {
         return json(400, false, 'Validasi Gagal', 'File tidak valid.', $validator->errors());
     }
 
-    // Jika tidak ada file → tetap sukses
-    if (!$request->hasFile('file')) {
-        return json(200, true, 'Tidak Ada File', 'Tidak ada file yang diupload.', []);
-    }
-
     $uploadedList = [];
 
     foreach ($request->file('file') as $file) {
-
-        // Convert file → base64
         $fileContent = file_get_contents($file->getRealPath());
         $base64      = base64_encode($fileContent);
         $mime        = $file->getMimeType();
-
         $base64Format = "data:{$mime};base64,{$base64}";
 
-        // Simpan ke database
         $upload = LostEventUpload::create([
-            'lost_event_id' => $lostEventId,
-            'filepath'      => $base64Format,              // langsung ke DB
+            'lost_event_id' => null,  // ← UBAH dari 0 ke null
+            'user_id'       => $user->id,
+            'filepath'      => $base64Format,
             'domain'        => $file->getClientOriginalName(),
-            'is_confirmed'  => 1,
+            'is_confirmed'  => 0,
         ]);
 
         $uploadedList[] = [
@@ -1553,9 +1554,8 @@ public function destroy($id)
         ];
     }
 
-    return json(200, true, 'Berhasil', 'Upload berhasil disimpan ke database.', $uploadedList);
+    return json(200, true, 'Berhasil', 'File berhasil diupload (pending).', $uploadedList);
 }
-
 
 //=====================================
 // GET PENDING LOST EVENTS

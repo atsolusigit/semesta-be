@@ -342,6 +342,47 @@ public function show(Request $request, $id)
     try {
         DB::beginTransaction();
 
+        // Cek duplikasi username jika diubah
+        if ($request->filled('username')) {
+            $inputUsername = $request->username;
+
+            $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputUsername) {
+                try {
+                    $decryptedUsername = encrypt_decrypt_db('dec', $otherUser->username, $otherUser->id);
+                    return $decryptedUsername === $inputUsername;
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            });
+
+            if ($duplicate) {
+                DB::rollBack();
+                return json(400, 'false', 'duplicate_username', 'Username sudah digunakan oleh pengguna lain.', []);
+            }
+        }
+
+        // Cek duplikasi email jika diubah
+        if ($request->filled('email')) {
+            $inputEmail = $request->email;
+
+            $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputEmail) {
+                try {
+                    if ($otherUser->email) {
+                        $decryptedEmail = encrypt_decrypt_db('dec', $otherUser->email, $otherUser->id);
+                        return $decryptedEmail === $inputEmail;
+                    }
+                    return false;
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            });
+
+            if ($duplicate) {
+                DB::rollBack();
+                return json(400, 'false', 'duplicate_email', 'Email sudah digunakan oleh pengguna lain.', []);
+            }
+        }
+
         $user->role_id = $request->role_id;
         $user->department_id = $request->department_id;
         $user->status = $request->status === 'aktif' ? 1 : 0;
@@ -631,8 +672,8 @@ public function rejectUser($id)
 
     $validation = check_validation($request->all(), [
         'name' => 'required|string|max:255',
-        'username' => 'required|string|max:255|unique:users,username,' . $user->id,
-        'email' => 'nullable|email:rfc,dns|max:255|unique:users,email,' . $user->id,
+        'username' => 'required|string|max:255',
+        'email' => 'nullable|email:rfc,dns|max:255',
         'nip' => 'nullable|string|max:100',
         'phone_number' => 'nullable|string|max:100',
         'gender' => 'nullable|in:male,female,other',
@@ -643,6 +684,47 @@ public function rejectUser($id)
 
     try {
         DB::beginTransaction();
+
+        // Cek duplikasi username jika diisi
+        if ($request->filled('username')) {
+            $inputUsername = $request->username;
+
+            $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputUsername) {
+                try {
+                    $decryptedUsername = encrypt_decrypt_db('dec', $otherUser->username, $otherUser->id);
+                    return $decryptedUsername === $inputUsername;
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            });
+
+            if ($duplicate) {
+                DB::rollBack();
+                return json(400, 'false', 'duplicate_username', 'Username sudah digunakan oleh pengguna lain.', null);
+            }
+        }
+
+        // Cek duplikasi email jika diisi
+        if ($request->filled('email')) {
+            $inputEmail = $request->email;
+
+            $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputEmail) {
+                try {
+                    if ($otherUser->email) {
+                        $decryptedEmail = encrypt_decrypt_db('dec', $otherUser->email, $otherUser->id);
+                        return $decryptedEmail === $inputEmail;
+                    }
+                    return false;
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            });
+
+            if ($duplicate) {
+                DB::rollBack();
+                return json(400, 'false', 'duplicate_email', 'Email sudah digunakan oleh pengguna lain.', null);
+            }
+        }
 
         // Update data biasa (tidak terenkripsi)
         $user->gender = $request->gender;
@@ -677,6 +759,7 @@ public function rejectUser($id)
                     User::where('id', $user->id)->update([
                         'username' => DB::raw($encryptedUsername)
                     ]);
+                    logger("Username updated successfully for user {$user->id}");
                 } else {
                     logger("Username encryption failed for user {$user->id}");
                 }
@@ -692,6 +775,7 @@ public function rejectUser($id)
                     User::where('id', $user->id)->update([
                         'email' => DB::raw($encryptedEmail)
                     ]);
+                    logger("Email updated successfully for user {$user->id}");
                 } else {
                     logger("Email encryption failed for user {$user->id}");
                 }
@@ -706,8 +790,11 @@ public function rejectUser($id)
             // Cek duplikasi NIP
             $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputNip) {
                 try {
-                    $decryptedNip = encrypt_decrypt_db('dec', $otherUser->nip, $otherUser->id);
-                    return $decryptedNip === $inputNip;
+                    if ($otherUser->nip) {
+                        $decryptedNip = encrypt_decrypt_db('dec', $otherUser->nip, $otherUser->id);
+                        return $decryptedNip === $inputNip;
+                    }
+                    return false;
                 } catch (\Throwable $e) {
                     return false;
                 }
@@ -836,6 +923,7 @@ public function rejectUser($id)
     } catch (\Exception $e) {
         DB::rollBack();
         logger("Gagal update profil: " . $e->getMessage());
+        logger("Stack trace: " . $e->getTraceAsString());
         return json(500, 'false', 'update_failed', 'Terjadi kesalahan saat memperbarui profil.', null);
     }
 }

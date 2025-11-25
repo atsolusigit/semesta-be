@@ -391,6 +391,8 @@ Route::middleware(['auth:api'])->group(function () {
     Route::patch('/risk-investasi/{id}/approve', [TrRiskInvestasiController::class, 'approve']);
     Route::patch('/risk-investasi/{id}/reject', [TrRiskInvestasiController::class, 'reject']);
     Route::get('/risk-investasi/erkap/{erkap_id}', [TrRiskInvestasiController::class, 'getByErkapID']);
+    Route::get('/export-risk-investasi/{format}', [TrRiskInvestasiController::class, 'export'])
+        ->where(['format' => 'pdf|excel']);
 });
 
 // ===================== MASTER UNTUK KEPERLUAN OPSI RCSA =====================

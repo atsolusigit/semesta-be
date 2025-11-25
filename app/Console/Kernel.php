@@ -24,10 +24,15 @@ class Kernel extends ConsoleKernel
             ->onOneServer();
 
         $schedule->command('erkap:prefetch-timeline')
-            // ->dailyAt($prefetchTime)
             ->hourly()
             ->withoutOverlapping()
             ->onOneServer();
+
+        $schedule->command('erkap:sync-risk')
+            ->hourly()
+            ->withoutOverlapping()
+            ->onOneServer();
+
     }
 
     protected function scheduleTimezone(): \DateTimeZone|string|null

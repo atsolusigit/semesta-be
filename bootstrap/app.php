@@ -32,18 +32,22 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withSchedule(function (Schedule $schedule) {
-        $tz           = (string) config('app.timezone', 'Asia/Jakarta');
-        $syncTime     = (string) config('services.erkap.sync_time', '01:00');
-        $prefetchTime = (string) config('services.erkap.prefetch_time', '22:30');
+        $tz = (string) config('app.timezone', 'Asia/Jakarta');
 
         $schedule->command('erkap:sync-daily')
-            ->dailyAt($syncTime)
+            ->hourly()
             ->timezone($tz)
             ->withoutOverlapping()
             ->onOneServer();
 
         $schedule->command('erkap:prefetch-timeline')
-            ->dailyAt($prefetchTime)
+            ->hourly()
+            ->timezone($tz)
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        $schedule->command('erkap:sync-risk')
+            ->hourly()
             ->timezone($tz)
             ->withoutOverlapping()
             ->onOneServer();

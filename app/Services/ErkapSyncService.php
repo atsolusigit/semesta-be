@@ -55,7 +55,7 @@ class ErkapSyncService
                         'dampak_inherent' => data_get($item, 'list_risk.0.risk.0.risk_awal_dampak'),
                         'ld_inherent'     => data_get($item, 'list_risk.0.risk.0.risk_awal_exp_kode'),
                         'dampak_current'  => data_get($item, 'list_risk.0.risk.0.risk_akhir_dampak'),
-                        'ld_current'      => data_get($item, 'list_risk.0.risk.0.risk_akhir_exp_kode'),
+                        // 'ld_current'      => data_get($item, 'list_risk.0.risk.0.risk_akhir_exp_kode'),
                         'synced_at'       => now(),
                     ]
                 );

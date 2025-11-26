@@ -37,7 +37,6 @@ class ErkapSyncService
         foreach ($resp['result'] ?? [] as $item) {
             DB::transaction(function () use ($item, $tahun, $bulan, $week, &$count) {
 
-                // 1) Upsert MASTER (by erkap_id + year)
                 $ri = RencanaInvestasi::updateOrCreate(
                     ['erkap_id' => $item['capex_id'], 'year' => $item['tahun']],
                     [   
@@ -53,15 +52,14 @@ class ErkapSyncService
                         'nilai_realisasi'       => $item['nilai_realisasi_keuangan'] ?? null,
                         'keterangan'            => $item['keterangan_revisi'] ?? '',
 
-                        // ringkas risk ke header bila perlu tampil cepat
                         'dampak_inherent' => data_get($item, 'list_risk.0.risk.0.risk_awal_dampak'),
                         'ld_inherent'     => data_get($item, 'list_risk.0.risk.0.risk_awal_exp_kode'),
                         'dampak_current'  => data_get($item, 'list_risk.0.risk.0.risk_akhir_dampak'),
-                        'ld_current'      => data_get($item, 'list_risk.0.risk.0.risk_akhir_exp_kode'),
+                        // 'ld_current'      => data_get($item, 'list_risk.0.risk.0.risk_akhir_exp_kode'),
+                        'synced_at'       => now(),
                     ]
                 );
 
-                // 2) Upsert PERIOD (by erkap_id + year + month + week)
                 $payloadForHash = [
                     'nilai_rkap' => $item['nilai_rkap'] ?? null,
                     'nilai_revisi' => $item['nilai_revisi'] ?? null,

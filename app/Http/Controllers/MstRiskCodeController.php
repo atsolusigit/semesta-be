@@ -74,9 +74,9 @@ class MstRiskCodeController extends Controller
     // Tambah data jenis risiko
     public function store(Request $request)
     {
-        // Check authorization: only role 1 and 2 can store
+       // Check authorization: only role 1, 2, 4 and 5 can store
         $user = auth()->user();
-        $roleCheck = check_role($user, [1, 2]);
+        $roleCheck = check_role($user, [1, 2, 4, 5]);
 
         if ($roleCheck !== true) {
             return $roleCheck;
@@ -113,9 +113,9 @@ class MstRiskCodeController extends Controller
     // Update jenis risiko
     public function update(Request $request, $id)
     {
-        // Check authorization: only role 1 and 2 can update
+        // Check authorization: only role 1, 2, 4 and 5 can update
         $user = auth()->user();
-        $roleCheck = check_role($user, [1, 2]);
+        $roleCheck = check_role($user, [1, 2, 4, 5]);
 
         if ($roleCheck !== true) {
             return $roleCheck;

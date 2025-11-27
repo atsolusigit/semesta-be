@@ -74,24 +74,21 @@ class MstEmailRiskOwnerController extends Controller
      */
     public function store(Request $request)
     {
-        // Check authorization: only role 1 and 2 can store
         $userRole = auth()->user()->role_id ?? null;
         if (!in_array($userRole, [1, 2])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
         }
 
         $exists = MstEmailRiskOwner::where('unit_kerja_id', $request->unit_kerja_id)->exists();
-
         if ($exists) {
             return json(500, false, 'Unit Kerja Exist', 'Unit Kerja '.$request->unit_kerja_id.' Exists', null);
         }
 
-        $user = auth()->user();
-
         $validator = Validator::make($request->all(), [
-            'unit_kerja_nama' => 'required|string',
-            'unit_kerja_email' => 'required|string',
-            'unit_kerja_id' => 'required|integer',
+            'unit_kerja_nama'   => 'required|string',
+            'unit_kerja_email'  => 'required|string',
+            'unit_kerja_id'     => 'required|integer',
+            'department_id'     => 'nullable|integer|exists:mst_department,id',
         ]);
 
         if ($validator->fails()) {
@@ -99,14 +96,16 @@ class MstEmailRiskOwnerController extends Controller
         }
 
         $data = MstEmailRiskOwner::create([
-            'unit_kerja_nama' => $request->unit_kerja_nama,
+            'unit_kerja_nama'  => $request->unit_kerja_nama,
             'unit_kerja_email' => $request->unit_kerja_email,
-            'unit_kerja_id' => $request->unit_kerja_id,
-            'created_by' => $user->id,
+            'unit_kerja_id'    => $request->unit_kerja_id,
+            'department_id'    => $request->department_id,
+            'created_by'       => auth()->id(),
         ]);
 
         return json(200, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
     }
+
 
     /**
      * Display the specified resource.
@@ -132,9 +131,8 @@ class MstEmailRiskOwnerController extends Controller
     /**
      * Update the specified resource in storage.
      */
-     public function update(Request $request, $id)
+    public function update(Request $request, $id)
     {
-        // Check authorization: only role 1 and 2 can update
         $userRole = auth()->user()->role_id ?? null;
         if (!in_array($userRole, [1, 2])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
@@ -146,19 +144,23 @@ class MstEmailRiskOwnerController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'unit_kerja_nama' => 'required|string',
-            'unit_kerja_email' => 'required|string',
-            'unit_kerja_id' => 'nullable|integer',
+            'unit_kerja_nama'   => 'required|string',
+            'unit_kerja_email'  => 'required|string',
+            'unit_kerja_id'     => 'nullable|integer',
+            'department_id'     => 'nullable|integer|exists:mst_department,id',
         ]);
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
-        $data->update($request->only('unit_kerja_id', 'unit_kerja_nama','unit_kerja_email'));
+        $data->update(
+            $request->only('unit_kerja_id', 'unit_kerja_nama', 'unit_kerja_email', 'department_id')
+        );
 
         return json(200, true, 'Berhasil Diperbarui', 'Data berhasil diperbarui.', $data);
     }
+
 
     /**
      * Remove the specified resource from storage.

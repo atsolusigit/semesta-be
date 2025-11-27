@@ -36,4 +36,9 @@ class MstEmailRiskOwner extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
+
+    public function department()
+    {
+        return $this->belongsTo(MstDepartment::class, 'department_id');
+    }
 }

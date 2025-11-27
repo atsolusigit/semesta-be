@@ -45,8 +45,11 @@ class MstEmailRiskOwnerController extends Controller
                 'unit_kerja_email' => $item->unit_kerja_email,
                 'unit_kerja_nama' => $item->unit_kerja_nama,
 
-                'department_id'    => $item->department_id,
-                'department_name'  => optional($item->department)->name,
+                'department' => $item->department ? [
+                    'id'            => $item->department->id,
+                    'name'          => $item->department->name,
+                    'abbreviation'  => $item->department->abbreviation,
+                ] : null,
 
                 'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
                 'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,

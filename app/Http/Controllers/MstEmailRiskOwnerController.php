@@ -17,7 +17,9 @@ class MstEmailRiskOwnerController extends Controller
    {
         $perPage = $request->input('per_page', 10);
 
-        $query = MstEmailRiskOwner::query()->orderBy('id', 'asc');
+        $query = MstEmailRiskOwner::query()
+        ->with('department')            
+        ->orderBy('id', 'asc');
 
         // Search filter
         if ($request->filled('search')) {
@@ -42,6 +44,10 @@ class MstEmailRiskOwnerController extends Controller
                 'unit_kerja_id' => $item->unit_kerja_id,
                 'unit_kerja_email' => $item->unit_kerja_email,
                 'unit_kerja_nama' => $item->unit_kerja_nama,
+
+                'department_id'    => $item->department_id,
+                'department_name'  => optional($item->department)->name,
+
                 'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
                 'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
             ];
@@ -104,7 +110,7 @@ class MstEmailRiskOwnerController extends Controller
      */
     public function show($id)
     {
-        $data = MstEmailRiskOwner::find($id);
+        $data = MstEmailRiskOwner::with('department')->find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }

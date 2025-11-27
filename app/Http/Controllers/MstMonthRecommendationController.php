@@ -10,7 +10,7 @@ class MstMonthRecommendationController extends Controller
 {
     public function index(Request $request)
     {
-        // Role-based access control - hanya role 1 dan 2 yang bisa melihat data
+        // Check authorization: only role 1, 2, 4 and 5 can access
         $user = auth()->user();
         $roleCheck = check_role($user, [1, 2, 4, 5]);
 
@@ -52,6 +52,7 @@ class MstMonthRecommendationController extends Controller
     public function store(Request $request)
     {
         $user = Auth::user();
+        //Check authorization: only role 1, 2, 4 and 5 can store
         $roleCheck = check_role($user, [1, 2, 4, 5]);
 
         if ($roleCheck !== true) {
@@ -83,6 +84,7 @@ class MstMonthRecommendationController extends Controller
     public function update(Request $request, $id)
     {
         $user = Auth::user();
+        // Check authorization: only role 1, 2, 4 and 5 can update
         $roleCheck = check_role($user, [1, 2, 4, 5]);
 
         if ($roleCheck !== true) {
@@ -118,6 +120,7 @@ class MstMonthRecommendationController extends Controller
     public function destroy($id)
     {
         $user = Auth::user();
+        // Check authorization: only role 1 can delete
         $roleCheck = check_role($user, 1);
 
         if ($roleCheck !== true) {

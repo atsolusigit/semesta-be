@@ -23,7 +23,7 @@ class MstDepartmentController extends Controller
     $user = auth()->user();
 
     if ($user) {
-        // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
+        // Check authorization: only role 1, 2, 4 and 5 can access all departments
         if (!in_array($user->role->id, [1, 2, 4, 5])) {
             $query->where('id', $user->department_id);
         }
@@ -96,7 +96,7 @@ public function show($id)
     $user = auth()->user();
 
     if ($user) {
-        // Hanya role selain 1 & 2 yang dibatasi
+        // Check authoriztion: only role 1, 2, 4 and 5 can access other departments
         if (!in_array($user->role->id, [1, 2, 4, 5]) && $user->department_id != $id) {
             return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
         }

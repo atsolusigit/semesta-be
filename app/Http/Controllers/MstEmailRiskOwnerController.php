@@ -14,41 +14,13 @@ class MstEmailRiskOwnerController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+     public function index(Request $request)
    {
-
-        $user = auth()->user();
-        $base = rtrim(config('services.erkap.base_url', env('ERKAP_BASE_URL', '')), '/');
-        $auth = config('services.erkap.basic_auth', env('ERKAP_BASIC_AUTH', ''));
-
-        if (!$base || !$auth) {
-            throw new \RuntimeException('ERKAP_BASE_URL / ERKAP_BASIC_AUTH belum diset.');
-        }
-
-        $result = Http::withHeaders(['Authorization' => $auth])
-            ->get("$base/api/semesta/master-unit-kerja")
-            ->throw()
-            ->json();
-
-        if (!is_array($result) || ($result['success'] ?? false) !== true) {
-        } else{
-            DB::beginTransaction();
-                foreach($result['result'] as $item){
-                    $resUpdate = MstEmailRiskOwner::updateOrCreate(
-                        ['unit_kerja_id' => $item['unit_kerja_id']], // Match condition
-                        [ 
-                            'unit_kerja_nama' => $item['unit_kerja_nama'],
-                            'created_by' =>  $user->id,
-                        ]
-                    );
-                }
-                
-            DB::commit();
-        }
-    
         $perPage = $request->input('per_page', 10);
 
-        $query = MstEmailRiskOwner::query()->orderBy('id', 'asc');
+        $query = MstEmailRiskOwner::query()
+        ->with('department')            
+        ->orderBy('id', 'asc');
 
         // Search filter
         if ($request->filled('search')) {
@@ -73,6 +45,13 @@ class MstEmailRiskOwnerController extends Controller
                 'unit_kerja_id' => $item->unit_kerja_id,
                 'unit_kerja_email' => $item->unit_kerja_email,
                 'unit_kerja_nama' => $item->unit_kerja_nama,
+
+                'department' => $item->department ? [
+                    'id'            => $item->department->id,
+                    'name'          => $item->department->name,
+                    'abbreviation'  => $item->department->abbreviation,
+                ] : null,
+
                 'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
                 'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
             ];
@@ -96,24 +75,21 @@ class MstEmailRiskOwnerController extends Controller
      */
     public function store(Request $request)
     {
-        // Check authorization: only role 1 and 2 can store
         $userRole = auth()->user()->role_id ?? null;
         if (!in_array($userRole, [1, 2])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
         }
 
         $exists = MstEmailRiskOwner::where('unit_kerja_id', $request->unit_kerja_id)->exists();
-
         if ($exists) {
             return json(500, false, 'Unit Kerja Exist', 'Unit Kerja '.$request->unit_kerja_id.' Exists', null);
         }
 
-        $user = auth()->user();
-
         $validator = Validator::make($request->all(), [
-            'unit_kerja_nama' => 'required|string',
-            'unit_kerja_email' => 'required|string',
-            'unit_kerja_id' => 'required|integer',
+            'unit_kerja_nama'   => 'required|string',
+            'unit_kerja_email'  => 'required|string',
+            'unit_kerja_id'     => 'required|integer',
+            'department_id'     => 'nullable|integer|exists:mst_department,id',
         ]);
 
         if ($validator->fails()) {
@@ -121,10 +97,11 @@ class MstEmailRiskOwnerController extends Controller
         }
 
         $data = MstEmailRiskOwner::create([
-            'unit_kerja_nama' => $request->unit_kerja_nama,
+            'unit_kerja_nama'  => $request->unit_kerja_nama,
             'unit_kerja_email' => $request->unit_kerja_email,
-            'unit_kerja_id' => $request->unit_kerja_id,
-            'created_by' => $user->id,
+            'unit_kerja_id'    => $request->unit_kerja_id,
+            'department_id'    => $request->department_id,
+            'created_by'       => auth()->id(),
         ]);
 
         return json(200, true, 'Berhasil Disimpan', 'Data berhasil disimpan.', $data);
@@ -135,7 +112,7 @@ class MstEmailRiskOwnerController extends Controller
      */
     public function show($id)
     {
-        $data = MstEmailRiskOwner::find($id);
+        $data = MstEmailRiskOwner::with('department')->find($id);
         if (!$data) {
             return json(404, false, 'Tidak Ditemukan', 'Data tidak ditemukan.', null);
         }
@@ -154,9 +131,8 @@ class MstEmailRiskOwnerController extends Controller
     /**
      * Update the specified resource in storage.
      */
-     public function update(Request $request, $id)
+    public function update(Request $request, $id)
     {
-        // Check authorization: only role 1 and 2 can update
         $userRole = auth()->user()->role_id ?? null;
         if (!in_array($userRole, [1, 2])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
@@ -168,16 +144,19 @@ class MstEmailRiskOwnerController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'unit_kerja_nama' => 'required|string',
-            'unit_kerja_email' => 'required|string',
-            'unit_kerja_id' => 'nullable|integer',
+            'unit_kerja_nama'   => 'required|string',
+            'unit_kerja_email'  => 'required|string',
+            'unit_kerja_id'     => 'nullable|integer',
+            'department_id'     => 'nullable|integer|exists:mst_department,id',
         ]);
 
         if ($validator->fails()) {
             return json(400, false, 'Validasi Gagal', 'Validasi gagal.', $validator->errors());
         }
 
-        $data->update($request->only('unit_kerja_id', 'unit_kerja_nama','unit_kerja_email'));
+        $data->update(
+            $request->only('unit_kerja_id', 'unit_kerja_nama', 'unit_kerja_email', 'department_id')
+        );
 
         return json(200, true, 'Berhasil Diperbarui', 'Data berhasil diperbarui.', $data);
     }

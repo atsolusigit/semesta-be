@@ -11,11 +11,13 @@ class MstEmailRiskOwner extends Model
 
     protected $table = 'mst_email_unit_kerja';
     protected $primaryKey = 'unit_kerja_id';
+    public $incrementing = false;
 
     protected $fillable = [
         'unit_kerja_id',
         'unit_kerja_nama',
         'unit_kerja_email',
+        'department_id', 
         'created_by',
         'updated_by'
     ];
@@ -33,5 +35,10 @@ class MstEmailRiskOwner extends Model
     public function updatedBy()
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(MstDepartment::class, 'department_id');
     }
 }

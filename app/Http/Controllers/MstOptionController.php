@@ -83,7 +83,7 @@ class MstOptionController extends Controller
     {
         // Check authorization: only role 1 and 2 can store
         $userRole = auth()->user()->role_id ?? null;
-        if (!in_array($userRole, [1, 2])) {
+        if (!in_array($userRole, [1, 2, 4, 5])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
         }
 
@@ -116,7 +116,7 @@ class MstOptionController extends Controller
     {
         // Check authorization: only role 1 and 2 can update
         $userRole = auth()->user()->role_id ?? null;
-        if (!in_array($userRole, [1, 2])) {
+        if (!in_array($userRole, [1, 2, 4, 5])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
         }
 

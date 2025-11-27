@@ -56,7 +56,7 @@ class MstHeatmapController extends Controller
     public function store(Request $request)
     {
         // Check authorization: only role 1 and 2 can store
-        $result = check_role(auth()->user(), [1, 2]);
+        $result = check_role(auth()->user(), [1, 2, 4, 5]);
         if ($result !== true) {
             return $result;
         }
@@ -87,7 +87,7 @@ class MstHeatmapController extends Controller
     public function update(Request $request, $id)
     {
         // Check authorization: only role 1 and 2 can update
-        $result = check_role(auth()->user(), [1, 2]);
+        $result = check_role(auth()->user(), [1, 2, 4, 5]);
         if ($result !== true) {
             return $result;
         }

@@ -76,7 +76,7 @@ class MstRiskCodeController extends Controller
     {
         // Check authorization: only role 1 and 2 can store
         $user = auth()->user();
-        $roleCheck = check_role($user, [1, 2]);
+        $roleCheck = check_role($user, [1, 2, 4, 5]);
 
         if ($roleCheck !== true) {
             return $roleCheck;
@@ -115,7 +115,7 @@ class MstRiskCodeController extends Controller
     {
         // Check authorization: only role 1 and 2 can update
         $user = auth()->user();
-        $roleCheck = check_role($user, [1, 2]);
+        $roleCheck = check_role($user, [1, 2, 4, 5]);
 
         if ($roleCheck !== true) {
             return $roleCheck;

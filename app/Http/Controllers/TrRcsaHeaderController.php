@@ -1442,6 +1442,7 @@ class TrRcsaHeaderController extends Controller
             return $result;
         }
 
+        $currentUser = auth()->user();
         $roleId = $currentUser->role_id ?? null;
         if (!in_array($roleId, [1, 4, 5, 6])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak main risk.', null);

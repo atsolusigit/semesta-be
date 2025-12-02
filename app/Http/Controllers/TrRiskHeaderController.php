@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Auth;
 class TrRiskHeaderController extends Controller
 {
 
-// TAMBAHKAN helper function di awal method index (sebelum query)
+// METHOD INDEX - PERBAIKAN KONSISTENSI FIELD NAMES
 public function index(Request $request)
 {
     $user = auth()->user();
@@ -131,7 +131,7 @@ public function index(Request $request)
                     'residual_risk_level' => $dataBulanan->residual_risk_level_risiko,
                     'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                     'residual_risk_posisi_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
-                    'realization_percentage' => $getRealizationPercentage($target, $realization, $realizationKualitatif), // PERBAIKAN
+                    'realization_percentage' => $getRealizationPercentage($target, $realization, $realizationKualitatif),
                     'is_finalized' => (bool) $dataBulanan->is_finalize,
                     'note_recommendation' => $dataBulanan->note_recommendation ?? null,
                     'uploads' => $dataBulanan->uploads->map(function ($upload) {
@@ -192,7 +192,7 @@ public function index(Request $request)
                         'residual_risk_level' => $monthlyEntry->residual_risk_level_risiko,
                         'residual_risk_posisi_risiko' => $monthlyEntry->residual_risk_posisi_risiko,
                         'residual_risk_posisi_risiko_color' => get_color_by_position($monthlyEntry->residual_risk_posisi_risiko),
-                        'realization_percentage' => $getRealizationPercentage($target, $realization, $realizationKualitatif), // PERBAIKAN
+                        'realization_percentage' => $getRealizationPercentage($target, $realization, $realizationKualitatif),
                         'is_finalized' => (bool) $monthlyEntry->is_finalize,
                         'note_recommendation' => $monthlyEntry->monthRecommendation->note ?? null,
                         'monthly_entry_data' => $monthlyEntry,
@@ -378,20 +378,20 @@ public function index(Request $request)
                     'process_code' => $dataBulanan->process_code,
                     'start_date' => $dataBulanan->start_date ? $dataBulanan->start_date->format('Y-m-d H:i:s') : null,
                     'expired_date' => $dataBulanan->expired_date ? $dataBulanan->expired_date->format('Y-m-d H:i:s') : null,
-                    'realization_quantitative' => $dataBulanan->realization_quantitative,
-                    'realization_kualitatif' => $dataBulanan->realization_kualitatif,
-                    'realization_note' => $dataBulanan->realization_note,
-                    'penjelasan_realisasi' => $dataBulanan->penjelasan_realisasi,
-                    'target_quantitative' => $dataBulanan->target_quantitative,
-                    'target_kualitatif' => $dataBulanan->target_kualitatif,
-                    'target_notes' => $dataBulanan->target_notes,
+                    'realization_quantitative' => $dataBulanan->realization_quantitative ?? null,
+                    'realization_kualitatif' => $dataBulanan->realization_kualitatif ?? null,
+                    'realization_note' => $dataBulanan->realization_note ?? null,
+                    'penjelasan_realisasi' => $dataBulanan->penjelasan_realisasi ?? null,
+                    'target_quantitative' => $dataBulanan->target_quantitative ?? null,
+                    'target_kualitatif' => $dataBulanan->target_kualitatif ?? null,
+                    'target_notes' => $dataBulanan->target_notes ?? null,
                     'target_satu_tahun_option' => $item->target_satu_tahun_option ?? null,
                     'residual_risk_level_dampak' => $dataBulanan->residual_risk_level_dampak,
                     'residual_risk_level_kemungkinan' => $dataBulanan->residual_risk_level_kemungkinan,
                     'residual_risk_posisi_risiko' => $dataBulanan->residual_risk_posisi_risiko,
                     'residual_risk_level_risiko' => $dataBulanan->residual_risk_level_risiko,
                     'residual_risk_level_risiko_color' => get_color_by_position($dataBulanan->residual_risk_posisi_risiko),
-                    'realization_percentage' => $getRealizationPercentage($target, $realization, $realizationKualitatif), // PERBAIKAN
+                    'realization_percentage' => $getRealizationPercentage($target, $realization, $realizationKualitatif),
                     'is_finalize' => (bool) $dataBulanan->is_finalize,
                     'finalized_at' => $dataBulanan->finalized_at,
                     'finalized_by' => $dataBulanan->finalized_by,
@@ -427,7 +427,7 @@ public function index(Request $request)
     return json(200, true, 'Data Ditemukan', 'Data risk header berhasil diambil.', $cleanData);
 }
 
-// METHOD SHOW - TAMBAHKAN helper function dan perbaikan
+// METHOD SHOW - PERBAIKAN TYPO
 public function show($id)
 {
     $user = auth()->user();
@@ -520,15 +520,15 @@ public function show($id)
                 'month_full_name' => ($monthNames[$dataBulanan->month] ?? 'Unknown') . ' ' . $data->year,
                 'risk_code' => $dataBulanan->risk_code,
                 'status_risiko' => $dataBulanan->status_risiko,
-                'penjelasan_realisasi' => $dataBulanan->penjelasan_realisasi,
+                'penjelasan_realisasi' => $dataBulanan->penjelasan_realisasi ?? null,
                 'process_code' => $dataBulanan->process_code,
                 'start_date' => $dataBulanan->start_date,
                 'expired_date' => $dataBulanan->expired_date,
-                'realization_quantitative' => $dataBulanan->realization_quantitative,
-                'realiztion_kualitatif' => $dataBulanan->realization_kualitatif,
-                'realization_note' => $dataBulanan->realization_note,
-                'target_quantitative' => $dataBulanan->target_quantitative,
-                'target_notes' => $dataBulanan->target_notes,
+                'realization_quantitative' => $dataBulanan->realization_quantitative ?? null,
+                'realization_kualitatif' => $dataBulanan->realization_kualitatif ?? null,
+                'realization_note' => $dataBulanan->realization_note ?? null,
+                'target_quantitative' => $dataBulanan->target_quantitative ?? null,
+                'target_notes' => $dataBulanan->target_notes ?? null,
                 'target_satu_tahun_option' => $data->target_satu_tahun_option ?? null,
                 'residual_risk_level_dampak' => $dataBulanan->residual_risk_level_dampak,
                 'residual_risk_level_kemungkinan' => $dataBulanan->residual_risk_level_kemungkinan,
@@ -591,7 +591,7 @@ public function show($id)
                 'start_date' => null,
                 'expired_date' => null,
                 'realization_quantitative' => null,
-                'realiztion_kualitatif' => null,
+                'realization_kualitatif' => null,
                 'realization_note' => null,
                 'target_quantitative' => null,
                 'target_notes' => null,
@@ -834,7 +834,7 @@ public function store(Request $request)
         'internal_control' => 'required|string',
         'target_satu_tahun_option' => 'nullable|exists:mst_option,id',
         'target_satu_tahun_notes' => 'nullable|string',
-        'target_quantitative_satu_tahun' => 'nullable|string|max:500'
+        'target_quantitative_satu_tahun' => 'nullable|string'
     ], [
         'risk_code.required' => 'risk code field is required.',
         'risk_code.array' => 'risk code must be an array.',
@@ -867,7 +867,6 @@ public function store(Request $request)
         'target_satu_tahun_option.exists' => 'selected target satu tahun option is invalid.',
         'target_satu_tahun_notes.string' => 'target satu tahun notes must be a string.',
         'target_quantitative_satu_tahun.string' => 'target quantitative satu tahun must be a string.',
-        'target_quantitative_satu_tahun.max' => 'target quantitative satu tahun may not be greater than 500 characters.',
     ]);
 
     if ($validator->fails()) {
@@ -1207,7 +1206,7 @@ private function handleGeneralUpdate(Request $request, $riskHeader)
         'internal_control' => 'nullable|string',
         'target_satu_tahun_option' => 'nullable|exists:mst_option,id',
         'target_satu_tahun_notes' => 'nullable|string',
-        'target_quantitative_satu_tahun' => 'nullable|string|max:500'
+        'target_quantitative_satu_tahun' => 'nullable|string'
     ], [
         'risk_code.required' => 'risk code field is required.',
         'risk_code.array' => 'risk code must be an array.',
@@ -1240,7 +1239,6 @@ private function handleGeneralUpdate(Request $request, $riskHeader)
         'target_satu_tahun_option.exists' => 'selected target satu tahun option is invalid.',
         'target_satu_tahun_notes.string' => 'target satu tahun notes must be a string.',
         'target_quantitative_satu_tahun.string' => 'target quantitative satu tahun must be a string.',
-        'target_quantitative_satu_tahun.max' => 'target quantitative satu tahun may not be greater than 500 characters.',
     ]);
 
     if ($validator->fails()) {

@@ -97,13 +97,20 @@ class TrRcsaHeaderController extends Controller
         $sortColumn = $sortMap[$sortBy] ?? 'id';
         $query->orderBy($sortColumn, $sortOrder);
 
-        $data = $query->paginate($perPage);
+        $usePagination = !$request->has('isSubmit');
 
-        if (empty($data->items())) {
+        if ($usePagination) {
+            $data = $query->paginate($perPage);
+            $items = $data->items();
+        } else {
+            $items = $query->get();
+        }
+
+        if (empty($items)) {
             return json(404, false, 'Data Tidak Ditemukan', 'Data rcsa header tidak ditemukan.', null);
         }
         
-        $resData = collect($data->items())->map(function ($item) {
+        $resData = collect($items)->map(function ($item) {
 
             $rcsaResidual = $item->rcsaResidual->map(function ($residual) {
                 return [
@@ -170,12 +177,12 @@ class TrRcsaHeaderController extends Controller
         });
 
         $cleanData = clean_recursive([
-            'current_page' => $data->currentPage(),
-            'per_page' => $data->perPage(),
-            'total' => $data->total(),
-            'last_page' => $data->lastPage(),
-            'from' => $data->firstItem(),
-            'to' => $data->lastItem(),
+            'current_page' => $usePagination ? $data->currentPage() : 1,
+            'per_page' => $usePagination ? $data->perPage() : count($items),
+            'total' => $usePagination ? $data->total() : count($items),
+            'last_page' => $usePagination ? $data->lastPage() : 1,
+            'from' => $usePagination ? $data->firstItem() : (count($items) ? 1 : null),
+            'to' => $usePagination ? $data->lastItem() : count($items),
             'data' => $resData,
         ]);
         return json(200, true, 'Data Ditemukan', 'Data rcsa header berhasil diambil.',$cleanData);

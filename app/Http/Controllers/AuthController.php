@@ -145,8 +145,8 @@ public function register(Request $request)
             \Log::error("Failed to send email to user {$request->email}: " . $e->getMessage());
         }
 
-        // Kirim email ke semua admin (role_id 1 dan 2)
-        $admins = User::whereIn('role_id', [1, 2])
+        // Kirim email ke admin dengan role_id 1 saja
+        $admins = User::where('role_id', 1)
                     ->where('status', 1)
                     ->get();
 

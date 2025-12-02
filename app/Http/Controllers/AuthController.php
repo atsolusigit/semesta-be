@@ -138,9 +138,14 @@ public function register(Request $request)
             'created_at' => $user->created_at,
         ];
 
-        Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
+        // Kirim email ke user yang baru register
+        try {
+            Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
+        } catch (\Throwable $e) {
+            \Log::error("Failed to send email to user {$request->email}: " . $e->getMessage());
+        }
 
-      // Kirim email ke semua admin (role_id 1 dan 2)
+        // Kirim email ke semua admin (role_id 1 dan 2)
         $admins = User::whereIn('role_id', [1, 2])
                     ->where('status', 1)
                     ->get();

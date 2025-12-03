@@ -62,6 +62,7 @@ class KnowledgeBaseController extends Controller
         'data' => $data
     ]);
 }
+
    public function show($id)
 {
     $data = Knowledgebase::with(['creator','updater','uploads'])->find($id);
@@ -118,14 +119,9 @@ class KnowledgeBaseController extends Controller
 
     $array_validation = [
         'title' => 'required|string|max:255',
-        'img_path' => 'nullable|string',
-        'doc_path' => 'nullable|string',
         'description' => 'nullable|string',
         'long_description' => 'nullable|string',
         'type' => 'required|in:1,2,3,4,5',
-
-        'upload_ids' => 'nullable|array',
-        'upload_ids.*' => 'integer|exists:knowledge_uploads,id',
     ];
 
     $validate = check_validation($request->all(), $array_validation);
@@ -138,8 +134,6 @@ class KnowledgeBaseController extends Controller
             'creator_id' => $user->id,
             'created_by' => $user->id,
             'title' => $request->title,
-            'img_path' => $request->img_path,
-            'doc_path' => $request->doc_path,
             'description' => $request->description,
             'long_description' => $request->long_description,
             'type' => $request->type,
@@ -149,7 +143,6 @@ class KnowledgeBaseController extends Controller
         KnowledgeUpload::whereNull('knowledge_id')
             ->where('created_by', $user->id)
             ->update(['knowledge_id' => $Base->id]);
-
 
         DB::commit();
 
@@ -190,12 +183,9 @@ class KnowledgeBaseController extends Controller
 
     $array_validation = [
         'title' => 'nullable|string|max:255',
-        'img_path' => 'nullable|string',
-        'doc_path' => 'nullable|string',
         'description' => 'nullable|string',
         'long_description' => 'nullable|string',
         'type' => 'nullable|in:1,2,3,4,5',
-
         'upload_ids' => 'nullable|array',
         'upload_ids.*' => 'integer|exists:knowledge_uploads,id',
     ];
@@ -208,29 +198,20 @@ class KnowledgeBaseController extends Controller
     try {
 
         if ($request->filled('title')) $Base->title = $request->title;
-        if ($request->filled('img_path')) $Base->img_path = $request->img_path;
         if ($request->has('description')) $Base->description = $request->description;
         if ($request->has('long_description')) $Base->long_description = $request->long_description;
-        if ($request->filled('doc_path')) $Base->doc_path = $request->doc_path;
         if ($request->has('type')) $Base->type = $request->type;
 
         $Base->updated_by = $user->id;
         $Base->save();
 
-
-        // ================================
         // AUTO LINK UPLOAD BARU
-        // ================================
         KnowledgeUpload::whereNull('knowledge_id')
             ->where('created_by', $user->id)
             ->update(['knowledge_id' => $Base->id]);
 
-
-        // ================================
         // LINK FILE BERDASARKAN upload_ids (optional)
-        // ================================
         if ($request->filled('upload_ids')) {
-
             KnowledgeUpload::whereIn('id', $request->upload_ids)
                 ->where(function ($q) use ($Base) {
                     $q->whereNull('knowledge_id')
@@ -238,7 +219,6 @@ class KnowledgeBaseController extends Controller
                 })
                 ->update(['knowledge_id' => $Base->id]);
         }
-
 
         DB::commit();
 
@@ -280,33 +260,27 @@ class KnowledgeBaseController extends Controller
         return json(404, false, 'not_found', 'Data tidak ditemukan', null);
     }
 
+    DB::beginTransaction();
+
     try {
-        // === HAPUS FILE dr knowledgebase ===
-        if (!empty($Base->img_path) && File::exists(public_path('storage/' . $Base->img_path))) {
-            File::delete(public_path('storage/' . $Base->img_path));
-        }
-
-        if (!empty($Base->doc_path) && File::exists(public_path('storage/' . $Base->doc_path))) {
-            File::delete(public_path('storage/' . $Base->doc_path));
-        }
-
-        // === HAPUS FILE DARI KNOWLEDGE_UPLOADS ===
+        // === HAPUS FILE DARI KNOWLEDGE_UPLOADS (base64 di database) ===
         $uploads = KnowledgeUpload::where('knowledge_id', $Base->id)->get();
 
         foreach ($uploads as $upload) {
-            if (!empty($upload->path) && File::exists(public_path('storage/' . $upload->path))) {
-                File::delete(public_path('storage/' . $upload->path));
-            }
-
+            // Karena path berisi base64, tidak perlu hapus file fisik
+            // Langsung hapus record dari database
             $upload->delete();
         }
 
         // === HAPUS KNOWLEDGEBASE ===
         $Base->delete();
 
+        DB::commit();
+
         return json(200, true, 'success', 'Data berhasil dihapus', null);
 
     } catch (\Exception $e) {
+        DB::rollback();
         return json(500, false, 'error', 'Gagal menghapus data: ' . $e->getMessage(), null);
     }
 }
@@ -314,14 +288,12 @@ class KnowledgeBaseController extends Controller
     public function trackReader($id)
     {
         try {
-            // FIX: Semua authenticated user bisa tracking, bukan hanya role 1
             if (!auth()->check()) {
                 return json(401, false, 'unauthenticated', 'User tidak terautentikasi', null);
             }
 
-            $user = auth()->user(); // FIX: Definisikan variable $user
+            $user = auth()->user();
 
-            // FIX: Cari knowledge base
             $knowledge = Knowledgebase::find($id);
             if (!$knowledge) {
                 return json(404, false, 'not_found', 'Knowledge base tidak ditemukan', null);
@@ -355,84 +327,90 @@ class KnowledgeBaseController extends Controller
         }
     }
 
-   public function uploadFile(Request $request)
-{
-    $result = check_role(auth()->user(), [1, 2, 3]);
-    if ($result !== true) {
-        return $result;
-    }
-
-    $type = $request->query('type');
-
-    if (!in_array($type, ['img_path', 'doc_path'])) {
-        return json(400, false, 'invalid_type', 'Parameter type harus img_path atau doc_path', null);
-    }
-
-    $rules = [
-        'file' => ($type === 'img_path')
-            ? 'required|file|mimes:jpg,jpeg,png,webp|max:20480'
-            : 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:51200',
-    ];
-
-    $validate = check_validation($request->all(), $rules);
-    if ($validate[0] !== 0) return $validate[1];
-
-    try {
-
-        $file = $request->file('file');
-
-        // 🔥 AMBIL MIME TYPE
-        $mime = $file->getMimeType();
-
-        // 🔥 KONVERSI FILE KE BASE64
-        $fileContent = file_get_contents($file->getRealPath());
-        $base64 = "data:$mime;base64," . base64_encode($fileContent);
-
-        // 🔥 SIMPAN BASE64 LANGSUNG KE DATABASE
-        $upload = KnowledgeUpload::create([
-            'knowledge_id' => null,
-            'type' => $type,
-            'path' => $base64,      // ⬅️ LANGSUNG BASE64
-            'created_by' => auth()->id(),
-        ]);
-
-        return json(200, true, 'success', 'File berhasil diupload', [
-            'upload_id' => $upload->id,
-            'base64'    => $base64,
-        ]);
-
-    } catch (\Exception $e) {
-        return json(500, false, 'error', 'Gagal upload file: ' . $e->getMessage(), null);
-    }
-}
-
-public function deleteFile($id, Request $request)
-{
-    $result = check_role(auth()->user(), [1, 2, 3]);
-    if ($result !== true) {
-        return $result;
-    }
-
-    $upload = KnowledgeUpload::find($id);
-    if (!$upload) {
-        return json(404, false, 'not_found', 'File tidak ditemukan', null);
-    }
-
-    try {
-        $fullPath = public_path('storage/' . $upload->path);
-
-        if (File::exists($fullPath)) {
-            File::delete($fullPath);
+    public function uploadFile(Request $request)
+    {
+        $result = check_role(auth()->user(), [1, 2, 3]);
+        if ($result !== true) {
+            return $result;
         }
 
-        $upload->delete();
+        $type = $request->query('type');
 
-        return json(200, true, 'success', 'File berhasil dihapus', null);
+        if (!in_array($type, ['img_path', 'doc_path'])) {
+            return json(400, false, 'invalid_type', 'Parameter type harus img_path atau doc_path', null);
+        }
 
-    } catch (\Exception $e) {
-        return json(500, false, 'error', 'Gagal menghapus file: ' . $e->getMessage(), null);
+        $rules = [
+            'file' => 'required',
+            'file.*' => ($type === 'img_path')
+                ? 'file|mimes:jpg,jpeg,png,webp|max:20480'
+                : 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:51200',
+        ];
+
+        $validate = check_validation($request->all(), $rules);
+        if ($validate[0] !== 0) return $validate[1];
+
+        try {
+
+            $files = $request->file('file');
+
+            // Paksa selalu array meskipun hanya 1 file
+            if (!is_array($files)) {
+                $files = [$files];
+            }
+
+            $uploaded = [];
+
+            foreach ($files as $file) {
+
+                $mime = $file->getMimeType();
+                $fileContent = file_get_contents($file->getRealPath());
+                $base64 = "data:$mime;base64," . base64_encode($fileContent);
+
+                $upload = KnowledgeUpload::create([
+                    'knowledge_id' => null,
+                    'type' => $type,
+                    'path' => $base64,
+                    'created_by' => auth()->id(),
+                ]);
+
+                $uploaded[] = [
+                    'upload_id' => $upload->id,
+                    'base64'    => $base64
+                ];
+            }
+
+            return json(200, true, 'success', 'File berhasil diupload', [
+                'uploads' => $uploaded
+            ]);
+
+        } catch (\Exception $e) {
+            return json(500, false, 'error', 'Gagal upload file: ' . $e->getMessage(), null);
+        }
     }
-}
 
+    public function deleteFile($id, Request $request)
+    {
+        $result = check_role(auth()->user(), [1, 2, 3]);
+        if ($result !== true) {
+            return $result;
+        }
+
+        $upload = KnowledgeUpload::find($id);
+        if (!$upload) {
+            return json(404, false, 'not_found', 'File tidak ditemukan', null);
+        }
+
+        try {
+            // Karena path berisi base64, tidak perlu hapus file fisik
+            // Langsung hapus record dari database
+            $upload->delete();
+
+            return json(200, true, 'success', 'File berhasil dihapus', null);
+
+        } catch (\Exception $e) {
+            return json(500, false, 'error', 'Gagal menghapus file: ' . $e->getMessage(), null);
+        }
+    }
 
 }

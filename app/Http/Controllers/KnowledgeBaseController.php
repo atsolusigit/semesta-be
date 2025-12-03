@@ -33,13 +33,13 @@ class KnowledgeBaseController extends Controller
 
     $data->transform(function ($item) use ($typeMap) {
 
-        // ambil file
-        $img = $item->uploads->where('type', 'img_path')->first();
-        $doc = $item->uploads->where('type', 'doc_path')->first();
+        // ambil semua file img dan doc (bisa multiple)
+        $imgs = $item->uploads->where('type', 'img_path')->pluck('path')->toArray();
+        $docs = $item->uploads->where('type', 'doc_path')->pluck('path')->toArray();
 
-        // convert path (base64 murni) menjadi base64+prefix
-        $item->img_path = $img ? $img->path : null;
-        $item->doc_path = $doc ? $doc->path : null;
+        // kembalikan sebagai array (kosong jika tidak ada)
+        $item->img_path = $imgs;
+        $item->doc_path = $docs;
 
         // creator_id
         $item->creator_id = $item->creator_id
@@ -70,8 +70,9 @@ class KnowledgeBaseController extends Controller
         return json(404, false, 'not_found', 'Data tidak ditemukan', null);
     }
 
-    $img = $data->uploads->where('type', 'img_path')->first();
-    $doc = $data->uploads->where('type', 'doc_path')->first();
+    // ambil semua file img dan doc (bisa multiple)
+    $imgs = $data->uploads->where('type', 'img_path')->pluck('path')->toArray();
+    $docs = $data->uploads->where('type', 'doc_path')->pluck('path')->toArray();
 
     $responseData = [
         'id' => $data->id,
@@ -79,9 +80,9 @@ class KnowledgeBaseController extends Controller
         'description' => $data->description,
         'long_description' => $data->long_description,
 
-        // langsung tampilkan base64
-        'img_path' => $img ? $img->path : null,
-        'doc_path' => $doc ? $doc->path : null,
+        // kembalikan sebagai array (kosong jika tidak ada)
+        'img_path' => $imgs,
+        'doc_path' => $docs,
 
         'type' => $data->type,
         'type_label' => match ($data->type) {

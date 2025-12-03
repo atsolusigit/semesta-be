@@ -13,6 +13,7 @@ class KnowledgeUpload extends Model
         'knowledge_id',
         'type',
         'path',
+        'filename',
         'created_by',
     ];
     public function knowledge()

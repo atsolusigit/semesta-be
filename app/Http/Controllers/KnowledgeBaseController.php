@@ -33,13 +33,26 @@ class KnowledgeBaseController extends Controller
 
     $data->transform(function ($item) use ($typeMap) {
 
-        // ambil file
-        $img = $item->uploads->where('type', 'img_path')->first();
-        $doc = $item->uploads->where('type', 'doc_path')->first();
+        // ambil semua file img dan doc (bisa multiple) dengan nama file
+        $imgs = $item->uploads->where('type', 'img_path')->map(function($upload) {
+            return [
+                'id' => $upload->id,
+                'filename' => $upload->filename,
+                'path' => $upload->path
+            ];
+        })->values()->toArray();
 
-        // convert path (base64 murni) menjadi base64+prefix
-        $item->img_path = $img ? $img->path : null;
-        $item->doc_path = $doc ? $doc->path : null;
+        $docs = $item->uploads->where('type', 'doc_path')->map(function($upload) {
+            return [
+                'id' => $upload->id,
+                'filename' => $upload->filename,
+                'path' => $upload->path
+            ];
+        })->values()->toArray();
+
+        // kembalikan sebagai array (kosong jika tidak ada)
+        $item->img_path = $imgs;
+        $item->doc_path = $docs;
 
         // creator_id
         $item->creator_id = $item->creator_id
@@ -49,8 +62,8 @@ class KnowledgeBaseController extends Controller
         // label
         $item->type_label = $typeMap[$item->type] ?? 'TIDAK DIKETAHUI';
 
-        $item->created_by_name = get_decrypted_username($item->creator ?? null);
-        $item->updated_by_name = get_decrypted_username($item->updater ?? null);
+        $item->created_by_name = get_decrypted_name($item->creator ?? null);
+        $item->updated_by_name = get_decrypted_name($item->updater ?? null);
 
         unset($item->creator, $item->updater, $item->uploads);
 
@@ -70,8 +83,22 @@ class KnowledgeBaseController extends Controller
         return json(404, false, 'not_found', 'Data tidak ditemukan', null);
     }
 
-    $img = $data->uploads->where('type', 'img_path')->first();
-    $doc = $data->uploads->where('type', 'doc_path')->first();
+    // ambil semua file img dan doc (bisa multiple) dengan nama file
+    $imgs = $data->uploads->where('type', 'img_path')->map(function($upload) {
+        return [
+            'id' => $upload->id,
+            'filename' => $upload->filename,
+            'path' => $upload->path
+        ];
+    })->values()->toArray();
+
+    $docs = $data->uploads->where('type', 'doc_path')->map(function($upload) {
+        return [
+            'id' => $upload->id,
+            'filename' => $upload->filename,
+            'path' => $upload->path
+        ];
+    })->values()->toArray();
 
     $responseData = [
         'id' => $data->id,
@@ -79,9 +106,9 @@ class KnowledgeBaseController extends Controller
         'description' => $data->description,
         'long_description' => $data->long_description,
 
-        // langsung tampilkan base64
-        'img_path' => $img ? $img->path : null,
-        'doc_path' => $doc ? $doc->path : null,
+        // kembalikan sebagai array (kosong jika tidak ada)
+        'img_path' => $imgs,
+        'doc_path' => $docs,
 
         'type' => $data->type,
         'type_label' => match ($data->type) {
@@ -363,6 +390,7 @@ class KnowledgeBaseController extends Controller
 
             foreach ($files as $file) {
 
+                $originalName = $file->getClientOriginalName();
                 $mime = $file->getMimeType();
                 $fileContent = file_get_contents($file->getRealPath());
                 $base64 = "data:$mime;base64," . base64_encode($fileContent);
@@ -371,12 +399,14 @@ class KnowledgeBaseController extends Controller
                     'knowledge_id' => null,
                     'type' => $type,
                     'path' => $base64,
+                    'filename' => $originalName,
                     'created_by' => auth()->id(),
                 ]);
 
                 $uploaded[] = [
                     'upload_id' => $upload->id,
-                    'base64'    => $base64
+                    'filename' => $originalName,
+                    'base64' => $base64
                 ];
             }
 

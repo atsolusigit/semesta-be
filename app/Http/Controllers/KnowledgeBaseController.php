@@ -33,9 +33,22 @@ class KnowledgeBaseController extends Controller
 
     $data->transform(function ($item) use ($typeMap) {
 
-        // ambil semua file img dan doc (bisa multiple)
-        $imgs = $item->uploads->where('type', 'img_path')->pluck('path')->toArray();
-        $docs = $item->uploads->where('type', 'doc_path')->pluck('path')->toArray();
+        // ambil semua file img dan doc (bisa multiple) dengan nama file
+        $imgs = $item->uploads->where('type', 'img_path')->map(function($upload) {
+            return [
+                'id' => $upload->id,
+                'filename' => $upload->filename,
+                'path' => $upload->path
+            ];
+        })->values()->toArray();
+
+        $docs = $item->uploads->where('type', 'doc_path')->map(function($upload) {
+            return [
+                'id' => $upload->id,
+                'filename' => $upload->filename,
+                'path' => $upload->path
+            ];
+        })->values()->toArray();
 
         // kembalikan sebagai array (kosong jika tidak ada)
         $item->img_path = $imgs;
@@ -49,8 +62,8 @@ class KnowledgeBaseController extends Controller
         // label
         $item->type_label = $typeMap[$item->type] ?? 'TIDAK DIKETAHUI';
 
-        $item->created_by_name = get_decrypted_username($item->creator ?? null);
-        $item->updated_by_name = get_decrypted_username($item->updater ?? null);
+        $item->created_by_name = get_decrypted_name($item->creator ?? null);
+        $item->updated_by_name = get_decrypted_name($item->updater ?? null);
 
         unset($item->creator, $item->updater, $item->uploads);
 
@@ -70,9 +83,22 @@ class KnowledgeBaseController extends Controller
         return json(404, false, 'not_found', 'Data tidak ditemukan', null);
     }
 
-    // ambil semua file img dan doc (bisa multiple)
-    $imgs = $data->uploads->where('type', 'img_path')->pluck('path')->toArray();
-    $docs = $data->uploads->where('type', 'doc_path')->pluck('path')->toArray();
+    // ambil semua file img dan doc (bisa multiple) dengan nama file
+    $imgs = $data->uploads->where('type', 'img_path')->map(function($upload) {
+        return [
+            'id' => $upload->id,
+            'filename' => $upload->filename,
+            'path' => $upload->path
+        ];
+    })->values()->toArray();
+
+    $docs = $data->uploads->where('type', 'doc_path')->map(function($upload) {
+        return [
+            'id' => $upload->id,
+            'filename' => $upload->filename,
+            'path' => $upload->path
+        ];
+    })->values()->toArray();
 
     $responseData = [
         'id' => $data->id,
@@ -364,6 +390,7 @@ class KnowledgeBaseController extends Controller
 
             foreach ($files as $file) {
 
+                $originalName = $file->getClientOriginalName();
                 $mime = $file->getMimeType();
                 $fileContent = file_get_contents($file->getRealPath());
                 $base64 = "data:$mime;base64," . base64_encode($fileContent);
@@ -372,12 +399,14 @@ class KnowledgeBaseController extends Controller
                     'knowledge_id' => null,
                     'type' => $type,
                     'path' => $base64,
+                    'filename' => $originalName,
                     'created_by' => auth()->id(),
                 ]);
 
                 $uploaded[] = [
                     'upload_id' => $upload->id,
-                    'base64'    => $base64
+                    'filename' => $originalName,
+                    'base64' => $base64
                 ];
             }
 

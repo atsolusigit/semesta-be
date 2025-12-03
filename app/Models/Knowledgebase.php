@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\KnowledgeBaseReader;
+use App\Models\KnowledgeUpload;
 
 class Knowledgebase extends Model
 {
@@ -27,6 +28,12 @@ class Knowledgebase extends Model
 {
     return $this->belongsTo(User::class, 'updated_by');
 }
+
+public function uploads()
+{
+    return $this->hasMany(KnowledgeUpload::class, 'knowledge_id');
+}
+
 
 
 }

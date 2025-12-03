@@ -106,6 +106,10 @@ Route::middleware(['auth:api'])->group(function () {
     Route::post('/knowledge-base', [KnowledgeBaseController::class, 'store']);                  // Tambah knowledge base (role 1,2)
     Route::put('/knowledge-base/{id}', [KnowledgeBaseController::class, 'update']);             // Update knowledge base (role 1,2)
     Route::delete('/knowledge-base/{id}', [KnowledgeBaseController::class, 'destroy']);         // Hapus knowledge base (role 1)
+
+    // File upload & delete routes (untuk update file setelah knowledge dibuat)
+    Route::post('/knowledge-base/file/upload', [KnowledgeBaseController::class, 'uploadFile']); // Upload file (role 1,2,3)
+    Route::delete('/knowledge-base/file/{id}/delete', [KnowledgeBaseController::class, 'deleteFile']); // Delete file (role 1,2,3)
 });
 
 // ===================== HEAT LABEL =====================

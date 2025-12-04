@@ -14,16 +14,29 @@ class Kernel extends ConsoleKernel
 
     protected function schedule(Schedule $schedule): void
     {
+<<<<<<< HEAD
+        $syncTime     = (string) config('services.erkap.sync_time', '01:00');
+        $prefetchTime = (string) config('services.erkap.prefetch_time', '22:30');
+
+        $schedule->command('erkap:sync-daily')
+            ->dailyAt($syncTime)
+=======
         // $syncTime     = (string) config('services.erkap.sync_time', '01:00');
         // $prefetchTime = (string) config('services.erkap.prefetch_time', '22:30');
 
         $schedule->command('erkap:sync-daily')
             // ->dailyAt($syncTime)
             ->hourly()
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             ->withoutOverlapping()
             ->onOneServer();
 
         $schedule->command('erkap:prefetch-timeline')
+<<<<<<< HEAD
+            ->dailyAt($prefetchTime)
+            ->withoutOverlapping()
+            ->onOneServer();
+=======
             ->hourly()
             ->withoutOverlapping()
             ->onOneServer();
@@ -33,6 +46,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer();
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     }
 
     protected function scheduleTimezone(): \DateTimeZone|string|null

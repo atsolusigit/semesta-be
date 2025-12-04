@@ -221,7 +221,11 @@
         .col-control { width: 15%; }
         .col-amount { width: 10%; }
         .col-percent { width: 8%; }
+<<<<<<< HEAD
+        .col-treatment { width: 15%; }
+=======
         .col-treatment { width: 8%; }
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         .col-status { width: 6%; }
 
         .rotate {
@@ -240,6 +244,8 @@
             margin-left: -10em;
             margin-right: -10em;
         }
+<<<<<<< HEAD
+=======
 
 .col-level { width: 4%; }
 
@@ -281,6 +287,7 @@
     vertical-align: middle;
 }
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     </style>
 </head>
 <body>
@@ -311,6 +318,16 @@
             <th rowspan="2" class="col-amount">TARGET 1 TAHUN</th>
         </tr>
         <tr>
+<<<<<<< HEAD
+            <th class="col-level">DAMPAK</th>
+            <th class="col-level">KEMUNGKINAN</th>
+            <th class="col-level">POSISI RISIKO</th>
+            <th class="col-level">LEVEL RISIKO</th>
+            <th class="col-level">DAMPAK</th>
+            <th class="col-level">KEMUNGKINAN</th>
+            <th class="col-level">POSISI RISIKO</th>
+            <th class="col-level">LEVEL RISIKO</th>
+=======
             <th class="col-level">
                 <div class="vtext">LEVEL DAMPAK</div>
             </th>
@@ -337,6 +354,7 @@
                 <div class="vtext">LEVEL RISIKO</div>
             </th>
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         </tr>
     </thead>
     <tbody>
@@ -426,6 +444,19 @@
             <th rowspan="2" class="col-amount">BIAYA PERLAKUAN RISIKO</th>
             <th colspan="4">RESIDUAL TARGET</th>
             <th rowspan="2" class="col-status">STATUS RISIKO</th>
+<<<<<<< HEAD
+            <th rowspan="2" class="col-recommendation">REKOMENDASI</th>
+        </tr>
+        <tr>
+            <th class="col-level">DAMPAK</th>
+            <th class="col-level">KEMUNGKINAN</th>
+            <th class="col-level">POSISI RISIKO</th>
+            <th class="col-level">LEVEL RISIKO</th>
+            <th class="col-level">DAMPAK</th>
+            <th class="col-level">KEMUNGKINAN</th>
+            <th class="col-level">POSISI RISIKO</th>
+            <th class="col-level">LEVEL RISIKO</th>
+=======
             <th rowspan="2" class="col-treatment">REKOMENDASI</th>
         </tr>
         <tr>
@@ -454,6 +485,7 @@
             <th class="col-level">
                 <div class="vtext">LEVEL RISIKO</div>
             </th>
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         </tr>
     </thead>
     <tbody>
@@ -559,6 +591,16 @@
                     <th rowspan="3" class="col-percent" style="vertical-align: middle;">% TARGET TAHUN {{ $year }}</th>
                     <th rowspan="3" class="col-amount" style="vertical-align: middle;">BIAYA PERLAKUAN RISIKO</th>
                     <th colspan="4">RESIDUAL TARGET RISK</th>
+<<<<<<< HEAD
+                    <th rowspan="3" class="col-treatment" style="vertical-align: middle;">EVALUASI PERLAKUAN RISIKO</th>
+                </tr>
+                <tr>
+                    <th colspan="4">TAHUN {{ $year }}<br>{{ $triwulan }}<br>BULAN {{ strtoupper($monthName) }}</th>
+                    <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL DAMPAK</th>
+                    <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL KEMUNGKINAN</th>
+                    <th rowspan="2" class="col-level" style="vertical-align: middle;">POSISI RISIKO</th>
+                    <th rowspan="2" class="col-level" style="vertical-align: middle;">LEVEL RISIKO</th>
+=======
                     <th rowspan="3" class="col-treatment col-level" style="vertical-align: middle;"> <div class="vtext">EVALUASI PERLAKUAN RISIKO</div> </th>
                 </tr>
                 <tr>
@@ -575,6 +617,7 @@
                                     <th rowspan="2" class="col-level" style="vertical-align: middle;">
                     <div class="vtext">LEVEL RISIKO</div>
                 </th>
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 </tr>
                 <tr>
                     <th class="col-amount">TARGET s/d BULAN {{ strtoupper($monthName) }}</th>

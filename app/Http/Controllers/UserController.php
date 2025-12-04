@@ -17,7 +17,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use App\Mail\UserApprovedMail;
 use App\Mail\UserRejectedMail;
+<<<<<<< HEAD
+=======
 use Illuminate\Support\Facades\Storage;
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 use Illuminate\Support\Facades\Mail;
 
 class UserController extends Controller
@@ -342,6 +345,8 @@ public function show(Request $request, $id)
     try {
         DB::beginTransaction();
 
+<<<<<<< HEAD
+=======
         // Cek duplikasi username jika diubah
         if ($request->filled('username')) {
             $inputUsername = $request->username;
@@ -383,6 +388,7 @@ public function show(Request $request, $id)
             }
         }
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $user->role_id = $request->role_id;
         $user->department_id = $request->department_id;
         $user->status = $request->status === 'aktif' ? 1 : 0;
@@ -528,7 +534,10 @@ public function rejectUser($id)
         return json(403, 'false', 'forbidden', 'Anda tidak memiliki akses untuk menolak user di departemen ini.', []);
     }
 
+<<<<<<< HEAD
+=======
     // Update status menjadi rejected
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     $user->status = 2; // 2 = rejected
     $user->save();
 
@@ -546,6 +555,9 @@ public function rejectUser($id)
         \Log::error('Failed to send rejection email: ' . $e->getMessage());
     }
 
+<<<<<<< HEAD
+    return json(200, 'true', 'success', 'User berhasil ditolak dan email notifikasi telah dikirim.', []);
+=======
     // Setelah email dikirim, hapus user dari database
     try {
         $user->delete();
@@ -555,6 +567,7 @@ public function rejectUser($id)
     }
 
     return json(200, 'true', 'success', 'User berhasil ditolak, email notifikasi telah dikirim, dan data user telah dihapus.', []);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 }
 
    public function getPendingUsers(Request $request)
@@ -666,18 +679,31 @@ public function rejectUser($id)
     return json(200, 'success', 'Success', 'Berhasil menampilkan user dengan status pending', $result);
 }
 
+<<<<<<< HEAD
+    public function updateProfile(Request $request)
+=======
    public function updateProfile(Request $request)
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 {
     $user = auth()->user();
 
     $validation = check_validation($request->all(), [
         'name' => 'required|string|max:255',
+<<<<<<< HEAD
+        'username' => 'required|string|max:255|unique:users,username,' . $user->id,
+        'email' => 'nullable|email:rfc,dns|max:255|unique:users,email,' . $user->id,
+        'nip' => 'nullable|string|max:100',
+        'phone_number' => 'nullable|string|max:100',
+        'gender' => 'nullable|in:male,female,other',
+        'profile_img' => 'nullable|url',
+=======
         'username' => 'required|string|max:255',
         'email' => 'nullable|email:rfc,dns|max:255',
         'nip' => 'nullable|string|max:100',
         'phone_number' => 'nullable|string|max:100',
         'gender' => 'nullable|in:male,female,other',
         'profile_img' => 'nullable|string', // Ubah dari 'url' karena sekarang bisa base64
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     ]);
 
     if ($validation[0] !== 0) return $validation[1];
@@ -685,6 +711,11 @@ public function rejectUser($id)
     try {
         DB::beginTransaction();
 
+<<<<<<< HEAD
+        // Update data biasa (tidak terenkripsi)
+        $user->gender = $request->gender;
+
+=======
         // Cek duplikasi username jika diisi
         if ($request->filled('username')) {
             $inputUsername = $request->username;
@@ -730,6 +761,7 @@ public function rejectUser($id)
         $user->gender = $request->gender;
 
         // Update profile_img jika ada (bisa URL atau base64)
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         if ($request->filled('profile_img')) {
             $user->profile_img = $request->profile_img;
         }
@@ -759,7 +791,10 @@ public function rejectUser($id)
                     User::where('id', $user->id)->update([
                         'username' => DB::raw($encryptedUsername)
                     ]);
+<<<<<<< HEAD
+=======
                     logger("Username updated successfully for user {$user->id}");
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 } else {
                     logger("Username encryption failed for user {$user->id}");
                 }
@@ -775,7 +810,10 @@ public function rejectUser($id)
                     User::where('id', $user->id)->update([
                         'email' => DB::raw($encryptedEmail)
                     ]);
+<<<<<<< HEAD
+=======
                     logger("Email updated successfully for user {$user->id}");
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 } else {
                     logger("Email encryption failed for user {$user->id}");
                 }
@@ -790,18 +828,26 @@ public function rejectUser($id)
             // Cek duplikasi NIP
             $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputNip) {
                 try {
+<<<<<<< HEAD
+                    $decryptedNip = encrypt_decrypt_db('dec', $otherUser->nip, $otherUser->id);
+                    return $decryptedNip === $inputNip;
+=======
                     if ($otherUser->nip) {
                         $decryptedNip = encrypt_decrypt_db('dec', $otherUser->nip, $otherUser->id);
                         return $decryptedNip === $inputNip;
                     }
                     return false;
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 } catch (\Throwable $e) {
                     return false;
                 }
             });
 
             if ($duplicate) {
+<<<<<<< HEAD
+=======
                 DB::rollBack();
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 return json(400, 'false', 'duplicate_nip', 'NIP sudah digunakan oleh pengguna lain.', null);
             }
 
@@ -923,11 +969,23 @@ public function rejectUser($id)
     } catch (\Exception $e) {
         DB::rollBack();
         logger("Gagal update profil: " . $e->getMessage());
+<<<<<<< HEAD
+=======
         logger("Stack trace: " . $e->getTraceAsString());
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         return json(500, 'false', 'update_failed', 'Terjadi kesalahan saat memperbarui profil.', null);
     }
 }
 
+<<<<<<< HEAD
+    public function getProfile()
+{
+    try {
+        $user = auth()->user();
+        $user = User::with('role', 'department')->find($user->id);
+
+        // Decrypt data dengan error handling menggunakan encrypt_decrypt_db
+=======
    public function getProfile()
 {
     try {
@@ -935,6 +993,7 @@ public function rejectUser($id)
         $user = User::with('role', 'department')->find($authUser->id);
 
         // Decrypt data
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $nameDecrypted = null;
         $usernameDecrypted = null;
         $emailDecrypted = null;
@@ -942,6 +1001,37 @@ public function rejectUser($id)
         $phoneDecrypted = null;
 
         if ($user->name) {
+<<<<<<< HEAD
+            try {
+                $nameDecrypted = encrypt_decrypt_db('dec', $user->name, $user->id);
+            } catch (\Exception $e) {
+                logger("Name decryption error in getProfile: " . $e->getMessage());
+            }
+        }
+
+        if ($user->username) {
+            try {
+                $usernameDecrypted = encrypt_decrypt_db('dec', $user->username, $user->id);
+            } catch (\Exception $e) {
+                logger("Username decryption error in getProfile: " . $e->getMessage());
+            }
+        }
+
+        if ($user->email) {
+            try {
+                $emailDecrypted = encrypt_decrypt_db('dec', $user->email, $user->id);
+            } catch (\Exception $e) {
+                logger("Email decryption error in getProfile: " . $e->getMessage());
+            }
+        }
+
+        if ($user->nip) {
+            try {
+                $nipDecrypted = encrypt_decrypt_db('dec', $user->nip, $user->id);
+            } catch (\Exception $e) {
+                logger("NIP decryption error in getProfile: " . $e->getMessage());
+            }
+=======
             try { $nameDecrypted = encrypt_decrypt_db('dec', $user->name, $user->id); }
             catch (\Exception $e) { logger("Name decryption error: " . $e->getMessage()); }
         }
@@ -959,10 +1049,24 @@ public function rejectUser($id)
         if ($user->nip) {
             try { $nipDecrypted = encrypt_decrypt_db('dec', $user->nip, $user->id); }
             catch (\Exception $e) { logger("NIP decryption error: " . $e->getMessage()); }
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
 
         if ($user->phone_number) {
             try {
+<<<<<<< HEAD
+                logger("Getting phone from DB: " . $user->phone_number);
+                $phoneDecrypted = encrypt_decrypt_db('dec', $user->phone_number, $user->id);
+
+                if (empty($phoneDecrypted)) {
+                    logger("Phone decryption returned empty result, setting to null");
+                    $phoneDecrypted = null;
+                } else {
+                    logger("Decrypted phone in getProfile: " . $phoneDecrypted);
+                }
+            } catch (\Exception $e) {
+                logger("Phone number decryption error in getProfile: " . $e->getMessage());
+=======
                 logger("Getting phone raw: " . $user->phone_number);
 
                 $phoneDecrypted = encrypt_decrypt_db('dec', $user->phone_number, $user->id);
@@ -973,11 +1077,14 @@ public function rejectUser($id)
                 }
             } catch (\Exception $e) {
                 logger("Phone decryption error: " . $e->getMessage());
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 logger("Stack trace: " . $e->getTraceAsString());
                 $phoneDecrypted = null;
             }
         }
 
+<<<<<<< HEAD
+=======
         // FOTO PROFIL — sekarang langsung kembalikan base64
         $profileImg = null;
 
@@ -991,6 +1098,7 @@ public function rejectUser($id)
             }
         }
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         return response()->json([
             'code' => 200,
             'status' => true,
@@ -998,7 +1106,11 @@ public function rejectUser($id)
             'message' => 'Data profil berhasil diambil.',
             'data' => [
                 'user' => [
+<<<<<<< HEAD
+                    'id' => encrypt_decrypt_md5('enc', $user->id), //  dienkripsi
+=======
                     'id' => encrypt_decrypt_md5('enc', $user->id),
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                     'name' => $nameDecrypted,
                     'username' => $usernameDecrypted,
                     'email' => $emailDecrypted,
@@ -1010,6 +1122,14 @@ public function rejectUser($id)
                     'role_id' => $user->role_id,
                     'role_name' => optional($user->role)->name,
                     'status' => $user->status,
+<<<<<<< HEAD
+                    'profile_img' => $user->profile_img,
+                ]
+            ]
+        ]);
+    } catch (\Exception $e) {
+        logger("Error in getProfile: " . $e->getMessage());
+=======
                     'profile_img' => $profileImg, // base64 langsung / atau URL DO
                 ]
             ]
@@ -1018,6 +1138,7 @@ public function rejectUser($id)
     } catch (\Exception $e) {
         logger("getProfile error: " . $e->getMessage());
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         return response()->json([
             'code' => 500,
             'status' => false,
@@ -1028,6 +1149,8 @@ public function rejectUser($id)
     }
 }
 
+<<<<<<< HEAD
+=======
 public function uploadPhoto(Request $request)
 {
     try {
@@ -1087,4 +1210,5 @@ public function uploadPhoto(Request $request)
     }
 }
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 }

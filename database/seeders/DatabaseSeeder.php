@@ -17,7 +17,16 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
          $this->call([
+<<<<<<< HEAD
+        MstHeatmapDampakSeeder::class,
+        MstHeatmapKemungkinanSeeder::class,
+        MstHeatmapSeeder::class,
+        MstHeatmapRiskRangeSeeder::class,
+        MstRiskCodeSeeder::class,
+        MstOptionSeeder::class,
+=======
         HeatmapSeeder::class,
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     ]);
 }
 }

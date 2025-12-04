@@ -16,11 +16,16 @@ class LostEvent extends Model
         'header_id',
         'rcsa_id',
         'tahun',
+<<<<<<< HEAD
+        'risk_owner_department',
+        'jenis_risiko',
+=======
         'type',
         'status',
         'note',
         'risk_owner_department_id',
         'jenis_risiko_id',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         'nama_kejadian',
         'identifikasi_kejadian',
         'kategori_kejadian',
@@ -62,7 +67,11 @@ class LostEvent extends Model
         return $this->belongsTo(TrRiskHeader::class, 'header_id');
     }
 
+<<<<<<< HEAD
+       /**
+=======
     /**
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
      * Relasi ke TrRcsaHeader
      */
     public function rcsa()
@@ -71,6 +80,8 @@ class LostEvent extends Model
     }
 
     /**
+<<<<<<< HEAD
+=======
      * Relasi ke Department (MstDepartment)
      */
     public function riskOwnerDepartmentRelation()
@@ -87,6 +98,7 @@ class LostEvent extends Model
     }
 
     /**
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
      * Relasi ke User yang membuat
      */
     public function createdBy()
@@ -103,6 +115,8 @@ class LostEvent extends Model
     }
 
     /**
+<<<<<<< HEAD
+=======
      * Relasi ke uploads
      */
     public function uploads()
@@ -119,6 +133,7 @@ class LostEvent extends Model
     }
 
     /**
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
      * Scope untuk filter berdasarkan tahun
      */
     public function scopeFilterByYear($query, $year)
@@ -132,10 +147,17 @@ class LostEvent extends Model
     /**
      * Scope untuk filter berdasarkan department
      */
+<<<<<<< HEAD
+    public function scopeFilterByDepartment($query, $department)
+    {
+        if ($department) {
+            return $query->where('risk_owner_department', 'like', '%' . $department . '%');
+=======
     public function scopeFilterByDepartment($query, $departmentId)
     {
         if ($departmentId) {
             return $query->where('risk_owner_department_id', $departmentId);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
         return $query;
     }
@@ -143,10 +165,17 @@ class LostEvent extends Model
     /**
      * Scope untuk filter berdasarkan jenis risiko
      */
+<<<<<<< HEAD
+    public function scopeFilterByJenisRisiko($query, $jenisRisiko)
+    {
+        if ($jenisRisiko) {
+            return $query->where('jenis_risiko', 'like', '%' . $jenisRisiko . '%');
+=======
     public function scopeFilterByJenisRisiko($query, $jenisRisikoId)
     {
         if ($jenisRisikoId) {
             return $query->where('jenis_risiko_id', $jenisRisikoId);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
         return $query;
     }
@@ -160,6 +189,9 @@ class LostEvent extends Model
             return $query->where(function ($q) use ($search) {
                 $q->where('nama_kejadian', 'like', '%' . $search . '%')
                   ->orWhere('identifikasi_kejadian', 'like', '%' . $search . '%')
+<<<<<<< HEAD
+                  ->orWhere('deskripsi_kejadian', 'like', '%' . $search . '%');
+=======
                   ->orWhere('deskripsi_kejadian', 'like', '%' . $search . '%')
                   ->orWhere('kategori_risiko_bumn', 'like', '%' . $search . '%')
                   ->orWhere('kategori_risiko_t2_t3_kbumn', 'like', '%' . $search . '%')
@@ -169,6 +201,7 @@ class LostEvent extends Model
                   ->orWhereHas('jenisRisikoRelation', function ($jr) use ($search) {
                       $jr->where('nama_jenis_risiko', 'like', '%' . $search . '%');
                   });
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             });
         }
         return $query;

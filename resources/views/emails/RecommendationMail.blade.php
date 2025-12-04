@@ -12,7 +12,11 @@
 </head>
 <body>
     <div class="header">
+<<<<<<< HEAD
+        <p style="text-align: left;"><h1>Yth {{ $risk_owner ?? 'Semesta User' }},</h1></p>
+=======
         <p style="text-align: left;"><h1>Yth {{ $data->risk_owner ?? 'Semesta User' }},</h1></p>
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         <p style="text-align: right;">{{ date('d-m-Y') }}</p>
     </div>
 
@@ -30,7 +34,10 @@
 
         <h1>Rekomendasi:</h1> {{ $data->rekomendasi }}
 
+<<<<<<< HEAD
+=======
         <hr>
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         <p>
             Apabila terdapat pertanyaan lebih lanjut terkait rekomendasi yang diberikan, 
             Anda dapat menghubungi kami melalui Tim IT dan Tim MR.<br/>

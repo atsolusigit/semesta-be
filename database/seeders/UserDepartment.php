@@ -15,6 +15,21 @@ class UserDepartment extends Seeder
      */
     public function run(): void
     {
+<<<<<<< HEAD
+        $now = Carbon::now()->toDateTimeString();
+
+
+
+        DB::table('mst_role')->updateOrInsert(
+                ['id' => $role['id']],
+                [
+                    'name'       => $role['name'],
+                    'created_by' => 1,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+=======
         // $now = Carbon::now()->toDateTimeString();
 
 
@@ -28,5 +43,6 @@ class UserDepartment extends Seeder
         //             'updated_at' => $now,
         //         ]
         //     );
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     }
 }

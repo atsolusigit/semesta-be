@@ -8,11 +8,19 @@ use Illuminate\Support\Facades\Auth;
 
 class MstMonthRecommendationController extends Controller
 {
+<<<<<<< HEAD
+     public function index(Request $request)
+    {
+        // Role-based access control - hanya role 1 dan 2 yang bisa melihat data
+        $user = auth()->user();
+        $roleCheck = check_role($user, [1, 2]);
+=======
     public function index(Request $request)
     {
         // Check authorization: only role 1, 2, 4 and 5 can access
         $user = auth()->user();
         $roleCheck = check_role($user, [1, 2, 4, 5]);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
         if ($roleCheck !== true) {
             return $roleCheck;
@@ -49,25 +57,39 @@ class MstMonthRecommendationController extends Controller
         return json(200, true, 'Berhasil', 'List data month recommendation', $mappedData);
     }
 
+<<<<<<< HEAD
+     public function store(Request $request)
+    {
+        $user = Auth::user();
+        $roleCheck = check_role($user, [1, 2]);
+=======
     public function store(Request $request)
     {
         $user = Auth::user();
         //Check authorization: only role 1, 2, 4 and 5 can store
         $roleCheck = check_role($user, [1, 2, 4, 5]);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
         if ($roleCheck !== true) {
             return $roleCheck;
         }
 
+<<<<<<< HEAD
+        $request->validate([
+=======
         $validation = check_validation($request->all(), [
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'name' => 'required|string|max:255',
             'required' => 'nullable|string|in:Rekomendasi,Tidak Rekomendasi'
         ]);
 
+<<<<<<< HEAD
+=======
         if ($validation[0] == 1) {
             return $validation[1];
         }
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         // Konversi string ke boolean
         $requiredValue = ($request->required === 'Rekomendasi') ? 1 : 0;
 
@@ -84,8 +106,12 @@ class MstMonthRecommendationController extends Controller
     public function update(Request $request, $id)
     {
         $user = Auth::user();
+<<<<<<< HEAD
+        $roleCheck = check_role($user, [1, 2]);
+=======
         // Check authorization: only role 1, 2, 4 and 5 can update
         $roleCheck = check_role($user, [1, 2, 4, 5]);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
         if ($roleCheck !== true) {
             return $roleCheck;
@@ -96,15 +122,22 @@ class MstMonthRecommendationController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'Month recommendation tidak ditemukan.', null);
         }
 
+<<<<<<< HEAD
+        $request->validate([
+=======
         $validation = check_validation($request->all(), [
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'name' => 'required|string|max:255',
             'required' => 'nullable|string|in:Rekomendasi,Tidak Rekomendasi'
         ]);
 
+<<<<<<< HEAD
+=======
         if ($validation[0] == 1) {
             return $validation[1];
         }
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         // Konversi string ke boolean
         $requiredValue = ($request->required === 'Rekomendasi') ? 1 : 0;
 
@@ -120,7 +153,10 @@ class MstMonthRecommendationController extends Controller
     public function destroy($id)
     {
         $user = Auth::user();
+<<<<<<< HEAD
+=======
         // Check authorization: only role 1 can delete
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $roleCheck = check_role($user, 1);
 
         if ($roleCheck !== true) {

@@ -5,11 +5,16 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\LostEvent;
 use App\Models\TrRiskHeader;
+<<<<<<< HEAD
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+=======
 use App\Models\MstRcsa;
 use App\Models\LostEventUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -19,8 +24,12 @@ class LostEventController extends Controller
     //===============================================================
     // LIST LOST EVENT HEADER WITH REALIZATION BELOW DANGER THRESHOLD
     //===============================================================
+<<<<<<< HEAD
+  public function index(Request $request)
+=======
 
 public function index(Request $request)
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 {
     $user = auth()->user();
 
@@ -28,18 +37,31 @@ public function index(Request $request)
         return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk melihat data ini.', null);
     }
 
+<<<<<<< HEAD
+    $perPage = $request->input('per_page', 10);
+    $filterType = strtolower($request->query('type', ''));
+    $search = $request->query('search');
+
+=======
     $perPage = $request->input('per_page');
     $filterType = strtolower($request->query('type', ''));
     $search = $request->query('search');
 
     // Query headers dengan filter threshold
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     $headers = TrRiskHeader::with([
         'department:id,name',
         'jenisRisiko:id,nama_jenis_risiko',
         'optionTargetSatuTahun:id,name,type',
+<<<<<<< HEAD
+        'rcsa:id,kategori_threshold_kri_aman,kategori_threshold_kri_hati_hati,kategori_threshold_kri_bahaya',
+        'monthlyData' => function ($query) {
+            $query->where('is_finalize', true)->orderBy('month', 'asc');
+=======
         'rcsa:id,kategori_threshold_kri_aman,kategori_threshold_kri_hati_hati,kategori_threshold_kri_bahaya,kategori_risiko_bumn,kategori_risiko_t2_t3_kbumn',
         'monthlyData' => function ($query) {
             $query->where('is_finalize', true)->orderBy('month', 'desc');
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
     ])
     ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
@@ -135,9 +157,17 @@ public function index(Request $request)
                 $realizationValue = $totalRealisasi;
                 $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
 
+<<<<<<< HEAD
+                // LOGIKA BARU: Hanya muncul jika realisasi <= threshold_bahaya
                 if ($item->rcsa && $thresholdBahaya > 0) {
                     $shouldInclude = $percentage <= $thresholdBahaya;
                 } else {
+                    // Fallback ke logika lama jika tidak ada RCSA
+=======
+                if ($item->rcsa && $thresholdBahaya > 0) {
+                    $shouldInclude = $percentage <= $thresholdBahaya;
+                } else {
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                     $shouldInclude = $percentage <= 50;
                 }
             }
@@ -162,9 +192,17 @@ public function index(Request $request)
                 $realizationValue = $totalRealisasi;
                 $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
 
+<<<<<<< HEAD
+                // LOGIKA BARU: Hanya muncul jika realisasi <= threshold_bahaya
                 if ($item->rcsa && $thresholdBahaya > 0) {
                     $shouldInclude = $percentage <= $thresholdBahaya;
                 } else {
+                    // Fallback ke logika lama jika tidak ada RCSA
+=======
+                if ($item->rcsa && $thresholdBahaya > 0) {
+                    $shouldInclude = $percentage <= $thresholdBahaya;
+                } else {
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                     $shouldInclude = $percentage <= 50;
                 }
             }
@@ -184,6 +222,10 @@ public function index(Request $request)
 
     $headerIds = $filteredData->pluck('id')->toArray();
 
+<<<<<<< HEAD
+    $lostEvents = LostEvent::whereIn('header_id', $headerIds)
+        ->with(['createdBy:id,username,name', 'updatedBy:id,username,name'])
+=======
     // Ambil lost events yang terkait dengan headers
     $lostEventsWithHeader = LostEvent::whereIn('header_id', $headerIds)
         ->with([
@@ -193,10 +235,30 @@ public function index(Request $request)
             'jenisRisikoRelation:id,nama_jenis_risiko',
             'uploadedFiles:id,lost_event_id,filepath,domain'
         ])
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         ->withTrashed()
         ->get()
         ->keyBy('header_id');
 
+<<<<<<< HEAD
+    $page = $request->input('page', 1);
+    $paginatedData = new \Illuminate\Pagination\LengthAwarePaginator(
+        $filteredData->forPage($page, $perPage),
+        $filteredData->count(),
+        $perPage,
+        $page,
+        ['path' => request()->url(), 'query' => request()->query()]
+    );
+
+    $orderedData = $paginatedData->getCollection()->map(function ($item) use ($lostEvents) {
+        $lostEvent = $lostEvents->get($item->id);
+
+        return [
+            'lost_event_id' => $lostEvent->id ?? null,
+            'header_id' => $item->id,
+            'rcsa_id' => $item->rcsa_id,
+            'tahun' => $item->year,
+=======
     // Ambil lost events yang independen (tanpa header_id)
     // TAMBAHAN: Filter berdasarkan type untuk independent lost events
     $independentLostEvents = LostEvent::whereNull('header_id')
@@ -264,6 +326,7 @@ public function index(Request $request)
             'status' => $lostEvent->status ?? 'draft',
             'tahun' => $item->year,
             'risk_owner_department_id' => $item->department_id ?? null,
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'risk_owner_department' => optional($item->department)->name ?? '',
             'jenis_risiko_id' => $item->jenis_risiko ?? null,
             'jenis_risiko' => $item->jenisRisiko->nama_jenis_risiko ?? '',
@@ -276,8 +339,13 @@ public function index(Request $request)
             'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian ?? null,
             'pihak_terkait' => $lostEvent->pihak_terkait ?? null,
             'status_asuransi' => $lostEvent->status_asuransi ?? null,
+<<<<<<< HEAD
+            'kategori_risiko_bumn' => $lostEvent->kategori_risiko_bumn ?? null,
+            'kategori_risiko_t2_t3_kbumn' => $lostEvent->kategori_risiko_t2_t3_kbumn ?? null,
+=======
             'kategori_risiko_bumn' => $lostEvent ? $lostEvent->kategori_risiko_bumn : ($item->rcsa->kategori_risiko_bumn ?? null),
             'kategori_risiko_t2_t3_kbumn' => $lostEvent ? $lostEvent->kategori_risiko_t2_t3_kbumn : ($item->rcsa->kategori_risiko_t2_t3_kbumn ?? null),
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'penjelasan_kerugian' => $lostEvent->penjelasan_kerugian ?? null,
             'nilai_kerugian' => $lostEvent->nilai_kerugian ?? null,
             'kejadian_berulang' => $lostEvent->kejadian_berulang ?? null,
@@ -301,6 +369,11 @@ public function index(Request $request)
             'threshold_aman' => $item->threshold_aman,
             'threshold_hati_hati' => $item->threshold_hati_hati,
             'threshold_bahaya' => $item->threshold_bahaya,
+<<<<<<< HEAD
+        ];
+    })->values();
+
+=======
             'uploaded_files' => $uploadedFiles,
         ]);
     }
@@ -399,6 +472,7 @@ public function index(Request $request)
         ['path' => request()->url(), 'query' => request()->query()]
     );
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     $cleanData = clean_recursive([
         'current_page' => $paginatedData->currentPage(),
         'per_page' => $paginatedData->perPage(),
@@ -406,12 +480,136 @@ public function index(Request $request)
         'last_page' => $paginatedData->lastPage(),
         'from' => $paginatedData->firstItem(),
         'to' => $paginatedData->lastItem(),
+<<<<<<< HEAD
+        'data' => $orderedData,
+=======
         'data' => array_values($paginatedData->items()),
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     ]);
 
     return json(200, true, 'Data Ditemukan', 'Data header dengan realisasi di bawah threshold bahaya berhasil diambil.', $cleanData);
 }
 
+<<<<<<< HEAD
+   //=====================================
+    // SHOW DETAIL LOST EVENT
+    //=====================================
+  public function show($headerId)
+{
+    $user = auth()->user();
+
+    if (!in_array($user->role_id, [1, 5])) {
+        return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk melihat data ini.', null);
+    }
+
+    $header = TrRiskHeader::with([
+        'department:id,name',
+        'jenisRisiko:id,nama_jenis_risiko',
+        'optionTargetSatuTahun:id,name,type',
+        'rcsa:id,kategori_threshold_kri_aman,kategori_threshold_kri_hati_hati,kategori_threshold_kri_bahaya',
+        'monthlyData' => function ($query) {
+            $query->where('is_finalize', true)->orderBy('month', 'asc');
+        }
+    ])
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+        $query->where('department_id', $user->department_id);
+    })
+    ->find($headerId);
+
+    if (!$header) {
+        return json(404, false, 'Tidak Ditemukan', 'Header tidak ditemukan.', null);
+    }
+
+    if ($header->monthlyData->count() !== 12) {
+        return json(400, false, 'Data Tidak Lengkap', 'Data risiko belum memiliki 12 bulan yang difinalisasi.', null);
+    }
+
+    $targetType = $header->optionTargetSatuTahun->type ?? null;
+
+    if (!$targetType) {
+        if (!empty($header->target_quantitative_satu_tahun)) {
+            if (preg_match('/\d/', $header->target_quantitative_satu_tahun)) {
+                $targetType = 'kuantitatif';
+            }
+        }
+        if (!empty($header->target_satu_tahun_notes) && empty($targetType)) {
+            $targetType = 'kualitatif';
+        }
+    }
+
+    $normalizedType = strtolower($targetType);
+
+    $percentage = 0;
+    $targetValue = null;
+    $realizationValue = null;
+
+    // Ambil threshold dari RCSA
+    $thresholdAman = null;
+    $thresholdHatiHati = null;
+    $thresholdBahaya = null;
+
+    if ($header->rcsa) {
+        $thresholdAman = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_aman ?? '0');
+        $thresholdHatiHati = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_hati_hati ?? '0');
+        $thresholdBahaya = (float) str_replace(['%', ','], ['', '.'], $header->rcsa->kategori_threshold_kri_bahaya ?? '0');
+    }
+
+    if ($normalizedType === 'kuantitatif' || $normalizedType === 'quantitative') {
+        $totalTarget = 0;
+        $totalRealisasi = 0;
+
+        foreach ($header->monthlyData as $monthly) {
+            $targetNum = (float) preg_replace('/[^0-9]/', '', $monthly->target_quantitative ?? '0');
+            $realNum = (float) preg_replace('/[^0-9]/', '', $monthly->realization_quantitative ?? '0');
+            $totalTarget += $targetNum;
+            $totalRealisasi += $realNum;
+        }
+
+        if ($totalTarget > 0) {
+            $targetValue = $totalTarget;
+            $realizationValue = $totalRealisasi;
+            $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+        }
+
+    } elseif ($normalizedType === 'kualitatif' || $normalizedType === 'qualitative') {
+        $totalTarget = 0;
+        $totalRealisasi = 0;
+
+        foreach ($header->monthlyData as $monthly) {
+            $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+            $targetNum = (float) $targetText;
+
+            $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+            $realNum = (float) $realText;
+
+            $totalTarget += $targetNum;
+            $totalRealisasi += $realNum;
+        }
+
+        if ($totalTarget > 0) {
+            $targetValue = $totalTarget; // DIPERBAIKI: $totalTarget bukan $totalTotal
+            $realizationValue = $totalRealisasi;
+            $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+        }
+    }
+
+    $lostEvent = LostEvent::where('header_id', $headerId)
+        ->with(['createdBy:id,username', 'updatedBy:id,username'])
+        ->first();
+
+    if (!$lostEvent) {
+        try {
+            DB::beginTransaction();
+
+            $penyebabKejadian = $header->penyebab_risiko ?? '';
+
+            $lostEvent = LostEvent::create([
+                'header_id' => $header->id,
+                'rcsa_id' => $header->rcsa_id,
+                'tahun' => $header->year,
+                'risk_owner_department' => optional($header->department)->name ?? '',
+                'jenis_risiko' => $header->jenisRisiko->nama_jenis_risiko ?? '',
+=======
 //=====================================
 // SHOW DETAIL LOST EVENT
 //=====================================
@@ -575,6 +773,7 @@ public function show($headerId)
                 'risk_owner_department_id' => $header->department_id ? (int) $header->department_id : null,
                 'jenis_risiko_id' => $header->jenis_risiko ? (int) $header->jenis_risiko : null,
                 'type' => $normalizedType ?? 'unknown',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 'nama_kejadian' => '',
                 'identifikasi_kejadian' => $header->peristiwa_risiko ?? '',
                 'kategori_kejadian' => null,
@@ -584,8 +783,13 @@ public function show($headerId)
                 'deskripsi_kejadian' => null,
                 'pihak_terkait' => null,
                 'status_asuransi' => null,
+<<<<<<< HEAD
+                'kategori_risiko_bumn' => null,
+                'kategori_risiko_t2_t3_kbumn' => null,
+=======
                 'kategori_risiko_bumn' => $kategoriRisikoBumn,
                 'kategori_risiko_t2_t3_kbumn' => $kategoriRisikoT2T3Kbumn,
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 'penjelasan_kerugian' => null,
                 'nilai_kerugian' => null,
                 'kejadian_berulang' => null,
@@ -595,6 +799,68 @@ public function show($headerId)
                 'perbaikan_mendatang' => null,
                 'nilai_premi' => null,
                 'nilai_klaim' => null,
+<<<<<<< HEAD
+                'created_by' => $user->id,
+            ]);
+
+            DB::commit();
+
+            $lostEvent->load(['createdBy:id,username', 'updatedBy:id,username']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return json(500, false, 'Error', 'Terjadi kesalahan saat membuat lost event.', [
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    $data = [
+        'lost_event_id' => $lostEvent->id,
+        'header_id' => $lostEvent->header_id,
+        'rcsa_id' => $header->rcsa_id,
+        'tahun' => $lostEvent->tahun,
+        'risk_owner_department' => $lostEvent->risk_owner_department,
+        'jenis_risiko_id' => $header->jenis_risiko ?? null,
+        'jenis_risiko' => $lostEvent->jenis_risiko,
+        'nama_kejadian' => $lostEvent->nama_kejadian,
+        'identifikasi_kejadian' => $lostEvent->identifikasi_kejadian,
+        'kategori_kejadian' => $lostEvent->kategori_kejadian,
+        'sumber_penyebab_kejadian' => $lostEvent->sumber_penyebab_kejadian,
+        'penyebab_kejadian' => $lostEvent->penyebab_kejadian ?: ($header->penyebab_risiko ?? ''),
+        'penanganan_saat_kejadian' => $lostEvent->penanganan_saat_kejadian,
+        'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian,
+        'pihak_terkait' => $lostEvent->pihak_terkait,
+        'status_asuransi' => $lostEvent->status_asuransi,
+        'kategori_risiko_bumn' => $lostEvent->kategori_risiko_bumn,
+        'kategori_risiko_t2_t3_kbumn' => $lostEvent->kategori_risiko_t2_t3_kbumn,
+        'penjelasan_kerugian' => $lostEvent->penjelasan_kerugian,
+        'nilai_kerugian' => $lostEvent->nilai_kerugian,
+        'kejadian_berulang' => $lostEvent->kejadian_berulang,
+        'frekuensi_kejadian' => $lostEvent->frekuensi_kejadian,
+        'mitigasi_yang_direncanakan' => $lostEvent->mitigasi_yang_direncanakan,
+        'realisasi_mitigasi' => $lostEvent->realisasi_mitigasi,
+        'perbaikan_mendatang' => $lostEvent->perbaikan_mendatang,
+        'nilai_premi' => $lostEvent->nilai_premi,
+        'nilai_klaim' => $lostEvent->nilai_klaim,
+        'created_at' => $lostEvent && $lostEvent->created_at ? $lostEvent->created_at->format('Y-m-d') : null,
+        'updated_at' => $lostEvent && $lostEvent->updated_at ? $lostEvent->updated_at->format('Y-m-d') : null,
+        'created_by' => $lostEvent->created_by,
+        'created_by_name' => get_decrypted_name($lostEvent->createdBy),
+        'updated_by' => $lostEvent->updated_by,
+        'updated_by_name' => get_decrypted_name($lostEvent->updatedBy),
+        'type' => $normalizedType ?? 'unknown',
+        'realization_percentage' => $percentage !== null
+            ? rtrim(rtrim(number_format($percentage, 2), '0'), '.') . '%'
+            : null,
+        'threshold_aman' => $thresholdAman,
+        'threshold_hati_hati' => $thresholdHatiHati,
+        'threshold_bahaya' => $thresholdBahaya,
+    ];
+
+    $cleanData = clean_recursive($data);
+
+    return json(200, true, 'Data Ditemukan', 'Detail lost event berhasil diambil.', $cleanData);
+=======
                 'status' => 'draft',
                 'created_by' => (int) $user->id,
             ];
@@ -703,6 +969,7 @@ public function show($headerId)
             'file' => config('app.debug') ? $e->getFile() : null,
         ]);
     }
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 }
 
 //=====================================
@@ -712,16 +979,23 @@ public function detail($id)
 {
     $user = auth()->user();
 
+<<<<<<< HEAD
+    if (!in_array($user->role_id, [1, 5])) {
+=======
     if (!in_array($user->role_id, [1, 2, 3, 4, 5])) {
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk melihat data ini.', null);
     }
 
     $lostEvent = LostEvent::with([
         'createdBy:id,username',
         'updatedBy:id,username',
+<<<<<<< HEAD
+=======
         'riskOwnerDepartmentRelation:id,name',
         'jenisRisikoRelation:id,nama_jenis_risiko',
         'uploadedFiles:id,lost_event_id,filepath,domain',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         'header' => function($query) {
             $query->with([
                 'jenisRisiko:id,nama_jenis_risiko',
@@ -738,6 +1012,14 @@ public function detail($id)
         return json(404, false, 'Tidak Ditemukan', 'Lost event tidak ditemukan.', null);
     }
 
+<<<<<<< HEAD
+    $header = $lostEvent->header;
+
+    if (!$header) {
+        return json(404, false, 'Tidak Ditemukan', 'Header risiko tidak ditemukan.', null);
+    }
+
+=======
     // Cegah role 2 & 3 melihat data department lain
     if (in_array($user->role_id, [2, 3])) {
         if ($lostEvent->risk_owner_department_id != $user->department_id) {
@@ -810,6 +1092,7 @@ public function detail($id)
     }
 
     // Jika lost event terkait dengan header
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     if ($header->monthlyData->count() !== 12) {
         return json(400, false, 'Data Tidak Lengkap', 'Data risiko belum memiliki 12 bulan yang difinalisasi.', null);
     }
@@ -887,12 +1170,19 @@ public function detail($id)
         'lost_event_id' => $lostEvent->id,
         'header_id' => $lostEvent->header_id,
         'rcsa_id' => $header->rcsa_id,
+<<<<<<< HEAD
+        'tahun' => $lostEvent->tahun,
+        'risk_owner_department' => $lostEvent->risk_owner_department,
+        'jenis_risiko_id' => $header->jenis_risiko ?? null,
+        'jenis_risiko' => $lostEvent->jenis_risiko,
+=======
         'status' => $lostEvent->status ?? 'draft',
         'tahun' => $lostEvent->tahun,
         'risk_owner_department_id' => $lostEvent->risk_owner_department_id,
         'risk_owner_department' => optional($lostEvent->riskOwnerDepartmentRelation)->name ?? '',
         'jenis_risiko_id' => $lostEvent->jenis_risiko_id,
         'jenis_risiko' => optional($lostEvent->jenisRisikoRelation)->nama_jenis_risiko ?? '',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         'nama_kejadian' => $lostEvent->nama_kejadian,
         'identifikasi_kejadian' => $lostEvent->identifikasi_kejadian,
         'kategori_kejadian' => $lostEvent->kategori_kejadian,
@@ -902,8 +1192,13 @@ public function detail($id)
         'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian,
         'pihak_terkait' => $lostEvent->pihak_terkait,
         'status_asuransi' => $lostEvent->status_asuransi,
+<<<<<<< HEAD
+        'kategori_risiko_bumn' => $lostEvent->kategori_risiko_bumn,
+        'kategori_risiko_t2_t3_kbumn' => $lostEvent->kategori_risiko_t2_t3_kbumn,
+=======
         'kategori_risiko_bumn' => $lostEvent->kategori_risiko_bumn ?? '',
         'kategori_risiko_t2_t3_kbumn' => $lostEvent->kategori_risiko_t2_t3_kbumn ?? '',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         'penjelasan_kerugian' => $lostEvent->penjelasan_kerugian,
         'nilai_kerugian' => $lostEvent->nilai_kerugian,
         'kejadian_berulang' => $lostEvent->kejadian_berulang,
@@ -919,14 +1214,21 @@ public function detail($id)
         'created_by_name' => get_decrypted_name($lostEvent->createdBy),
         'updated_by' => $lostEvent->updated_by,
         'updated_by_name' => get_decrypted_name($lostEvent->updatedBy),
+<<<<<<< HEAD
+        'type' => $normalizedType,
+=======
         'type' => $lostEvent->type ?? ($normalizedType ?? 'unknown'),
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         'realization_percentage' => $percentage !== null
             ? rtrim(rtrim(number_format($percentage, 2), '0'), '.') . '%'
             : null,
         'threshold_aman' => $thresholdAman,
         'threshold_hati_hati' => $thresholdHatiHati,
         'threshold_bahaya' => $thresholdBahaya,
+<<<<<<< HEAD
+=======
         'uploaded_files' => $uploadedFiles,
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     ];
 
     $cleanData = clean_recursive($data);
@@ -934,6 +1236,39 @@ public function detail($id)
     return json(200, true, 'Data Ditemukan', 'Detail lost event berhasil diambil.', $cleanData);
 }
 
+<<<<<<< HEAD
+    /**
+     * Update lost event
+     * Role 1: Bisa update semua data
+     * Role 2: Bisa update hanya data department mereka
+     */
+    public function update(Request $request, $id)
+{
+    $user = auth()->user();
+
+    if (!in_array($user->role_id, [1, 5])) {
+        return json(403, false, 'Forbidden', 'Anda tidak memiliki akses untuk mengubah data.', null);
+    }
+
+    $lostEvent = LostEvent::find($id);
+
+    if (!$lostEvent) {
+        return json(404, false, 'Tidak Ditemukan', 'Lost event tidak ditemukan.', null);
+    }
+
+    if ($user->role_id === 2) {
+        $userDepartmentName = optional($user->department)->name ?? '';
+        if ($lostEvent->risk_owner_department !== $userDepartmentName) {
+            return json(403, false, 'Forbidden', 'Anda hanya dapat mengubah data untuk department Anda sendiri.', null);
+        }
+    }
+
+    // Field bawaan header TIDAK required saat update
+    $validator = Validator::make($request->all(), [
+        'tahun' => 'nullable|string|max:4',
+        'risk_owner_department' => 'nullable|string|max:255',
+        'jenis_risiko' => 'nullable|string|max:255',
+=======
 // Lost Event Create dengan Upload
 public function store(Request $request)
 {
@@ -971,6 +1306,7 @@ public function store(Request $request)
         'tahun' => 'required|string|max:4',
         'risk_owner_department_id' => 'required|exists:mst_department,id',
         'jenis_risiko_id' => 'required|exists:mst_jenis_risiko,id',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         'nama_kejadian' => 'required|string|max:255',
         'identifikasi_kejadian' => 'nullable|string',
         'kategori_kejadian' => 'nullable|string|max:255',
@@ -994,6 +1330,9 @@ public function store(Request $request)
     ]);
 
     if ($validator->fails()) {
+<<<<<<< HEAD
+        return json(422, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
+=======
         return json(403, false, 'Validasi Gagal', 'Data yang dikirim tidak valid.', $validator->errors());
     }
 
@@ -1058,11 +1397,41 @@ public function store(Request $request)
         if (empty($kategoriRisikoT2T3Kbumn) && $header->rcsa) {
             $kategoriRisikoT2T3Kbumn = $header->rcsa->kategori_risiko_t2_t3_kbumn ?? '';
         }
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     }
 
     try {
         DB::beginTransaction();
 
+<<<<<<< HEAD
+        $data = $validator->validated();
+
+        // Hapus field header agar tidak bisa diubah
+        unset(
+            $data['tahun'],
+            $data['risk_owner_department'],
+            $data['jenis_risiko'],
+            $data['identifikasi_kejadian'],
+            $data['mitigasi_yang_direncanakan']
+        );
+
+        if ($user->role_id === 2) {
+            $userDepartmentName = optional($user->department)->name ?? '';
+            if ($lostEvent->risk_owner_department !== $userDepartmentName) {
+                return json(403, false, 'Forbidden', 'Anda tidak dapat mengubah department ke department lain.', null);
+            }
+        }
+
+        $data['updated_by'] = $user->id;
+
+        $lostEvent->update($data);
+
+        DB::commit();
+
+        return json(200, true, 'Berhasil', 'Lost event berhasil diupdate.', [
+            'id' => $lostEvent->id,
+        ]);
+=======
         // Buat lost event baru
         $lostEvent = LostEvent::create([
             'header_id' => $headerId,
@@ -1402,6 +1771,7 @@ public function update(Request $request, $id)
         $cleanData = clean_recursive($data);
 
         return json(200, true, 'Berhasil', 'Lost event berhasil diupdate.', $cleanData);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     } catch (\Exception $e) {
         DB::rollBack();
         return json(500, false, 'Error', 'Terjadi kesalahan saat mengupdate data.', [
@@ -1409,16 +1779,23 @@ public function update(Request $request, $id)
         ]);
     }
 }
+<<<<<<< HEAD
+=======
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     /**
      * Delete lost event (soft delete)
      * Hanya Role 1 yang bisa delete
      */
+<<<<<<< HEAD
+    public function destroy($id)
+=======
     /**
  * Delete lost event (soft delete)
  * Hanya Role 1 yang bisa delete dan hanya jika status draft
  */
 public function destroy($id)
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 {
     $user = auth()->user();
 
@@ -1434,11 +1811,14 @@ public function destroy($id)
         return json(404, false, 'Tidak Ditemukan', 'Lost event tidak ditemukan.', null);
     }
 
+<<<<<<< HEAD
+=======
     // VALIDASI: Hanya bisa delete jika status draft
     if ($lostEvent->status !== 'draft') {
         return json(400, false, 'Gagal', 'Lost event hanya dapat dihapus jika berstatus draft.', null);
     }
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     try {
         DB::beginTransaction();
 
@@ -1456,6 +1836,8 @@ public function destroy($id)
     }
 }
 
+<<<<<<< HEAD
+=======
     /**
      * Delete uploaded file from lost event
      */
@@ -2001,4 +2383,5 @@ private function formatLostEventResponse($lostEvent)
     ];
 }
 
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 }

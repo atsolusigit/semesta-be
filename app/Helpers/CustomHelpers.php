@@ -100,32 +100,38 @@ if (!function_exists('time_elapsed_string')) {
 }
 
 if (!function_exists('encrypt_decrypt_db')) {
-    /**
-     * Format a number as currency.
-     *
-     * @param float $amount
-     * @param string $currency
-     * @return string
-     */
+
     function encrypt_decrypt_db($type, $value, $id)
     {
-        if ($type == 'enc') {
-            $value = "AES_ENCRYPT('$value', concat('SM','$id'))";
-        }
-        else {
-            $value = DB::select("SELECT AES_DECRYPT('$value', concat('SM', $id)) as result");
+        // Safety: pastikan id valid integer/string
+        $id = (string) $id;
+        $key = 'SM' . $id;
 
-            if (count($value) == 0) {
-                $value = '';
-            }
-            else {
-                $value = $value[0]->result;
-            }
+        // ENCRYPT: kembalikan expression agar MySQL mengeksekusi AES_ENCRYPT saat update
+        if ($type === 'enc') {
+            // Quote value & key menggunakan PDO agar aman terhadap tanda kutip
+            $pdo = DB::getPdo();
+            $quotedValue = $pdo->quote($value);       // menghasilkan '...'
+            $quotedKey = $pdo->quote($key);           // menghasilkan 'SM23'
+            // Contoh return: DB::raw("AES_ENCRYPT('nilai', 'SM23')")
+            return DB::raw("AES_ENCRYPT({$quotedValue}, {$quotedKey})");
         }
 
-        return $value;
+        // DECRYPT: jalankan AES_DECRYPT terhadap ciphertext yang disimpan (binary) menggunakan binding
+        try {
+            // Jika $value adalah instance of \Illuminate\Database\Query\Expression (rare), we can't bind it.
+            // Normalnya $value adalah nilai dari DB (binary/varbinary) -> gunakan binding.
+            $row = DB::selectOne(
+                "SELECT CAST(AES_DECRYPT(?, ?) AS CHAR) AS result",
+                [$value, $key]
+            );
+
+            return $row->result ?? null;
+        } catch (\Throwable $e) {
+            \Log::warning("encrypt_decrypt_db(decode) error for id {$id}: " . $e->getMessage());
+            return null;
+        }
     }
-
 }
 
 if (!function_exists('encrypt_decrypt_md5')) {
@@ -959,28 +965,23 @@ if (!function_exists('clean_recursive')) {
 }
 
 if (!function_exists('get_decrypted_username')) {
-    /**
-     * Ambil dan dekripsi username dari objek user, fallback ke 'Unknown User' jika gagal.
-     *
-     * @param object|null $userObject
-     * @return string
-     */
     function get_decrypted_username($userObject)
     {
-        if (!$userObject || !isset($userObject->username) || !isset($userObject->id)) {
+        if (!$userObject || empty($userObject->id)) {
             return 'Unknown User';
         }
 
         try {
-            $decryptedRaw = encrypt_decrypt_db('dec', $userObject->username, $userObject->id);
-            if (is_string($decryptedRaw) && !empty(trim($decryptedRaw))) {
-                $cleaned = clean_string($decryptedRaw);
-                if (!empty($cleaned)) {
-                    return $cleaned;
-                }
+            $row = DB::selectOne("
+                SELECT CAST(AES_DECRYPT(username, CONCAT('SM', ?)) AS CHAR) AS name
+                FROM users WHERE id = ? LIMIT 1
+            ", [$userObject->id, $userObject->id]);
+
+            if ($row && !empty($row->name)) {
+                return clean_string($row->name);
             }
         } catch (\Throwable $e) {
-            \Log::warning("Error decrypt username for user ID {$userObject->id}: " . $e->getMessage());
+            \Log::warning("Decrypt username error for user {$userObject->id}: ".$e->getMessage());
         }
 
         return 'Unknown User';
@@ -995,16 +996,16 @@ if (!function_exists('get_decrypted_name')) {
         }
 
         try {
-            $row = \DB::select("
-                SELECT CAST(AES_DECRYPT(name, CONCAT('SM', ?)) AS CHAR) as result
+            $row = DB::selectOne("
+                SELECT CAST(AES_DECRYPT(name, CONCAT('SM', ?)) AS CHAR) AS result
                 FROM users WHERE id = ? LIMIT 1
             ", [$userObject->id, $userObject->id]);
 
-            if ($row && !empty($row[0]->result)) {
-                return clean_string($row[0]->result);
+            if ($row && !empty($row->result)) {
+                return clean_string($row->result);
             }
         } catch (\Throwable $e) {
-            \Log::warning("Error decrypt name for user ID {$userObject->id}: " . $e->getMessage());
+            \Log::warning("Decrypt name error for user {$userObject->id}: ".$e->getMessage());
         }
 
         return 'User Tidak diketahui';
@@ -1019,16 +1020,16 @@ if (!function_exists('get_decrypted_email')) {
         }
 
         try {
-            $row = \DB::select("
-                SELECT CAST(AES_DECRYPT(email, CONCAT('SM', ?)) AS CHAR) as result
+            $row = DB::selectOne("
+                SELECT CAST(AES_DECRYPT(email, CONCAT('SM', ?)) AS CHAR) AS result
                 FROM users WHERE id = ? LIMIT 1
             ", [$userObject->id, $userObject->id]);
 
-            if ($row && !empty($row[0]->result)) {
-                return clean_string($row[0]->result);
+            if ($row && !empty($row->result)) {
+                return clean_string($row->result);
             }
         } catch (\Throwable $e) {
-            \Log::warning("Error decrypt email for user ID {$userObject->id}: " . $e->getMessage());
+            \Log::warning("Decrypt email error for user {$userObject->id}: ".$e->getMessage());
         }
 
         return 'Email Tidak diketahui';

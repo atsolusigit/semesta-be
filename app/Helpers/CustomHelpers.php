@@ -28,11 +28,7 @@ if (!function_exists('check_validation')) {
             $json = response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
-<<<<<<< HEAD
                 'message' => 'error validation. [400 - bad request]',
-=======
-                'message' => 'validasi gagal',
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 'data' => $validator->messages()
             ], 200);
 

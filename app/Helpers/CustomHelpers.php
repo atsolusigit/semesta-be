@@ -28,7 +28,7 @@ if (!function_exists('check_validation')) {
             $json = response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
-                'message' => 'error validation. [400 - bad request]',
+                'message' => 'validasi gagal',
                 'data' => $validator->messages()
             ], 200);
 
@@ -478,16 +478,6 @@ if (!function_exists('process_yearly_residual_risk')) {
     }
 }
 
-<<<<<<< HEAD
-if (!function_exists('process_risk_monthly_file_uploads')) {
-    /**
-     * Proses file uploads untuk risk monthly
-     *
-     * @param array $uploadedFiles
-     * @param object $monthly
-     * @return void
-     */
-=======
 if (!function_exists('process_lost_event_file_uploads')) {
 
     /**
@@ -526,7 +516,6 @@ if (!function_exists('process_lost_event_file_uploads')) {
 
 if (!function_exists('process_risk_monthly_file_uploads')) {
 
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     function process_risk_monthly_file_uploads($uploadedFiles, $monthly)
     {
         if (!is_array($uploadedFiles)) {
@@ -534,28 +523,17 @@ if (!function_exists('process_risk_monthly_file_uploads')) {
         }
 
         foreach ($uploadedFiles as $file) {
-<<<<<<< HEAD
-=======
 
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             if (!isset($file['filepath']) || empty($file['filepath'])) {
                 continue;
             }
 
             TrRiskMonthlyUpload::create([
-<<<<<<< HEAD
-                'header_id' => $monthly->header_id,
-                'risk_monthly_id' => $monthly->id,
-                'filepath' => $file['filepath'],
-                'domain' => $file['domain'] ?? basename($file['filepath']),
-                'is_confirmed' => true,
-=======
                 'header_id'        => $monthly->header_id,
                 'risk_monthly_id'  => $monthly->id,
                 'filepath'         => $file['filepath'],  // base64 tersimpan
                 'domain'           => $file['domain'] ?? 'dokumen',
                 'is_confirmed'     => true,
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             ]);
         }
     }
@@ -609,13 +587,8 @@ if (!function_exists('validate_bulk_quantitative_data')) {
             if (array_key_exists('target_quantitative', $monthData) && is_null($monthData['target_quantitative'])) {
                 return [
                     'valid' => false,
-<<<<<<< HEAD
-                    'title' => 'Target Quantitative Tidak Boleh Kosong',
-                    'message' => "Data pada index {$index} memiliki kuantitatif target yang kosong. Mohon isi dengan nilai yang valid.",
-=======
                     'title' => 'Data Tidak Boleh Kosong',
                     'message' => "Ada data yang masih kosong. Mohon mengisi data dengan benar.",
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                     'data' => [
                         'header_id' => $headerId,
                         'invalid_index' => $index,
@@ -703,41 +676,14 @@ if (!function_exists('validate_bulk_monthly_constraints')) {
      * @param object $existingMonthly
      * @param bool $requireAllMonths
      * @param int $headerId
-<<<<<<< HEAD
-     * @return array
-     */
-    function validate_bulk_monthly_constraints($processedMonthlyData, $existingMonthly, $requireAllMonths, $headerId)
-=======
      * @param bool $bypassFinalization - parameter baru untuk bypass pengecekan finalisasi
      * @return array
      */
     function validate_bulk_monthly_constraints($processedMonthlyData, $existingMonthly, $requireAllMonths, $headerId, $bypassFinalization = false)
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     {
         $requestedMonths = collect($processedMonthlyData)->pluck('month')->toArray();
         $warnings = [];
 
-<<<<<<< HEAD
-        // Check finalization
-        $finalizedMonths = [];
-        foreach ($processedMonthlyData as $monthData) {
-            $month = $monthData['month'];
-            if (isset($existingMonthly[$month]) && $existingMonthly[$month]->is_finalize) {
-                $finalizedMonths[] = $month;
-            }
-        }
-
-        if (!empty($finalizedMonths)) {
-            return [
-                'valid' => false,
-                'title' => 'Data Sudah Difinalisasi',
-                'message' => 'Bulan berikut sudah difinalisasi dan tidak bisa diubah: ' . implode(', ', $finalizedMonths),
-                'data' => [
-                    'header_id' => $headerId,
-                    'finalized_months' => $finalizedMonths
-                ]
-            ];
-=======
         // Check finalization - bisa di-bypass oleh role tertentu
         if (!$bypassFinalization) {
             $finalizedMonths = [];
@@ -759,7 +705,6 @@ if (!function_exists('validate_bulk_monthly_constraints')) {
                     ]
                 ];
             }
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
 
         // Check for duplicate months
@@ -1066,8 +1011,6 @@ if (!function_exists('get_decrypted_name')) {
     }
 }
 
-<<<<<<< HEAD
-=======
 if (!function_exists('get_decrypted_email')) {
     function get_decrypted_email($userObject)
     {
@@ -1092,7 +1035,6 @@ if (!function_exists('get_decrypted_email')) {
     }
 }
 
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 if (!function_exists('get_month_name')) {
     /**
      * Ambil nama bulan dalam bahasa Indonesia berdasarkan nomor bulan.
@@ -1387,8 +1329,6 @@ if (!function_exists('check_role')) {
         return true;
     }
 }
-<<<<<<< HEAD
-=======
 
 if (!function_exists('detect_storage_disk')) {
     /**
@@ -1512,4 +1452,3 @@ if (!function_exists('delete_file_from_storage')) {
         }
     }
 }
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae

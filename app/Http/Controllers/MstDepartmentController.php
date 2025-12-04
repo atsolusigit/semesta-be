@@ -15,11 +15,7 @@ class MstDepartmentController extends Controller
 {
     public function index(Request $request)
 {
-<<<<<<< HEAD
-    $perPage = $request->input('per_page', 10);
-=======
     $perPage = $request->input('per_page');
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     $query = MstDepartment::select('id', 'name', 'abbreviation', 'created_at', 'created_by')
         ->with('createdBy:id,name,email');
@@ -27,13 +23,8 @@ class MstDepartmentController extends Controller
     $user = auth()->user();
 
     if ($user) {
-<<<<<<< HEAD
-        // Hanya role selain 1 & 2 yang dibatasi ke departemennya sendiri
-        if (!in_array($user->role->id, [1, 2])) {
-=======
         // Check authorization: only role 1, 2, 4 and 5 can access all departments
         if (!in_array($user->role->id, [1, 2, 4, 5])) {
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             $query->where('id', $user->department_id);
         }
     }
@@ -46,12 +37,6 @@ class MstDepartmentController extends Controller
         });
     }
 
-<<<<<<< HEAD
-    // Pagination
-    $data = $query->orderBy('id')->paginate($perPage);
-
-    // Mapping data
-=======
     // Jika per_page kosong atau = "all", ambil semua data
     if (empty($perPage) || $perPage === 'all') {
         $data = $query->orderBy('id')->get();
@@ -77,7 +62,6 @@ class MstDepartmentController extends Controller
     // Kalau per_page dikirim, tetap gunakan pagination Laravel
     $data = $query->orderBy('id')->paginate($perPage);
 
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     $mappedData = $data->getCollection()->map(function ($item) {
         return [
             'id' => $item->id,
@@ -90,10 +74,6 @@ class MstDepartmentController extends Controller
         ];
     });
 
-<<<<<<< HEAD
-    // Prepare response dengan pagination
-=======
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     $responseData = [
         'current_page' => $data->currentPage(),
         'per_page' => $data->perPage(),
@@ -116,13 +96,8 @@ public function show($id)
     $user = auth()->user();
 
     if ($user) {
-<<<<<<< HEAD
-        // Hanya role selain 1 & 2 yang dibatasi
-        if (!in_array($user->role->id, [1, 2]) && $user->department_id != $id) {
-=======
         // Check authoriztion: only role 1, 2, 4 and 5 can access other departments
         if (!in_array($user->role->id, [1, 2, 4, 5]) && $user->department_id != $id) {
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             return json(404, false, 'Not Found', 'Departemen tidak ditemukan.', null);
         }
     }

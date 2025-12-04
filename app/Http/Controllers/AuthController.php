@@ -43,25 +43,6 @@ public function register(Request $request)
             return response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
-<<<<<<< HEAD
-                'message' => 'error validation. [400 - bad request]',
-                'data' => [
-                    'username' => ['The username has already been taken.']
-                ]
-            ], 400);
-        }
-
-        // Validasi domain email kbn.co.id
-        if (!preg_match('/^[\w\-\.]+@kbn\.co\.id$/i', $request->email)) {
-            return response()->json([
-                'code' => 400,
-                'status' => 'error_validation',
-                'message' => 'error validation. [400 - bad request]',
-                'data' => [
-                    'email' => ['Maaf, gunakan email @kbn.co.id untuk proses register.']
-                ]
-            ], 400);
-=======
                 'message' => 'The username has already been taken.',
                 'data' => [
                     'username' => ['The username has already been taken.']
@@ -105,7 +86,6 @@ public function register(Request $request)
                     'email' => ["Maaf, gunakan email dengan domain: @{$allowedDomainsStr} untuk proses register."]
                 ]
             ], 200);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
 
         $array_validation = [
@@ -150,10 +130,6 @@ public function register(Request $request)
         ]);
 
         // ========== KIRIM EMAIL SEBELUM COMMIT ==========
-<<<<<<< HEAD
-        // Siapkan data plain untuk email
-=======
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $userDataForEmail = (object)[
             'id' => $user->id,
             'name' => $name,
@@ -162,22 +138,6 @@ public function register(Request $request)
             'created_at' => $user->created_at,
         ];
 
-<<<<<<< HEAD
-        // Email ke USER (Konfirmasi Registrasi)
-        Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
-
-        // Email ke ADMIN/SPV (Notifikasi User Baru)
-        $admins = User::whereIn('role_id', [1, 2])
-                     ->where('status', 1)
-                     ->get();
-
-        foreach ($admins as $admin) {
-            $adminEmail = encrypt_decrypt_db('dec', $admin->email, $admin->id);
-            Mail::to($adminEmail)->send(new UserRegisteredMail($userDataForEmail));
-        }
-
-        // Jika sampai sini tidak ada error, commit transaksi
-=======
         // Kirim email ke user yang baru register
         try {
             Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
@@ -206,7 +166,6 @@ public function register(Request $request)
             }
         }
 
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         DB::commit();
 
         return json(200, 'true', 'success', 'Akun berhasil didaftarkan. Menunggu persetujuan admin.', [
@@ -362,11 +321,7 @@ public function register(Request $request)
                 return response()->json([
                     'code' => 400,
                     'status' => 'error_validation',
-<<<<<<< HEAD
-                    'message' => 'error validation. [400 - bad request]',
-=======
                     'message' => 'Password lama salah.',
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                     'data' => [
                         'old_password' => ['Password lama salah.']
                     ]

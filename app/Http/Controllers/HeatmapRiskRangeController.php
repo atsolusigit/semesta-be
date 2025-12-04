@@ -21,13 +21,8 @@ class HeatmapRiskRangeController extends Controller
 
     public function store(Request $request)
     {
-<<<<<<< HEAD
-        // Check authorization: only role 1 and 2 can store
-        $result = check_role(auth()->user(), [1, 2]);
-=======
         // Check authorization: only role 1, 2, 4 and 5 can store
         $result = check_role(auth()->user(), [1, 2, 4, 5]);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         if ($result !== true) {
             return $result;
         }
@@ -65,13 +60,8 @@ class HeatmapRiskRangeController extends Controller
 
     public function update(Request $request, $id)
     {
-<<<<<<< HEAD
-        // Check authorization: only role 1 and 2 can update
-       $result = check_role(auth()->user(), [1, 2]);
-=======
         // Check authorization: only role 1, 2, 4 and 5 can update
        $result = check_role(auth()->user(), [1, 2, 4, 5]);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         if ($result !== true) {
             return $result;
         }

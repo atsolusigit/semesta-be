@@ -8,15 +8,9 @@ use Illuminate\Support\Facades\Validator;
 
 class MstOptionController extends Controller
 {
-<<<<<<< HEAD
-    public function index(Request $request)
-{
-    $perPage = $request->input('per_page', 10);
-=======
    public function index(Request $request)
 {
     $perPage = $request->input('per_page');
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     $query = MstOption::query()->orderBy('id', 'asc');
 
@@ -35,10 +29,6 @@ class MstOptionController extends Controller
         $query->where('type', $request->type);
     }
 
-<<<<<<< HEAD
-    // Pagination
-    $data = $query->paginate($perPage);
-=======
     // Jika per_page kosong atau 'all', ambil semua data tanpa pagination
     if (empty($perPage) || $perPage === 'all') {
         $data = $query->get();
@@ -62,7 +52,6 @@ class MstOptionController extends Controller
 
     // Pagination
     $data = $query->paginate((int) $perPage);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     // Mapping data
     $mappedData = $data->getCollection()->map(function ($item) {
@@ -89,20 +78,12 @@ class MstOptionController extends Controller
 
     return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $responseData);
 }
-<<<<<<< HEAD
-    public function store(Request $request)
-    {
-        // Check authorization: only role 1 and 2 can store
-        $userRole = auth()->user()->role_id ?? null;
-        if (!in_array($userRole, [1, 2])) {
-=======
 
     public function store(Request $request)
     {
         // Check authorization: only role 1, 2, 4 and 5 can store
         $userRole = auth()->user()->role_id ?? null;
         if (!in_array($userRole, [1, 2, 4, 5])) {
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk menambah data', null);
         }
 
@@ -133,15 +114,9 @@ class MstOptionController extends Controller
 
     public function update(Request $request, $id)
     {
-<<<<<<< HEAD
-        // Check authorization: only role 1 and 2 can update
-        $userRole = auth()->user()->role_id ?? null;
-        if (!in_array($userRole, [1, 2])) {
-=======
        // Check authorization: only role 1, 2, 4 and 5 can update
         $userRole = auth()->user()->role_id ?? null;
         if (!in_array($userRole, [1, 2, 4, 5])) {
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki akses untuk mengubah data', null);
         }
 

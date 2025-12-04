@@ -8,15 +8,9 @@ use Illuminate\Support\Facades\Validator;
 
 class MstRiskCodeController extends Controller
 {
-<<<<<<< HEAD
-    public function index(Request $request)
-{
-    $perPage = $request->input('per_page', 10);
-=======
    public function index(Request $request)
 {
     $perPage = $request->input('per_page');
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     $query = MstRiskCode::query()->orderBy('id', 'asc');
 
@@ -29,10 +23,6 @@ class MstRiskCodeController extends Controller
         });
     }
 
-<<<<<<< HEAD
-    // Pagination
-    $data = $query->paginate($perPage);
-=======
     // Jika per_page kosong atau 'all', ambil semua data tanpa pagination
     if (empty($perPage) || $perPage === 'all') {
         $data = $query->get();
@@ -55,7 +45,6 @@ class MstRiskCodeController extends Controller
 
     // Pagination
     $data = $query->paginate((int) $perPage);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     // Mapping data
     $mappedData = $data->getCollection()->map(function ($item) {
@@ -82,22 +71,12 @@ class MstRiskCodeController extends Controller
     return json(200, true, 'Data ditemukan', 'Data jenis risiko berhasil diambil.', $responseData);
 }
 
-<<<<<<< HEAD
-
-    // Tambah data jenis risiko
-    public function store(Request $request)
-    {
-        // Check authorization: only role 1 and 2 can store
-        $user = auth()->user();
-        $roleCheck = check_role($user, [1, 2]);
-=======
     // Tambah data jenis risiko
     public function store(Request $request)
     {
        // Check authorization: only role 1, 2, 4 and 5 can store
         $user = auth()->user();
         $roleCheck = check_role($user, [1, 2, 4, 5]);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
         if ($roleCheck !== true) {
             return $roleCheck;
@@ -134,15 +113,9 @@ class MstRiskCodeController extends Controller
     // Update jenis risiko
     public function update(Request $request, $id)
     {
-<<<<<<< HEAD
-        // Check authorization: only role 1 and 2 can update
-        $user = auth()->user();
-        $roleCheck = check_role($user, [1, 2]);
-=======
         // Check authorization: only role 1, 2, 4 and 5 can update
         $user = auth()->user();
         $roleCheck = check_role($user, [1, 2, 4, 5]);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
         if ($roleCheck !== true) {
             return $roleCheck;

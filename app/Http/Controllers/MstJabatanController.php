@@ -10,11 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class MstJabatanController extends Controller
 {
-<<<<<<< HEAD
-    /**
-=======
   /**
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
  * Display a listing of jabatan
  */
 public function index(Request $request)
@@ -22,17 +18,10 @@ public function index(Request $request)
     $request->validate([
         'department_id' => 'nullable|integer',
         'search' => 'nullable|string|max:255',
-<<<<<<< HEAD
-        'per_page' => 'nullable|integer|min:1|max:100'
-    ]);
-
-    $perPage = $request->input('per_page', 10);
-=======
         'per_page' => 'nullable' // biarkan FE bebas atur, tidak wajib integer
     ]);
 
     $perPage = $request->input('per_page');
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     $query = MstJabatan::with('department:id,name')->orderBy('name', 'asc');
 
@@ -59,9 +48,6 @@ public function index(Request $request)
         });
     }
 
-<<<<<<< HEAD
-    // Pagination
-=======
     // Jika per_page kosong atau 'all', ambil semua data tanpa pagination
     if (empty($perPage) || $perPage === 'all') {
         $data = $query->get();
@@ -85,7 +71,6 @@ public function index(Request $request)
     }
 
     // Kalau per_page dikirim, gunakan pagination
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     $data = $query->paginate($perPage);
 
     // Mapping data

@@ -409,10 +409,6 @@ class RencanaInvestasiController extends Controller
             ], 400);
         }
 
-<<<<<<< HEAD
-        $now              = now();
-        $tahunForTimeline = (int) $now->year;
-=======
         $now = now();
 
         $filterYear = null;
@@ -423,7 +419,6 @@ class RencanaInvestasiController extends Controller
         }
 
         $tahunForTimeline = $filterYear ?: (int) $now->year;
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $bulanForTimeline = (int) $now->month;
         $weekForTimeline  = (int) max(1, min((int)ceil($now->day / 7), 4));
         $monthName        = $this->getMonthName($bulanForTimeline);
@@ -442,11 +437,6 @@ class RencanaInvestasiController extends Controller
                     ->where('week',  $weekForTimeline);
                 },
             ])
-<<<<<<< HEAD
-            ->orderBy('rencana_investasi.id', 'asc')
-            ->get();
-
-=======
 
             ->when(!is_null($filterYear), function ($q) use ($filterYear) {
                 $q->where('rencana_investasi.year', $filterYear);
@@ -492,7 +482,6 @@ class RencanaInvestasiController extends Controller
             ], 404);
         }
 
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $departmentName = $this->guessDepartmentName($rows, null);
 
         $flatRows = $rows->map(function ($it) use ($tahunForTimeline, $bulanForTimeline, $weekForTimeline) {
@@ -565,10 +554,7 @@ class RencanaInvestasiController extends Controller
         }
     }
 
-<<<<<<< HEAD
-=======
 
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     private function extractTargetTimeline($it): array
     {
         $period = $it->periods->first();

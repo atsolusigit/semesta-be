@@ -37,10 +37,7 @@ use App\Http\Controllers\TrRiskInvestasiController;
 use App\Http\Controllers\MstRcsaController;
 use App\Http\Controllers\RecommendationNotifController;
 use App\Http\Controllers\MstEmailRiskOwnerController;
-<<<<<<< HEAD
-=======
 use App\Http\Controllers\MstEmailDomainController;
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
 // ============================
 //  Auth Routes (tanpa token)
@@ -91,22 +88,14 @@ Route::middleware(['auth:api'])->group(function () {
         Route::put('{id}', [UserController::class, 'update']);      // Update user
         Route::delete('{id}', [UserController::class, 'destroy']);  // Hapus user
 
-<<<<<<< HEAD
-        Route::post('{id}/approve', [UserController::class, 'approveUser']);
-        Route::post('{id}/reject', [UserController::class, 'rejectUser']);
-=======
         Route::post('{id}/approve', [UserController::class, 'approveUser']); // Approve user
         Route::post('{id}/reject', [UserController::class, 'rejectUser']); // Reject user
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     });
 
     // Profile endpoints
     Route::get('/my-profile', [UserController::class, 'getProfile']);
     Route::post('/profile/update', [UserController::class, 'updateProfile']);
-<<<<<<< HEAD
-=======
      Route::post('/profile/photo/upload', [UserController::class, 'uploadPhoto']);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 });
 
 // API Knowledge Base Management
@@ -117,6 +106,10 @@ Route::middleware(['auth:api'])->group(function () {
     Route::post('/knowledge-base', [KnowledgeBaseController::class, 'store']);                  // Tambah knowledge base (role 1,2)
     Route::put('/knowledge-base/{id}', [KnowledgeBaseController::class, 'update']);             // Update knowledge base (role 1,2)
     Route::delete('/knowledge-base/{id}', [KnowledgeBaseController::class, 'destroy']);         // Hapus knowledge base (role 1)
+
+    // File upload & delete routes (untuk update file setelah knowledge dibuat)
+    Route::post('/knowledge-base/file/upload', [KnowledgeBaseController::class, 'uploadFile']); // Upload file (role 1,2,3)
+    Route::delete('/knowledge-base/file/{id}/delete', [KnowledgeBaseController::class, 'deleteFile']); // Delete file (role 1,2,3)
 });
 
 // ===================== HEAT LABEL =====================
@@ -193,8 +186,6 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/option/{id}', [MstOptionController::class, 'destroy']);                     // Hapus option (role 1)
 });
 
-<<<<<<< HEAD
-=======
 // API Email Domain Management
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/email-domains', [MstEmailDomainController::class, 'index']);       // List semua email domain (role 1 & 2)
@@ -205,7 +196,6 @@ Route::middleware(['auth:api'])->group(function () {
     Route::delete('/email-domains/{id}', [MstEmailDomainController::class, 'destroy']); // Hapus email domain
 });
 
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 // ===================== RISK HEADER =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/risk-header', [TrRiskHeaderController::class, 'index']);                            // List all risk headers (semua role)
@@ -292,28 +282,16 @@ Route::middleware(['auth:api'])->group(function () {
 Route::middleware(['auth:api'])->group(function () {
     Route::get('/export-risk/{format}', [ExportRiskController::class, 'export'])
         ->where(['format' => 'pdf|excel'])
-<<<<<<< HEAD
-        ->middleware(RoleAccessMiddleware::class . ':1,2,3'); // Export risk file (role 1,2,3)
-
-    Route::get('/export-risk/{id}/preview', [ExportRiskController::class, 'preview'])
-        ->where('id', '[0-9]+')
-        ->middleware(RoleAccessMiddleware::class . ':1,2,3'); // Preview export risk (role 1,2,3)
-=======
         ->middleware(RoleAccessMiddleware::class . ':1,2,3,4,5'); // Export risk file (role 1,2,3)
 
     Route::get('/export-risk/{id}/preview', [ExportRiskController::class, 'preview'])
         ->where('id', '[0-9]+')
         ->middleware(RoleAccessMiddleware::class . ':1,2,3,4,5'); // Preview export risk (role 1,2,3)
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     // Export Lost Event (hanya role 1, 4, dan 5)
     Route::get('/export-lost-event/{format}', [ExportRiskController::class, 'exportLostEvent'])
         ->where(['format' => 'pdf|excel'])
-<<<<<<< HEAD
-        ->middleware(RoleAccessMiddleware::class . ':1,4,5');
-=======
         ->middleware(RoleAccessMiddleware::class . ':1,2,3,4,5');
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 });
 
 // ===================== RISK TIMELINE PDF =====================
@@ -350,26 +328,18 @@ Route::middleware(['auth:api'])->group(function () {
 
 // ===================== LOST EVENT =====================
 Route::middleware(['auth:api'])->group(function () {
-<<<<<<< HEAD
-    Route::get('/lost-events', [LostEventController::class, 'index']); // List header < 50%
-=======
     Route::get('/lost-events', [LostEventController::class, 'index']); // List header berdasarkan treshold
     Route::get('/lost-events/pending', [LostEventController::class, 'getPending']); // Get pending submissions
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     Route::get('/lost-events/{id}', [LostEventController::class, 'show']);
     Route::get('/lost-events/detail/{id}', [LostEventController::class, 'detail']); // Detail by lost_event_id
     Route::post('/lost-events', [LostEventController::class, 'store']); // Create new lost event
     Route::put('/lost-events/{id}', [LostEventController::class, 'update']); // Update by lost_event_id
-<<<<<<< HEAD
-    Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
-=======
     Route::patch('/lost-events/{id}/submit', [LostEventController::class, 'submit']); // Submit lost event
     Route::patch('/lost-events/{id}/approve', [LostEventController::class, 'approve']); // Approve lost event
     Route::patch('/lost-events/{id}/reject', [LostEventController::class, 'reject']); // Reject lost event
     Route::delete('/lost-events/{id}', [LostEventController::class, 'destroy']); // Delete by lost_event_id
     Route::delete('/lost-event-uploads/{fileId}', [LostEventController::class, 'deleteUploadedFile']); // Delete uploaded file by fileId
    Route::post('/lost-events/upload', [LostEventController::class, 'uploadFile']); // Upload file for lost event
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 });
 
 // ===================== JENIS RISIKO =====================
@@ -423,10 +393,6 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/export-rencana-investasi/{format}', [RencanaInvestasiController::class, 'export'])
         ->where(['format' => 'pdf|excel']);
     Route::get('/investasi/timeline', [RencanaInvestasiController::class, 'timeline']);
-<<<<<<< HEAD
-    
-=======
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     Route::get('/risk-investasi', [TrRiskInvestasiController::class, 'index']);
     Route::get('/risk-investasi/{id}', [TrRiskInvestasiController::class, 'show']);
@@ -452,23 +418,11 @@ Route::middleware(['auth:api'])->group(function () {
 // ===================== EMAIL RECOMMENDATION RENCANA INVESTASI =====================
 Route::middleware(['auth:api'])->group(function () {
     Route::post('/send-rekomendasi-investasi', [RecommendationNotifController::class, 'sendRecommendationEmails']);
-<<<<<<< HEAD
-    Route::get('/list-rekomendasi/{id}', [RecommendationNotifController::class, 'show']);   
-=======
     Route::get('/list-rekomendasi/{id}', [RecommendationNotifController::class, 'show']);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 });
 
 // ===================== MASTER EMAIL UNIT KERJA =====================
 Route::middleware(['auth:api'])->group(function () {
-<<<<<<< HEAD
-    Route::get('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'index']);             
-    Route::get('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'show']);         
-    Route::post('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'store']);   
-    Route::put('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'update']);
-    Route::post('/sync-email-unit-kerja', [MstEmailRiskOwnerController::class, 'sync']);
-    Route::delete('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'destroy']);
-=======
     Route::get('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'index']);
     Route::get('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'show']);
     Route::post('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'store']);
@@ -478,5 +432,4 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'index']);
     Route::get('/email-unit-kerja/{id}', [MstEmailRiskOwnerController::class, 'show']);
     Route::post('/email-unit-kerja', [MstEmailRiskOwnerController::class, 'store']);
->>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 });

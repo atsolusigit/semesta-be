@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\TrRiskHeader;
 use App\Models\LostEvent;
+<<<<<<< HEAD
+=======
+use App\Models\MstDepartment;
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\MultiSheetRiskExport;
@@ -16,6 +20,7 @@ class ExportRiskController extends Controller
     private $colorMap = [];
 
     public function export(Request $request, $format)
+<<<<<<< HEAD
     {
         // Validasi format yang didukung
         if (!in_array($format, ['excel', 'pdf'])) {
@@ -148,6 +153,150 @@ class ExportRiskController extends Controller
         }
     }
 
+=======
+{
+    // Validasi format yang didukung
+    if (!in_array($format, ['excel', 'pdf'])) {
+        return response()->json([
+            'status' => 400,
+            'success' => false,
+            'message' => 'Format tidak didukung',
+            'data' => 'Format yang didukung: excel, pdf'
+        ], 400);
+    }
+
+    $user = Auth::user();
+
+    // Cek akses role
+    if (!in_array($user->role_id, [1, 2, 3, 4, 5])) {
+        return response()->json([
+            'status' => 403,
+            'success' => false,
+            'message' => 'Anda tidak memiliki akses untuk export Risk.',
+        ], 403);
+    }
+
+    $filterYear  = $request->get('year');
+    $filterMonth = $request->get('month');
+    $filterDepartment = $request->get('department_id');
+
+    // Normalisasi filter bulan
+    if (is_array($filterMonth) && isset($filterMonth['month'])) {
+        $filterMonth = (int) $filterMonth['month'];
+    } elseif (!is_null($filterMonth)) {
+        $filterMonth = (int) $filterMonth;
+    }
+
+    // Normalisasi filter department
+    if (!is_null($filterDepartment)) {
+        $filterDepartment = (int) $filterDepartment;
+    }
+
+    // Ambil data header dengan semua field yang diperlukan untuk semua export
+    $headers = TrRiskHeader::with([
+        'department:id,name',
+        'jenisRisiko:id,nama_jenis_risiko',
+        'monthlyData' => function ($q) use ($filterYear, $filterMonth) {
+            $q->select([
+                'id',
+                'header_id',
+                'target_kualitatif',
+                'target_quantitative',
+                'target_option',
+                'realization_quantitative',
+                'realization_kualitatif',
+                'realization_option',
+                'residual_risk_level_dampak',
+                'residual_risk_level_kemungkinan',
+                'residual_risk_posisi_risiko',
+                'residual_risk_level_risiko',
+                'realization_note',
+                'status_risiko',
+                'start_date',
+                'month',
+                'note_recommendation'
+            ]);
+
+            if (!empty($filterYear)) {
+                $q->whereYear('start_date', $filterYear);
+            }
+            if (!empty($filterMonth)) {
+                $q->where('month', $filterMonth);
+            }
+        },
+    ])
+    ->select([
+        'id',
+        'risk_code',
+        'jenis_risiko',
+        'sasaran',
+        'peristiwa_risiko',
+        'penyebab_risiko',
+        'dampak_risiko',
+        'department_id',
+        // Inherent risk fields
+        'inherent_risk_level_dampak',
+        'inherent_risk_level_kemungkinan',
+        'inherent_risk_posisi_risiko',
+        'inherent_risk_level_risiko',
+        // Residual target risk fields
+        'residual_target_level_dampak',
+        'residual_target_level_kemungkinan',
+        'residual_target_posisi_risiko',
+        'residual_target_level_risiko',
+        // Other fields
+        'internal_control',
+        'target_quantitative_satu_tahun',
+        'target_satu_tahun_notes',
+        'target_satu_tahun_option',
+        'mitigasi',
+        'biaya_perlakuan_risiko'
+    ])
+    // Filter berdasarkan department untuk role 2 dan 3
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+        $query->where('department_id', $user->department_id);
+    })
+    // Filter berdasarkan department jika ada (untuk role 1)
+    ->when(!is_null($filterDepartment), function ($query) use ($filterDepartment) {
+        $query->where('department_id', $filterDepartment);
+    })
+    ->orderBy('risk_code')
+    ->get();
+
+    // Setelah data di-load, tambahkan risk code names secara manual
+    $this->loadRiskCodeNames($headers);
+
+    // Kalau tidak ada data
+    if ($headers->isEmpty()) {
+        return response()->json([
+            'status' => 404,
+            'success' => false,
+            'message' => 'Data Tidak Ditemukan',
+            'data' => 'Data risiko untuk filter tersebut tidak ditemukan.'
+        ], 404);
+    }
+
+    // Nama file dengan format yang sesuai
+    $monthName = $this->getMonthName($filterMonth);
+    $departmentName = $this->getDepartmentNameFromHeaders($headers, $filterDepartment);
+
+    try {
+        if ($format === 'excel') {
+            return $this->exportExcel($headers, $monthName, $filterYear, $departmentName);
+        } else {
+            return $this->exportPdf($headers, $monthName, $filterYear, $departmentName);
+        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 500,
+            'success' => false,
+            'message' => 'Gagal melakukan export',
+            'data' => ['error' => $e->getMessage()]
+        ], 500);
+    }
+}
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         /**
      * Load risk code names untuk multiple risk codes
      */
@@ -665,7 +814,11 @@ private function formatTarget($quantitative, $qualitative)
             return 'SEMUA_DEPT';
         }
 
+<<<<<<< HEAD
         $department = \App\Models\Department::find($departmentId);
+=======
+        $department = \App\Models\MstDepartment::find($departmentId);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         return $department ? strtoupper(str_replace(' ', '_', $department->name)) : 'DEPT_' . $departmentId;
     }
 
@@ -686,6 +839,7 @@ private function formatTarget($quantitative, $qualitative)
     }
 
     private function shouldFilterByUserDepartment()
+<<<<<<< HEAD
     {
         $user = Auth::user();
 
@@ -694,6 +848,26 @@ private function formatTarget($quantitative, $qualitative)
                $user->department_id;
     }
 
+=======
+{
+    $user = Auth::user();
+
+    // Jika user tidak ada, tidak perlu filter
+    if (!$user) {
+        return false;
+    }
+
+    // Role ID 1 = Admin/Super Admin (tidak perlu filter)
+    // Role ID 2, 3 = User department (perlu filter)
+    // Sesuaikan dengan role_id di sistem Anda
+    if (in_array($user->role_id, [2, 3]) && !empty($user->department_id)) {
+        return true;
+    }
+
+    return false;
+}
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     public function preview(Request $request, $id)
     {
         $filterYear  = $request->get('year');
@@ -869,6 +1043,7 @@ public function exportLostEvent(Request $request, $format)
 
     $user = Auth::user();
 
+<<<<<<< HEAD
     $filterYear = $request->get('year');
     $filterType = strtolower($request->get('type', '')); // <--- Tambahan filter type
     $filterDepartment = $request->get('department_id');
@@ -971,27 +1146,191 @@ public function exportLostEvent(Request $request, $format)
         ->withTrashed()
         ->get()
         ->keyBy('header_id');
+=======
+    // Cek akses role
+    if (!in_array($user->role_id, [1, 2, 3, 4, 5])) {
+        return response()->json([
+            'status' => 403,
+            'success' => false,
+            'message' => 'Anda tidak memiliki akses untuk export Loss Event.',
+        ], 403);
+    }
+
+    $filterYear = $request->get('year');
+    $filterType = strtolower($request->get('type', ''));
+    $filterDepartment = $request->get('department_id');
+    $filterJenisRisiko = $request->get('jenis_risiko_id');
+    $search = $request->get('search');
+
+    // Ambil data dari LostEvent HANYA yang sudah approved
+    // Mengambil berdasarkan lost_event_id (id), bukan header_id atau rcsa_id
+    $lostEvents = \App\Models\LostEvent::with([
+        'header' => function ($query) {
+            $query->with([
+                'optionTargetSatuTahun:id,name,type',
+                'monthlyData' => function ($q) {
+                    $q->where('is_finalize', true)->orderBy('month', 'asc');
+                }
+            ]);
+        },
+        'riskOwnerDepartmentRelation:id,name',
+        'jenisRisikoRelation:id,nama_jenis_risiko'
+    ])
+    ->where('status', 'approved')
+    // Filter berdasarkan department user jika perlu
+    ->when(in_array($user->role_id, [2, 3]), function ($query) use ($user) {
+        $query->where('risk_owner_department_id', $user->department_id);
+    })
+    ->when($filterJenisRisiko, function ($query) use ($filterJenisRisiko) {
+    $query->where('jenis_risiko_id', $filterJenisRisiko);
+    })
+    ->when($filterYear, function ($query) use ($filterYear) {
+        $query->where('tahun', $filterYear);
+    })
+    ->when($filterDepartment, function ($query) use ($filterDepartment) {
+        $query->where('risk_owner_department_id', $filterDepartment);
+    })
+    // Filter berdasarkan type dari kolom 'type' di tabel lost_events
+    ->when($filterType, function ($query) use ($filterType) {
+        $query->whereRaw('LOWER(type) = ?', [$filterType]);
+    })
+    ->when($search, function ($query) use ($search) {
+        $query->where(function ($q) use ($search) {
+            $q->where('tahun', 'like', '%' . $search . '%')
+              ->orWhere('nama_kejadian', 'like', '%' . $search . '%')
+              ->orWhere('identifikasi_kejadian', 'like', '%' . $search . '%')
+              ->orWhereHas('riskOwnerDepartmentRelation', function ($dept) use ($search) {
+                  $dept->where('name', 'like', '%' . $search . '%');
+              })
+              ->orWhereHas('jenisRisikoRelation', function ($jr) use ($search) {
+                  $jr->where('nama_jenis_risiko', 'like', '%' . $search . '%');
+              });
+        });
+    })
+    ->withTrashed()
+    ->orderBy('id', 'asc')
+    ->get();
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     if ($lostEvents->isEmpty()) {
         return response()->json([
             'status' => 404,
             'success' => false,
+<<<<<<< HEAD
             'message' => 'Tidak ada data Lost Event untuk diexport.',
         ], 404);
     }
 
     // Siapkan data export
     $exportData = $this->prepareLostEventData($filteredData, $lostEvents);
+=======
+            'message' => 'Tidak ada data Loss Event yang sudah approved untuk diexport.',
+        ], 404);
+    }
+
+    // Hitung persentase untuk setiap lost event (sama seperti di index)
+    // TIDAK memfilter berdasarkan header, ambil SEMUA lost event yang approved
+    foreach ($lostEvents as $lostEvent) {
+        $percentage = 0;
+        $detectedType = '';
+
+        // Jika ada header, hitung persentase
+        if ($lostEvent->header && $lostEvent->header->monthlyData->isNotEmpty()) {
+            $targetType = optional($lostEvent->header->optionTargetSatuTahun)->type;
+
+            // Deteksi type jika tidak ada di optionTargetSatuTahun
+            if (!$targetType) {
+                if (!empty($lostEvent->header->target_quantitative_satu_tahun) &&
+                    preg_match('/\d/', $lostEvent->header->target_quantitative_satu_tahun)) {
+                    $targetType = 'kuantitatif';
+                } elseif (!empty($lostEvent->header->target_satu_tahun_notes)) {
+                    $targetType = 'kualitatif';
+                }
+            }
+
+            $normalizedType = strtolower($targetType ?? '');
+            $detectedType = $normalizedType;
+
+            // Hitung persentase untuk Kuantitatif
+            if (in_array($normalizedType, ['kuantitatif', 'quantitative'])) {
+                $totalTarget = 0;
+                $totalRealisasi = 0;
+
+                foreach ($lostEvent->header->monthlyData as $monthly) {
+                    $targetNum = (float) preg_replace('/[^0-9]/', '', $monthly->target_quantitative ?? '0');
+                    $realNum = (float) preg_replace('/[^0-9]/', '', $monthly->realization_quantitative ?? '0');
+                    $totalTarget += $targetNum;
+                    $totalRealisasi += $realNum;
+                }
+
+                if ($totalTarget > 0) {
+                    $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+                }
+            }
+            // Hitung persentase untuk Kualitatif
+            elseif (in_array($normalizedType, ['kualitatif', 'qualitative'])) {
+                $totalTarget = 0;
+                $totalRealisasi = 0;
+
+                foreach ($lostEvent->header->monthlyData as $monthly) {
+                    $targetText = trim(str_replace(['%', ','], ['', '.'], $monthly->target_kualitatif ?? '0'));
+                    $targetNum = (float) $targetText;
+
+                    $realText = trim(str_replace(['%', ','], ['', '.'], $monthly->realization_kualitatif ?? '0'));
+                    $realNum = (float) $realText;
+
+                    $totalTarget += $targetNum;
+                    $totalRealisasi += $realNum;
+                }
+
+                if ($totalTarget > 0) {
+                    $percentage = round(($totalRealisasi / $totalTarget) * 100, 2);
+                }
+            }
+        } else {
+            // Jika tidak ada header, gunakan type dari lost_event
+            $detectedType = $lostEvent->type ?? '';
+        }
+
+        $lostEvent->calculated_percentage = $percentage;
+        $lostEvent->detected_type = $detectedType;
+    }
+
+    // Siapkan data export
+    $exportData = $this->prepareLostEventData($lostEvents);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     if (empty($exportData)) {
         return response()->json([
             'status' => 404,
             'success' => false,
+<<<<<<< HEAD
             'message' => 'Tidak ada data Lost Event untuk diexport.',
         ], 404);
     }
 
     $departmentName = $this->getDepartmentNameFromHeaders($filteredData, $filterDepartment);
     $yearName = $filterYear ?? 'SEMUA_TAHUN';
+=======
+            'message' => 'Tidak ada data Loss Event untuk diexport.',
+        ], 404);
+    }
+
+    // MODIFIKASI: Ambil nama department yang sebenarnya
+        $departmentName = 'SEMUA_DEPARTEMEN';
+
+        // Jika user role 2 atau 3, ambil dari department user
+        if (in_array($user->role_id, [2, 3]) && $user->department_id) {
+            $dept = \App\Models\MstDepartment::find($user->department_id);
+            $departmentName = $dept ? $dept->name : 'SEMUA_DEPARTEMEN';
+        }
+        // Jika ada filter department dari parameter request (untuk role 1, 4, 5)
+        elseif ($filterDepartment) {
+            $dept = \App\Models\MstDepartment::find($filterDepartment);
+            $departmentName = $dept ? $dept->name : 'SEMUA_DEPARTEMEN';
+        }
+
+        $yearName = $filterYear ?? 'SEMUA_TAHUN';
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     try {
         if ($format === 'excel') {
@@ -1009,15 +1348,23 @@ public function exportLostEvent(Request $request, $format)
     }
 }
 
+<<<<<<< HEAD
 
 /**
  * Prepare data untuk export
  */
 private function prepareLostEventData($headers, $lostEvents)
+=======
+/**
+ * Prepare data untuk export - mengambil dari LostEvent dengan perhitungan persentase
+ */
+private function prepareLostEventData($lostEvents)
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 {
     $data = [];
     $no = 1;
 
+<<<<<<< HEAD
     foreach ($headers as $item) {
         $lostEvent = $lostEvents->get($item->id);
 
@@ -1035,6 +1382,28 @@ private function prepareLostEventData($headers, $lostEvents)
             'kategori_kejadian' => $lostEvent->kategori_kejadian ?? '',
             'sumber_penyebab_kejadian' => $lostEvent->sumber_penyebab_kejadian ?? '',
             'penyebab_kejadian' => $item->penyebab_risiko ?? '',
+=======
+    foreach ($lostEvents as $lostEvent) {
+        // Format persentase: jika 0 atau tidak ada header maka 0%, jika ada maka tampilkan dengan 2 desimal
+        $percentageFormatted = $lostEvent->calculated_percentage !== null && $lostEvent->calculated_percentage > 0
+            ? rtrim(rtrim(number_format($lostEvent->calculated_percentage, 2), '0'), '.') . '%'
+            : '0%';
+
+        // Ambil nama department dan jenis risiko dari relasi
+        $departmentName = optional($lostEvent->riskOwnerDepartmentRelation)->name ?? '';
+        $jenisRisikoName = optional($lostEvent->jenisRisikoRelation)->nama_jenis_risiko ?? '';
+
+        $data[] = [
+            'no' => $no++,
+            'tahun' => $lostEvent->tahun ?? '',
+            'risk_owner_department' => $departmentName,
+            'jenis_risiko' => $jenisRisikoName,
+            'nama_kejadian' => $lostEvent->nama_kejadian ?? '',
+            'identifikasi_kejadian' => $lostEvent->identifikasi_kejadian ?? '',
+            'kategori_kejadian' => $lostEvent->kategori_kejadian ?? '',
+            'sumber_penyebab_kejadian' => $lostEvent->sumber_penyebab_kejadian ?? '',
+            'penyebab_kejadian' => $lostEvent->penyebab_kejadian ?? '',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'penanganan_saat_kejadian' => $lostEvent->penanganan_saat_kejadian ?? '',
             'deskripsi_kejadian' => $lostEvent->deskripsi_kejadian ?? '',
             'pihak_terkait' => $lostEvent->pihak_terkait ?? '',
@@ -1046,15 +1415,24 @@ private function prepareLostEventData($headers, $lostEvents)
             'nilai_kerugian_formatted' => $this->formatCurrency($lostEvent->nilai_kerugian ?? 0),
             'kejadian_berulang' => $lostEvent->kejadian_berulang ?? '',
             'frekuensi_kejadian' => $lostEvent->frekuensi_kejadian ?? '',
+<<<<<<< HEAD
             'mitigasi_yang_direncanakan' => $item->mitigasi ?? '',
+=======
+            'mitigasi_yang_direncanakan' => $lostEvent->mitigasi_yang_direncanakan ?? '',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'realisasi_mitigasi' => $lostEvent->realisasi_mitigasi ?? '',
             'perbaikan_mendatang' => $lostEvent->perbaikan_mendatang ?? '',
             'nilai_premi' => $lostEvent->nilai_premi ?? 0,
             'nilai_premi_formatted' => $this->formatCurrency($lostEvent->nilai_premi ?? 0),
             'nilai_klaim' => $lostEvent->nilai_klaim ?? 0,
             'nilai_klaim_formatted' => $this->formatCurrency($lostEvent->nilai_klaim ?? 0),
+<<<<<<< HEAD
             'realization_percentage' => number_format($item->calculated_percentage, 2) . '%',
             'type' => $item->detected_type ?? 'unknown',
+=======
+            'realization_percentage' => $percentageFormatted,
+            'type' => $lostEvent->detected_type ?? '',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         ];
     }
 
@@ -1066,7 +1444,11 @@ private function prepareLostEventData($headers, $lostEvents)
  */
 private function exportLostEventExcel($data, $year, $departmentName)
 {
+<<<<<<< HEAD
     $filename = "Lost_Event_Report_{$departmentName}_{$year}_" . time() . ".xlsx";
+=======
+    $filename = "Loss_Event_Report_{$departmentName}_{$year}_" . time() . ".xlsx";
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     return Excel::download(
         new \App\Exports\LostEventExport($data, $year, $departmentName),
@@ -1079,7 +1461,11 @@ private function exportLostEventExcel($data, $year, $departmentName)
  */
 private function exportLostEventPdf($data, $year, $departmentName)
 {
+<<<<<<< HEAD
     $filename = "Lost_Event_Report_{$departmentName}_{$year}_" . time() . ".pdf";
+=======
+    $filename = "Loss_Event_Report_{$departmentName}_{$year}_" . time() . ".pdf";
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     $pdf = Pdf::loadView('exports.lost_event_pdf', [
         'data' => $data,

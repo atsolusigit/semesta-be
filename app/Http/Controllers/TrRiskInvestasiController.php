@@ -35,22 +35,51 @@ class TrRiskInvestasiController extends Controller
             $dn = $request->department_name;
             $query->whereHas('investasi', fn($q) => $q->where('department_name', 'like', "%{$dn}%"));
         }
+<<<<<<< HEAD
         if ($request->filled('search')) {
             $s = $request->search;
+=======
+        
+        if ($request->filled('search')) {
+            $s = trim($request->search);
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             $query->where(function ($qq) use ($s) {
                 $qq->where('kategori_risiko', 'like', "%{$s}%")
                 ->orWhere('sub_kategori_risiko', 'like', "%{$s}%")
                 ->orWhere('sasaran', 'like', "%{$s}%")
                 ->orWhere('peristiwa_risiko', 'like', "%{$s}%")
                 ->orWhere('penyebab_risiko', 'like', "%{$s}%")
+<<<<<<< HEAD
                 ->orWhereHas('investasi', function ($qh) use ($s) {
                     $qh->where('nama_investasi', 'like', "%{$s}%")
                         ->orWhere('department_name', 'like', "%{$s}%");
+=======
+                ->orWhere('dampak_inherent', 'like', "%{$s}%")
+                ->orWhere('dampak_residual', 'like', "%{$s}%")
+                ->orWhere('mitigasi_risiko', 'like', "%{$s}%")
+                ->orWhere('status', 'like', "%{$s}%")
+                ->orWhere('approval_notes', 'like', "%{$s}%")
+                
+                // relasi investasi
+                ->orWhereHas('investasi', function ($qh) use ($s) {
+                    $qh->where('nama_investasi', 'like', "%{$s}%")
+                        ->orWhere('department_name', 'like', "%{$s}%")
+                        ->orWhere('jenis_investasi', 'like', "%{$s}%")
+                        ->orWhere('kategori_investasi', 'like', "%{$s}%")
+                        ->orWhere('erkap_id', 'like', "%{$s}%");
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 });
             });
         }
 
 
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $sortMap = [
             'tahun'        => 'ri.year',
             'nilai'        => 'ri.nilai_rkap',
@@ -520,6 +549,10 @@ class TrRiskInvestasiController extends Controller
     {
         ini_set('memory_limit', '512M');
         set_time_limit(120);
+<<<<<<< HEAD
+=======
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         if (!in_array($format, ['excel', 'pdf'])) {
             return response()->json([
                 'status'  => 400,
@@ -529,12 +562,27 @@ class TrRiskInvestasiController extends Controller
             ], 400);
         }
 
+<<<<<<< HEAD
+=======
+        $filterYear = null;
+        if ($request->filled('tahun')) {
+            $filterYear = (int) $request->tahun;
+        } elseif ($request->filled('year')) {
+            $filterYear = (int) $request->year;
+        }
+
+        $filterJenis   = $request->filled('jenis_investasi') ? $request->jenis_investasi : null;
+        $filterDept    = $request->filled('department_name') ? $request->department_name : null;
+        $filterSearch  = $request->filled('search') ? $request->search : null;
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $query = TrRiskInvestasi::query()
             ->with([
                 'investasi:erkap_id,department_name,nama_investasi,jenis_investasi,kategori_investasi,year,nilai_rkap,nilai_revisi,unit_kerja_id',
                 'approvedByUser:id,username,name'
             ]);
 
+<<<<<<< HEAD
         if ($request->filled('tahun')) {
             $query->whereHas('investasi', fn($q) => $q->where('year', (int) $request->tahun));
         }
@@ -551,6 +599,24 @@ class TrRiskInvestasiController extends Controller
 
         if ($request->filled('search')) {
             $s = $request->search;
+=======
+        if (!is_null($filterYear)) {
+            $query->whereHas('investasi', fn($q) => $q->where('year', $filterYear));
+        }
+
+        if (!empty($filterJenis)) {
+            $ji = $filterJenis;
+            $query->whereHas('investasi', fn($q) => $q->where('jenis_investasi', 'like', "%{$ji}%"));
+        }
+
+        if (!empty($filterDept)) {
+            $dn = $filterDept;
+            $query->whereHas('investasi', fn($q) => $q->where('department_name', 'like', "%{$dn}%"));
+        }
+
+        if (!empty($filterSearch)) {
+            $s = $filterSearch;
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             $query->where(function ($qq) use ($s) {
                 $qq->where('kategori_risiko', 'like', "%{$s}%")
                 ->orWhere('sub_kategori_risiko', 'like', "%{$s}%")
@@ -625,6 +691,7 @@ class TrRiskInvestasiController extends Controller
                 );
             }
 
+<<<<<<< HEAD
             $filename = 'RiskProfileInvestasi_' . now()->format('Ymd_His') . '.pdf';
             $departmentName = $rows->first()?->investasi->department_name ?? 'SEMUA UNIT';
             $year = $request->filled('tahun') ? (int)$request->tahun : null;
@@ -632,6 +699,16 @@ class TrRiskInvestasiController extends Controller
                 'rows' => $flatRows,
                 'departmentName' => $departmentName,
                 'year' => $year,
+=======
+            $filename        = 'RiskProfileInvestasi_' . now()->format('Ymd_His') . '.pdf';
+            $departmentName  = $rows->first()?->investasi->department_name ?? 'SEMUA UNIT';
+            $yearForHeader   = $filterYear;
+
+            $pdf = Pdf::loadView('exports.risk_investasi_pdf', [
+                'rows'           => $flatRows,
+                'departmentName' => $departmentName,
+                'year'           => $yearForHeader,
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             ])->setPaper('A4', 'landscape');
 
             return $pdf->download($filename);
@@ -649,4 +726,8 @@ class TrRiskInvestasiController extends Controller
 
 
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 }

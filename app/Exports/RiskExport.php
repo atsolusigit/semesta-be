@@ -233,9 +233,13 @@ private function formatRealizationBulan($monthly)
 {
     // Kalau sudah ada relasi riskCode
     if (isset($header->riskCode) && $header->riskCode && $header->riskCode->isNotEmpty()) {
+<<<<<<< HEAD
         return $header->riskCode->map(function ($code) {
             return (!empty($code->code) ? $code->code . ' - ' : '') . $code->name;
         })->implode(', ');
+=======
+        return $header->riskCode->pluck('code')->implode(', '); // GANTI: hapus semua reference ke ->name
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     }
 
     if (!empty($header->risk_code)) {
@@ -263,11 +267,17 @@ private function formatRealizationBulan($monthly)
             $riskCodes = DB::table('mst_risk_code')
                 ->whereIn('id', $riskCodeIds)
                 ->orderBy('id')
+<<<<<<< HEAD
                 ->get(['name']);
 
             return $riskCodes->map(function ($rc) {
                 return (!empty($rc->code) ? $rc->code . ' - ' : '') . $rc->name;
             })->implode(', ');
+=======
+                ->pluck('code'); // GANTI: hanya ambil 'code'
+
+            return $riskCodes->implode(', ');
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
     }
 
@@ -316,10 +326,23 @@ private function formatRealizationBulan($monthly)
 
         $riskCode = $this->getRiskCodeName($header);
 
+<<<<<<< HEAD
         $data[] = [
             $no++,
             $riskCode,
             $header->jenis_risiko ?? '',
+=======
+        // PERBAIKAN: Ambil nama jenis risiko dari relasi
+        $jenisRisikoName = '';
+        if (isset($header->jenisRisiko) && $header->jenisRisiko) {
+            $jenisRisikoName = $header->jenisRisiko->nama_jenis_risiko ?? '';
+        }
+
+        $data[] = [
+            $no++,
+            $riskCode,
+            $jenisRisikoName, // PERBAIKAN: Ganti dari $header->jenis_risiko
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             $header->sasaran ?? '',
             $header->peristiwa_risiko ?? '',
             $header->penyebab_risiko ?? '',
@@ -376,28 +399,48 @@ private function formatRealizationBulan($monthly)
             'PERISTIWA RISIKO',
             'PENYEBAB RISIKO',
             'DAMPAK RISIKO',
+<<<<<<< HEAD
             'DAMPAK',
             'KEMUNGKINAN',
+=======
+            'LEVEL DAMPAK',
+            'LEVEL KEMUNGKINAN',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'POSISI RISIKO',
             'LEVEL RISIKO',
             'INTERNAL CONTROL',
             'TARGET s/d BULAN ' . strtoupper($this->monthName),
             'REALISASI s/d BULAN ' . strtoupper($this->monthName),
             '%',
+<<<<<<< HEAD
             'DAMPAK',
             'KEMUNGKINAN',
+=======
+            'LEVEL DAMPAK',
+            'LEVEL KEMUNGKINAN',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'POSISI RISIKO',
             'LEVEL RISIKO',
             'TARGET 1 TAHUN',
             'REALISASI S/D BULAN ' . strtoupper($this->monthName),
+<<<<<<< HEAD
             'DAMPAK',
             'KEMUNGKINAN',
+=======
+            'LEVEL DAMPAK',
+            'LEVEL KEMUNGKINAN',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'POSISI RISIKO',
             'LEVEL RISIKO',
             'PERLAKUAN RISIKO (MITIGASI)',
             'BIAYA PERLAKUAN RISIKO',
+<<<<<<< HEAD
             'DAMPAK',
             'KEMUNGKINAN',
+=======
+            'LEVEL DAMPAK',
+            'LEVEL KEMUNGKINAN',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             'POSISI RISIKO',
             'LEVEL RISIKO',
             'STATUS RISIKO',
@@ -506,6 +549,7 @@ private function formatRealizationBulan($monthly)
 public function registerEvents(): array
 {
     return [
+<<<<<<< HEAD
         AfterSheet::class => function(AfterSheet $event) {
             $sheet = $event->sheet->getDelegate();
 
@@ -622,6 +666,176 @@ public function registerEvents(): array
                 $sheet->setCellValue($value['column'].'6', $value['name']);
                 $this->setHeaderStyle($sheet, $value['column'].'6:'.$value['column'].'7', 'd8e4bc', 8, true);
             }
+=======
+    AfterSheet::class => function(AfterSheet $event) {
+    $sheet = $event->sheet->getDelegate();
+
+    // Merge cells untuk header
+    $sheet->mergeCells('A1:AG1');
+    $sheet->mergeCells('A2:AG2');
+    $sheet->mergeCells('A3:AG3');
+    $sheet->mergeCells('A4:AG4');
+
+    // merge header horizontal
+    $mergeHorizontal = array(
+        [
+            "range_start" => "H",
+            "range_end" => "K",
+            "name" => "INHERENT RISK"
+        ],
+        [
+            "range_start" => "P",
+            "range_end" => "S",
+            "name" => "RESIDUAL RISK"
+        ],
+        [
+            "range_start" => "V",
+            "range_end" => "Y",
+            "name" => "RESIDUAL RISK"
+        ],
+        [
+            "range_start" => "AB",
+            "range_end" => "AE",
+            "name" => "RESIDUAL TARGET"
+        ],
+    );
+
+    foreach ($mergeHorizontal as $value) {
+        $sheet->mergeCells($value['range_start'].'6:'.$value['range_end'].'6');
+        $sheet->setCellValue($value['range_start'].'6', $value['name']);
+        $this->setHeaderStyle($sheet, $value['range_start'].'6:'.$value['range_end'].'6', 'd8e4bc', 8, true);
+    }
+
+    // Set header sub-columns dengan orientasi vertikal untuk kolom risiko
+    $riskSubHeaders = [
+        // Inherent Risk
+        ['column' => 'H', 'text' => 'LEVEL DAMPAK'],
+        ['column' => 'I', 'text' => 'LEVEL KEMUNGKINAN'],
+        ['column' => 'J', 'text' => 'POSISI RISIKO'],
+        ['column' => 'K', 'text' => 'LEVEL RISIKO'],
+        // Residual Risk Saat Ini
+        ['column' => 'P', 'text' => 'LEVEL DAMPAK'],
+        ['column' => 'Q', 'text' => 'LEVEL KEMUNGKINAN'],
+        ['column' => 'R', 'text' => 'POSISI RISIKO'],
+        ['column' => 'S', 'text' => 'LEVEL RISIKO'],
+        // Residual Risk (kedua)
+        ['column' => 'V', 'text' => 'LEVEL DAMPAK'],
+        ['column' => 'W', 'text' => 'LEVEL KEMUNGKINAN'],
+        ['column' => 'X', 'text' => 'POSISI RISIKO'],
+        ['column' => 'Y', 'text' => 'LEVEL RISIKO'],
+        // Residual Target
+        ['column' => 'AB', 'text' => 'LEVEL DAMPAK'],
+        ['column' => 'AC', 'text' => 'LEVEL KEMUNGKINAN'],
+        ['column' => 'AD', 'text' => 'POSISI RISIKO'],
+        ['column' => 'AE', 'text' => 'LEVEL RISIKO'],
+    ];
+
+    foreach ($riskSubHeaders as $header) {
+    $sheet->setCellValue($header['column'].'7', $header['text']);
+    $sheet->getStyle($header['column'].'7')->applyFromArray([
+        'font' => ['bold' => true, 'size' => 7],
+        'alignment' => [
+            'horizontal' => Alignment::HORIZONTAL_CENTER,
+            'vertical' => Alignment::VERTICAL_CENTER,
+            'textRotation' => 90,
+            'wrapText' => true, // agar tidak terpotong
+            'shrinkToFit' => true // agar mengecil otomatis
+        ],
+        'fill' => [
+            'fillType' => Fill::FILL_SOLID,
+            'startColor' => ['rgb' => 'd8e4bc']
+        ],
+        'borders' => [
+            'allBorders' => [
+                'borderStyle' => Border::BORDER_THIN,
+                'color' => ['rgb' => '000000']
+            ]
+        ]
+    ]);
+}
+
+    // Tambahkan ini setelah loop riskSubHeaders
+    $sheet->getRowDimension(7)->setRowHeight(75);
+
+
+    // merge header vertical (yang tidak termasuk dalam risk headers)
+    $mergeVertical = array(
+        [
+            "column" => "A",
+            "name" => "NO"
+        ],
+        [
+            "column" => "B",
+            "name" => "KODE RISIKO"
+        ],
+        [
+            "column" => "C",
+            "name" => "JENIS RISIKO"
+        ],
+        [
+            "column" => "D",
+            "name" => "SASARAN"
+        ],
+        [
+            "column" => "E",
+            "name" => "PERISTIWA RISIKO"
+        ],
+        [
+            "column" => "F",
+            "name" => "PENYEBAB RISIKO"
+        ],
+        [
+            "column" => "G",
+            "name" => "DAMPAK RISIKO"
+        ],
+        [
+            "column" => "L",
+            "name" => "INTERNAL CONTROL"
+        ],
+        [
+            "column" => "M",
+            "name" => "TARGET s/d BULAN " . strtoupper($this->monthName)
+        ],
+        [
+            "column" => "N",
+            "name" => "REALISASI s/d BULAN " . strtoupper($this->monthName)
+        ],
+        [
+            "column" => "O",
+            "name" => "% s/d BULAN " . strtoupper($this->monthName)
+        ],
+        [
+            "column" => "T",
+            "name" => "TARGET 1 TAHUN"
+        ],
+        [
+            "column" => "U",
+            "name" => "REALISASI s/d BULAN " . strtoupper($this->monthName)
+        ],
+        [
+            "column" => "Z",
+            "name" => "PERLAKUAN RISIKO (MITIGASI)"
+        ],
+        [
+            "column" => "AA",
+            "name" => "BIAYA PERLAKUAN RISIKO"
+        ],
+        [
+            "column" => "AF",
+            "name" => "STATUS RISIKO"
+        ],
+        [
+            "column" => "AG",
+            "name" => "REKOMENDASI"
+        ],
+    );
+
+    foreach ($mergeVertical as $value) {
+        $sheet->mergeCells($value['column'].'6:'.$value['column'].'7');
+        $sheet->setCellValue($value['column'].'6', $value['name']);
+        $this->setHeaderStyle($sheet, $value['column'].'6:'.$value['column'].'7', 'd8e4bc', 8, true);
+    }
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
             // Set column widths
             $columnWidths = [
@@ -657,7 +871,11 @@ public function registerEvents(): array
                 'AD' => 6,
                 'AE' => 8,
                 'AF' => 12,
+<<<<<<< HEAD
                 'AG' => 35,
+=======
+                'AG' => 20,
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             ];
 
             foreach ($columnWidths as $column => $width) {

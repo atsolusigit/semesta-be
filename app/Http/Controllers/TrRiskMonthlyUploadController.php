@@ -98,6 +98,7 @@ class TrRiskMonthlyUploadController extends Controller
     }
 
     public function destroy($id)
+<<<<<<< HEAD
     {
         // Check authorization: only role 1 can delete
         $user = auth()->user();
@@ -194,4 +195,124 @@ class TrRiskMonthlyUploadController extends Controller
             return json(500, false, 'Gagal Menghapus File', 'Gagal menghapus file: ' . $e->getMessage(), null);
         }
     }
+=======
+{
+    $user = auth()->user();
+
+    // Check authorization: roles 1,2,3,4,5 can delete
+    $roleCheck = check_role($user, [1, 2, 3, 4, 5]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
+    $data = TrRiskMonthlyUpload::find($id);
+
+    if (!$data) {
+        return json(404, false, 'Data Tidak Ditemukan', 'Data tidak ditemukan.', null);
+    }
+
+    // Role 2 dan 3 hanya bisa delete berdasarkan department_id mereka
+    if (in_array($user->role_id, [2, 3])) {
+        if ($data->department_id != $user->department_id) {
+            return json(403, false, 'Akses Ditolak', 'Anda hanya dapat menghapus data dari department Anda sendiri.', null);
+        }
+    }
+
+    $filePath = $data->filepath;
+
+    /**
+     * Jika file base64, filepath selalu diawali "data:"
+     * BERARTI tidak disimpan di S3 → tidak perlu delete fisik file
+     */
+    if (!str_starts_with($filePath, 'data:')) {
+        // file BUKAN base64 → berarti file fisik (URL atau path)
+        try {
+            if (filter_var($filePath, FILTER_VALIDATE_URL)) {
+                // ambil hanya path dari URL S3
+                $parsedPath = parse_url($filePath, PHP_URL_PATH);
+                $cleanPath = ltrim($parsedPath, '/');
+            } else {
+                $cleanPath = $filePath;
+            }
+
+            Storage::disk('s3')->delete($cleanPath);
+
+        } catch (\Exception $e) {
+            return json(500, false, 'Gagal Menghapus File', 'Gagal menghapus file: ' . $e->getMessage(), null);
+        }
+    }
+
+    // Delete database record
+    $data->delete();
+
+    return json(200, true, 'Berhasil Dihapus', 'Data berhasil dihapus.', null);
+}
+
+
+    public function deleteTempFile(Request $request)
+{
+    $user = auth()->user();
+
+    // Check authorization: roles 1,2,3,4,5 can delete temp files
+    $roleCheck = check_role($user, [1, 2, 3, 4, 5]);
+
+    if ($roleCheck !== true) {
+        return $roleCheck;
+    }
+
+    $filename = $request->get('filename');
+
+    if (!$filename) {
+        return json(400, false, 'Nama file kosong', 'Nama file harus dikirim.', null);
+    }
+
+    \Log::info('deleteTempFile - Original: ' . $filename);
+
+    /**
+     * 1. CEK BASE64
+     * Base64 selalu diawali "data:"
+     */
+    if (str_starts_with($filename, 'data:')) {
+        \Log::info('deleteTempFile - Base64 detected, no physical delete needed.');
+
+        return json(200, true, 'Berhasil', 'File base64 tidak perlu dihapus dari storage.', null);
+    }
+
+    /**
+     * 2. FILE FISIK → PROSES DELETE S3
+     */
+    if (filter_var($filename, FILTER_VALIDATE_URL)) {
+        $parsedPath = parse_url($filename, PHP_URL_PATH);
+        $cleanPath = ltrim($parsedPath, '/');
+    } else {
+        $cleanPath = $filename;
+    }
+
+    \Log::info('deleteTempFile - Clean path: ' . $cleanPath);
+
+    try {
+        $disk = Storage::disk('s3');
+
+        // cek apakah file ada
+        if (!$disk->exists($cleanPath)) {
+            \Log::warning('deleteTempFile - File does not exist: ' . $cleanPath);
+
+            return json(404, false, 'Data Tidak Ditemukan', 'File tidak ditemukan.', null);
+        }
+
+        // hapus file dari S3
+        $disk->delete($cleanPath);
+
+        \Log::info('deleteTempFile - File deleted: ' . $cleanPath);
+
+        return json(200, true, 'Berhasil', 'File berhasil dihapus.', null);
+
+    } catch (\Exception $e) {
+        \Log::error('deleteTempFile - Error: ' . $e->getMessage());
+        return json(500, false, 'Gagal Menghapus File', 'Gagal menghapus file: ' . $e->getMessage(), null);
+    }
+}
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 }

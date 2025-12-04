@@ -409,8 +409,21 @@ class RencanaInvestasiController extends Controller
             ], 400);
         }
 
+<<<<<<< HEAD
         $now              = now();
         $tahunForTimeline = (int) $now->year;
+=======
+        $now = now();
+
+        $filterYear = null;
+        if ($request->filled('year')) {
+            $filterYear = (int) $request->year;
+        } elseif ($request->filled('tahun')) {
+            $filterYear = (int) $request->tahun;
+        }
+
+        $tahunForTimeline = $filterYear ?: (int) $now->year;
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $bulanForTimeline = (int) $now->month;
         $weekForTimeline  = (int) max(1, min((int)ceil($now->day / 7), 4));
         $monthName        = $this->getMonthName($bulanForTimeline);
@@ -429,9 +442,57 @@ class RencanaInvestasiController extends Controller
                     ->where('week',  $weekForTimeline);
                 },
             ])
+<<<<<<< HEAD
             ->orderBy('rencana_investasi.id', 'asc')
             ->get();
 
+=======
+
+            ->when(!is_null($filterYear), function ($q) use ($filterYear) {
+                $q->where('rencana_investasi.year', $filterYear);
+            })
+
+            ->when($request->filled('department_name'), function ($q) use ($request) {
+                $name = trim((string)$request->department_name);
+                if ($name !== '') {
+                    $q->where(function ($qq) use ($name) {
+                        $qq->where('rencana_investasi.department_name', 'like', "%{$name}%")
+                        ->orWhere('mst_email_unit_kerja.unit_kerja_nama', 'like', "%{$name}%");
+                    });
+                }
+            })
+
+            ->when($request->filled('jenis_investasi'), function ($q) use ($request) {
+                $ji = trim((string)$request->jenis_investasi);
+                if ($ji !== '') {
+                    $q->where('rencana_investasi.jenis_investasi', 'like', "%{$ji}%");
+                }
+            })
+
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $s = trim((string)$request->search);
+                if ($s !== '') {
+                    $q->where(function ($qq) use ($s) {
+                        $qq->where('rencana_investasi.nama_investasi', 'like', "%{$s}%")
+                        ->orWhere('rencana_investasi.kategori_investasi', 'like', "%{$s}%")
+                        ->orWhere('rencana_investasi.keterangan', 'like', "%{$s}%");
+                    });
+                }
+            })
+
+            ->orderBy('rencana_investasi.id', 'asc')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return response()->json([
+                'status'  => 404,
+                'success' => false,
+                'message' => 'Tidak Ada Data',
+                'data'    => 'Data rencana investasi tidak ditemukan.',
+            ], 404);
+        }
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $departmentName = $this->guessDepartmentName($rows, null);
 
         $flatRows = $rows->map(function ($it) use ($tahunForTimeline, $bulanForTimeline, $weekForTimeline) {
@@ -504,6 +565,10 @@ class RencanaInvestasiController extends Controller
         }
     }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     private function extractTargetTimeline($it): array
     {
         $period = $it->periods->first();

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 <!-- resources/views/exports/rencana_investasi_pdf.blade.php -->
+=======
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 <!DOCTYPE html>
 <html>
 <head>

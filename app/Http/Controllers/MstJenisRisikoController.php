@@ -10,7 +10,11 @@ class MstJenisRisikoController extends Controller
 {
  public function index(Request $request)
 {
+<<<<<<< HEAD
     $perPage = $request->input('per_page', 10);
+=======
+    $perPage = $request->input('per_page');
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
     $query = MstJenisRisiko::with(['createdBy:id,username'])
         ->orderBy('id', 'asc');
@@ -21,10 +25,37 @@ class MstJenisRisikoController extends Controller
         $query->where('nama_jenis_risiko', 'like', "%{$search}%");
     }
 
+<<<<<<< HEAD
     // Pagination
     $data = $query->paginate($perPage);
 
     // Mapping data
+=======
+    // Jika per_page kosong atau = "all", ambil semua data tanpa pagination
+    if (empty($perPage) || $perPage === 'all') {
+        $data = $query->get();
+
+        $mappedData = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'nama_jenis_risiko' => $item->nama_jenis_risiko,
+                'created_by' => $item->created_by,
+                'created_by_username' => get_decrypted_username($item->createdBy),
+                'created_at' => $item->created_at ? $item->created_at->format('Y-m-d') : null,
+                'updated_at' => $item->updated_at ? $item->updated_at->format('Y-m-d') : null,
+            ];
+        });
+
+        return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', [
+            'total' => $mappedData->count(),
+            'data' => $mappedData,
+        ]);
+    }
+
+    // Kalau per_page dikirim, gunakan pagination Laravel
+    $data = $query->paginate($perPage);
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     $mappedData = $data->getCollection()->map(function ($item) {
         return [
             'id' => $item->id,
@@ -36,7 +67,10 @@ class MstJenisRisikoController extends Controller
         ];
     });
 
+<<<<<<< HEAD
     // Prepare response dengan pagination
+=======
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     $responseData = [
         'current_page' => $data->currentPage(),
         'per_page' => $data->perPage(),
@@ -50,6 +84,10 @@ class MstJenisRisikoController extends Controller
     return json(200, true, 'Data Ditemukan', 'Data berhasil diambil.', $responseData);
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     public function store(Request $request)
     {
         // Check authorization: only role 1 and 2 can store

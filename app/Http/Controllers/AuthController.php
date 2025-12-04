@@ -43,6 +43,7 @@ public function register(Request $request)
             return response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
+<<<<<<< HEAD
                 'message' => 'error validation. [400 - bad request]',
                 'data' => [
                     'username' => ['The username has already been taken.']
@@ -60,6 +61,51 @@ public function register(Request $request)
                     'email' => ['Maaf, gunakan email @kbn.co.id untuk proses register.']
                 ]
             ], 400);
+=======
+                'message' => 'The username has already been taken.',
+                'data' => [
+                    'username' => ['The username has already been taken.']
+                ]
+            ], 200);
+        }
+
+        // Get active email domains from database
+        $activeDomains = \App\Models\MstEmailDomain::getActiveDomains();
+
+        if (empty($activeDomains)) {
+            return response()->json([
+                'code' => 500,
+                'status' => 'error',
+                'message' => 'Tidak ada domain email yang aktif. Hubungi administrator.',
+                'data' => []
+            ], 200);
+        }
+
+        // Create domain pattern for validation (e.g., @kbn.co.id|@gmail.com)
+        $domainPattern = implode('|', array_map(function($domain) {
+            return preg_quote($domain, '/');
+        }, $activeDomains));
+
+        // Validate email domain dynamically
+        $emailDomain = null;
+        if ($request->has('email')) {
+            $emailParts = explode('@', $request->email);
+            if (count($emailParts) === 2) {
+                $emailDomain = strtolower($emailParts[1]);
+            }
+        }
+
+        if (!in_array($emailDomain, $activeDomains)) {
+            $allowedDomainsStr = implode(', @', $activeDomains);
+            return response()->json([
+                'code' => 400,
+                'status' => 'error_validation',
+                'message' => 'Domain email tidak diizinkan.',
+                'data' => [
+                    'email' => ["Maaf, gunakan email dengan domain: @{$allowedDomainsStr} untuk proses register."]
+                ]
+            ], 200);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
 
         $array_validation = [
@@ -104,7 +150,10 @@ public function register(Request $request)
         ]);
 
         // ========== KIRIM EMAIL SEBELUM COMMIT ==========
+<<<<<<< HEAD
         // Siapkan data plain untuk email
+=======
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $userDataForEmail = (object)[
             'id' => $user->id,
             'name' => $name,
@@ -113,6 +162,7 @@ public function register(Request $request)
             'created_at' => $user->created_at,
         ];
 
+<<<<<<< HEAD
         // Email ke USER (Konfirmasi Registrasi)
         Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
 
@@ -127,6 +177,36 @@ public function register(Request $request)
         }
 
         // Jika sampai sini tidak ada error, commit transaksi
+=======
+        // Kirim email ke user yang baru register
+        try {
+            Mail::to($request->email)->send(new UserRegistrationConfirmationMail($userDataForEmail));
+        } catch (\Throwable $e) {
+            \Log::error("Failed to send email to user {$request->email}: " . $e->getMessage());
+        }
+
+        // Kirim email ke admin dengan role_id 1 saja
+        $admins = User::where('role_id', 1)
+                    ->where('status', 1)
+                    ->get();
+
+        foreach ($admins as $admin) {
+            try {
+                $adminEmail = encrypt_decrypt_db('dec', $admin->email, $admin->id);
+
+                // Validasi email admin sebelum mengirim
+                if (!empty($adminEmail) && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+                    Mail::to($adminEmail)->send(new UserRegisteredMail($userDataForEmail));
+                } else {
+                    \Log::warning("Invalid admin email for user ID: {$admin->id}");
+                }
+            } catch (\Throwable $e) {
+                // Log error tapi jangan stop proses registrasi
+                \Log::error("Failed to send email to admin ID {$admin->id}: " . $e->getMessage());
+            }
+        }
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         DB::commit();
 
         return json(200, 'true', 'success', 'Akun berhasil didaftarkan. Menunggu persetujuan admin.', [
@@ -282,7 +362,11 @@ public function register(Request $request)
                 return response()->json([
                     'code' => 400,
                     'status' => 'error_validation',
+<<<<<<< HEAD
                     'message' => 'error validation. [400 - bad request]',
+=======
+                    'message' => 'Password lama salah.',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                     'data' => [
                         'old_password' => ['Password lama salah.']
                     ]

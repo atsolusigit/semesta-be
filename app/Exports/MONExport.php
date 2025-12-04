@@ -63,11 +63,19 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
         'J' => 12,  // % TAHUNAN
         'K' => 12,  // BIAYA
         'L' => 25,  // EVALUASI PERLAKUAN RISIKO - KEMBALI KE POSISI ASLI
+<<<<<<< HEAD
         'M' => 18,  // LEVEL DAMPAK
         'N' => 15,  // LEVEL KEMUNGKINAN
         'O' => 15,  // POSISI RISIKO
         'P' => 12,  // LEVEL RISIKO
         'Q' => 25   // EVALUASI PERLAKUAN RISIKO - POSISI BARU
+=======
+        'M' => 12,  // LEVEL DAMPAK
+        'N' => 12,  // LEVEL KEMUNGKINAN
+        'O' => 12,  // POSISI RISIKO
+        'P' => 12,  // LEVEL RISIKO
+        'Q' => 12   // EVALUASI PERLAKUAN RISIKO - POSISI BARU
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     ];
 
     /**
@@ -340,6 +348,12 @@ class MONExport implements FromArray, WithStyles, WithEvents, WithTitle
     /**
  * Build data rows from headers - Updated to use new format methods
  */
+<<<<<<< HEAD
+=======
+/**
+ * Build data rows from headers - Updated to use new format methods
+ */
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 private function buildDataRows(): array
 {
     $dataRows = [];
@@ -349,6 +363,7 @@ private function buildDataRows(): array
         // Get monthly data safely
         $monthly = $header->monthlyData?->first();
 
+<<<<<<< HEAD
         // --- Resolve risk name (robust) ---
         $riskName = '';
 
@@ -361,6 +376,16 @@ private function buildDataRows(): array
             $riskName = collect($header->riskCode)->pluck('name')->filter()->implode(', ');
         }
         // 3) Jika ada field risk_code (bisa berupa JSON string, "1,2", array, atau numeric)
+=======
+        // --- Resolve risk code (robust) ---
+        $riskCode = '';
+
+        // 1) Jika relasi riskCode sudah di-load, ambil code-nya
+        if (isset($header->riskCode) && $header->riskCode && is_iterable($header->riskCode) && count($header->riskCode) > 0) {
+            $riskCode = collect($header->riskCode)->pluck('code')->filter()->implode(', ');
+        }
+        // 2) Jika ada field risk_code (bisa berupa JSON string, "1,2", array, atau numeric)
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         elseif (!empty($header->risk_code)) {
             $codesField = $header->risk_code;
             $ids = [];
@@ -387,6 +412,7 @@ private function buildDataRows(): array
                 $riskCodes = DB::table('mst_risk_code')
                     ->whereIn('id', $ids)
                     ->orderBy('id')
+<<<<<<< HEAD
                     ->pluck('name');
                 $riskName = $riskCodes->implode(', ');
             }
@@ -398,6 +424,20 @@ private function buildDataRows(): array
         }
         // --- end resolve ---
 
+=======
+                    ->pluck('code');
+                $riskCode = $riskCodes->implode(', ');
+            }
+        }
+        // --- end resolve ---
+
+        // Get jenis risiko name from relation
+        $jenisRisikoName = '';
+        if (isset($header->jenisRisiko) && $header->jenisRisiko) {
+            $jenisRisikoName = $header->jenisRisiko->nama_jenis_risiko ?? '';
+        }
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         // Get formatted values using the new methods
         $targetBulanan = $this->formatTargetBulan($monthly);
         $realisasiBulanan = $this->formatRealizationBulan($monthly);
@@ -413,8 +453,13 @@ private function buildDataRows(): array
 
         $dataRows[] = [
             $no,                                                              // 1. NO auto increment
+<<<<<<< HEAD
             $riskName,                                                        // 2. KODE RISIKO (HANYA NAME)
             $header->jenis_risiko ?? '',                                     // 3. JENIS RISIKO
+=======
+            $riskCode,                                                        // 2. KODE RISIKO (CODE)
+            $jenisRisikoName,                                                 // 3. JENIS RISIKO (NAMA)
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             $header->peristiwa_risiko ?? '',                                 // 4. PERISTIWA RISIKO
             $header->penyebab_risiko ?? '',                                  // 5. PENYEBAB RISIKO
             $targetBulanan,                                                  // 6. TARGET BULAN (formatted)
@@ -428,7 +473,11 @@ private function buildDataRows(): array
             $header->residual_target_level_kemungkinan ?? '',                // 14. LEVEL KEMUNGKINAN
             $header->residual_target_posisi_risiko ?? '',                    // 15. POSISI RISIKO
             $header->residual_target_level_risiko ?? '',                     // 16. LEVEL RISIKO
+<<<<<<< HEAD
             $monthly->realization_note ?? ''                                 // 17. EVALUASI PERLAKUAN RISIKO (DIPINDAH KE AKHIR)
+=======
+            $monthly->realization_note ?? ''                                 // 17. EVALUASI PERLAKUAN RISIKO
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         ];
 
         $no++;
@@ -551,6 +600,7 @@ private function buildDataRows(): array
     /**
      * Merge cells for headers - Update range ke Q untuk menampung kolom baru
      */
+<<<<<<< HEAD
     private function mergeCells(Worksheet $sheet): void
     {
         $mergeRanges = [
@@ -677,6 +727,144 @@ private function buildDataRows(): array
         }
     }
 
+=======
+    /**
+ * Merge cells for headers - Update range ke Q untuk menampung kolom baru
+ */
+private function mergeCells(Worksheet $sheet): void
+{
+    $mergeRanges = [
+        'A1:Q1', // KERTAS KERJA MONITORING RISIKO
+        'A2:Q2', // PT. KAWASAN BERIKAT NUSANTARA
+        'A3:Q3', // UNIT KERJA
+        'A4:Q4', // PERIODE
+    ];
+
+    foreach ($mergeRanges as $range) {
+        $sheet->mergeCells($range);
+    }
+
+    //merge header horizontal (for inherent risk, residual risk and residual target)
+    $mergeHorizontal = array(
+        [
+            "range_start" => "F6",
+            "range_end" => "I6",
+            "name" => "WAKTU PELAKSANAAN"
+        ],
+        [
+            "range_start" => "F7",
+            "range_end" => "I7",
+            "name" => "TAHUN ".$this->year
+        ],
+        [
+            "range_start" => "F8",
+            "range_end" => "I8",
+            "name" => "TRIWULAN ".$this->triwulan
+        ],
+        [
+            "range_start" => "F9",
+            "range_end" => "I9",
+            "name" => "BULAN ".$this->monthName
+        ],
+        [
+            "range_start" => "M6",
+            "range_end" => "P7", // RESIDUAL TARGET RISK hanya M-P (tidak termasuk Q)
+            "name" => "RESIDUAL TARGET RISK"
+        ],
+    );
+
+    foreach ($mergeHorizontal as $value) {
+        $sheet->mergeCells($value['range_start'].':'.$value['range_end']);
+        $sheet->setCellValue($value['range_start'], $value['name']);
+
+        $this->setHeaderHorizontalStyle($sheet, $value['range_start'].':'.$value['range_end'], 'FFd8e4bc', 8, true);
+    }
+
+    //merge header vertical
+$mergeVertical = array(
+    [
+        "column" => "A",
+        "name" => "NO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "B",
+        "name" => "KODE RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "C",
+        "name" => "JENIS RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "D",
+        "name" => "PERISTIWA RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "E",
+        "name" => "PENYEBAB RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "J",
+        "name" => " % s/d BULAN ".$this->monthName,
+        "start_row" => "6"
+    ],
+    [
+        "column" => "K",
+        "name" => "% TARGET TAHUN ".$this->year,
+        "start_row" => "6"
+    ],
+    [
+        "column" => "L",
+        "name" => "BIAYA PERLAKUAN RISIKO",
+        "start_row" => "6"
+    ],
+    [
+        "column" => "M",
+        "name" => "LEVEL DAMPAK",
+        "start_row" => "8",
+        "vertical" => true
+    ],
+    [
+        "column" => "N",
+        "name" => "LEVEL KEMUNGKINAN",
+        "start_row" => "8",
+        "vertical" => true
+    ],
+    [
+        "column" => "O",
+        "name" => "POSISI RISIKO",
+        "start_row" => "8",
+        "vertical" => true
+    ],
+    [
+        "column" => "P",
+        "name" => "LEVEL RISIKO",
+        "start_row" => "8",
+        "vertical" => true
+    ],
+    [
+        "column" => "Q",
+        "name" => "EVALUASI PERLAKUAN RISIKO",
+        "start_row" => "6",
+        "vertical" => true  // Tambah flag vertical
+    ],
+);
+
+    foreach ($mergeVertical as $value) {
+        $sheet->mergeCells($value['column'].$value['start_row'].':'.$value['column'].'10');
+        $sheet->setCellValue($value['column'].$value['start_row'], $value['name']);
+
+        // Cek apakah perlu vertical alignment
+        $isVertical = isset($value['vertical']) && $value['vertical'] === true;
+        $this->setHeaderHorizontalStyle($sheet, $value['column'].$value['start_row'].':'.$value['column'].'10', 'FFd8e4bc', 8, true, $isVertical);
+    }
+}
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     /**
      * Set column widths
      */
@@ -809,11 +997,20 @@ private function applyRiskLevelColors(Worksheet $sheet): void
         }
     }
 
+<<<<<<< HEAD
     function setHeaderHorizontalStyle($sheet, $range, $bgColor = '4472C4', $fontSize = 8, $bold = true)
     {
         $sheet->getStyle($range)->applyFromArray([
             'font' => [
                 'bold' => $bold
+=======
+        function setHeaderHorizontalStyle($sheet, $range, $bgColor = '4472C4', $fontSize = 8, $bold = true, $vertical = false)
+    {
+        $styleArray = [
+            'font' => [
+                'bold' => $bold,
+                'size' => $fontSize
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -830,6 +1027,17 @@ private function applyRiskLevelColors(Worksheet $sheet): void
                     'color' => ['rgb' => '000000']
                 ]
             ]
+<<<<<<< HEAD
         ]);
+=======
+        ];
+
+        // Tambahkan textRotation untuk vertical text
+        if ($vertical) {
+            $styleArray['alignment']['textRotation'] = 90;
+        }
+
+        $sheet->getStyle($range)->applyFromArray($styleArray);
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     }
 }

@@ -20,6 +20,10 @@ class TrRiskHeader extends Model
         'sasaran',
         'peristiwa_risiko',
         'penyebab_risiko',
+<<<<<<< HEAD
+=======
+        'penjelasan_realisasi',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         'dampak_risiko',
         'inherent_risk_level_dampak',
         'inherent_risk_level_kemungkinan',

@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Mail\SentMessage;
 use App\Mail\RecommendationNotif;
 use App\Models\RecommendationInvestasiNotif;
+<<<<<<< HEAD
+=======
+use App\Models\MstEmailRiskOwner;
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 
 class RecommendationNotifController extends Controller
 {
@@ -26,9 +30,16 @@ class RecommendationNotifController extends Controller
 
     public function sendRecommendationEmails(Request $request) {
 
+<<<<<<< HEAD
         $result = check_role(auth()->user(), [1,2]);
         if ($result !== true) return $result;
 
+=======
+        $result = check_role(auth()->user(), [1,2,4,5]);
+        if ($result !== true) return $result;
+
+        $user = auth()->user();
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $validator = Validator::make($request->all(), [
             'erkap_id' =>'required|integer',
             'nama_investasi' => 'required|string',
@@ -36,9 +47,23 @@ class RecommendationNotifController extends Controller
             'tahun'=> 'required|numeric',
             'rekomendasi' => 'required|string',
             'risk_owner' => 'required|string',
+<<<<<<< HEAD
         ]);
         if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
 
+=======
+            'risk_owner_id' => 'required|numeric',
+        ]);
+        if ($validator->fails()) return json(400,false,'Validasi Gagal','Validasi gagal.',$validator->errors());
+
+        $email_user = MstEmailRiskOwner::where('unit_kerja_id', $request->risk_owner_id)->value('unit_kerja_email');
+        $email_str = $email_user;
+        $email_user = explode(",", $email_user);
+        if (empty($email_user)) {
+             return json(404, false, 'Email Tidak Ditemukan', 'Email '.$request->risk_owner.' tidak ditemukan, harap tambahkan di master email.', null);
+        }
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         $jmlNotif = RecommendationInvestasiNotif::where('erkap_id', $request->erkap_id)->count();
         $jmlNotif +=1;
 
@@ -57,6 +82,7 @@ class RecommendationNotifController extends Controller
 
             DB::beginTransaction();
 
+<<<<<<< HEAD
             $currentUser = get_decrypted_name(auth()->user());
 
             $myRequest['created_by'] = auth()->id();
@@ -64,6 +90,15 @@ class RecommendationNotifController extends Controller
             $myRequest['dikirim_oleh'] = $currentUser;
             $myRequest['status'] = 'Terkirim';
 
+=======
+            $currentUser = get_decrypted_name($user->id);
+
+            $myRequest['created_by'] = $user->id;
+            $myRequest['kirim_ke'] = $email_str;
+            $myRequest['dikirim_oleh'] = $currentUser;
+            $myRequest['status'] = 'Terkirim';
+      
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             $item = RecommendationInvestasiNotif::create($myRequest);
             
             $responseData = [
@@ -75,6 +110,7 @@ class RecommendationNotifController extends Controller
                 'status' => $myRequest['status'] ,
             ];
             
+<<<<<<< HEAD
             if(Mail::to(['atsolusigit@gmail.com', 'ramdhaniteddy21@gmail.com'])
             ->cc(['aryoaditya2000@gmail.com'])
             ->send(new RecommendationNotif(
@@ -86,6 +122,13 @@ class RecommendationNotifController extends Controller
                     // $data->rekomendasi,
                     // $data->risk_owner,
                     // $data->count_notif,
+=======
+            $cc = '';
+            if(Mail::to($email_user)
+            ->when($cc, fn($mail) => $mail->cc($cc))
+            ->send(new RecommendationNotif(
+                    $data
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             )) instanceof SentMessage){
         
                 DB::commit();

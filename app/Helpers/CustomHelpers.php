@@ -28,7 +28,11 @@ if (!function_exists('check_validation')) {
             $json = response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
+<<<<<<< HEAD
                 'message' => 'error validation. [400 - bad request]',
+=======
+                'message' => 'validasi gagal',
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                 'data' => $validator->messages()
             ], 200);
 
@@ -478,6 +482,7 @@ if (!function_exists('process_yearly_residual_risk')) {
     }
 }
 
+<<<<<<< HEAD
 if (!function_exists('process_risk_monthly_file_uploads')) {
     /**
      * Proses file uploads untuk risk monthly
@@ -486,6 +491,46 @@ if (!function_exists('process_risk_monthly_file_uploads')) {
      * @param object $monthly
      * @return void
      */
+=======
+if (!function_exists('process_lost_event_file_uploads')) {
+
+    /**
+     * Simpan file yang sudah diupload ke tabel lost_event_uploads
+     *
+     * @param array $uploadedFiles
+     * @param object $lostEvent
+     * @return void
+     */
+    function process_lost_event_file_uploads($uploadedFiles, $lostEvent)
+    {
+        if (!is_array($uploadedFiles)) {
+            return;
+        }
+
+        foreach ($uploadedFiles as $file) {
+
+            // Pastikan format benar
+            if (
+                !isset($file['filepath']) ||
+                empty($file['filepath'])
+            ) {
+                continue;
+            }
+
+            \App\Models\LostEventUpload::create([
+                'lost_event_id' => $lostEvent->id,
+                'filepath' => $file['filepath'],
+                'domain' => $file['domain'] ?? 'Lost_Event_Report_SEMUA_DEPARTMENT',
+                'is_confirmed' => 1,
+            ]);
+        }
+    }
+}
+
+
+if (!function_exists('process_risk_monthly_file_uploads')) {
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     function process_risk_monthly_file_uploads($uploadedFiles, $monthly)
     {
         if (!is_array($uploadedFiles)) {
@@ -493,16 +538,28 @@ if (!function_exists('process_risk_monthly_file_uploads')) {
         }
 
         foreach ($uploadedFiles as $file) {
+<<<<<<< HEAD
+=======
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             if (!isset($file['filepath']) || empty($file['filepath'])) {
                 continue;
             }
 
             TrRiskMonthlyUpload::create([
+<<<<<<< HEAD
                 'header_id' => $monthly->header_id,
                 'risk_monthly_id' => $monthly->id,
                 'filepath' => $file['filepath'],
                 'domain' => $file['domain'] ?? basename($file['filepath']),
                 'is_confirmed' => true,
+=======
+                'header_id'        => $monthly->header_id,
+                'risk_monthly_id'  => $monthly->id,
+                'filepath'         => $file['filepath'],  // base64 tersimpan
+                'domain'           => $file['domain'] ?? 'dokumen',
+                'is_confirmed'     => true,
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
             ]);
         }
     }
@@ -556,8 +613,13 @@ if (!function_exists('validate_bulk_quantitative_data')) {
             if (array_key_exists('target_quantitative', $monthData) && is_null($monthData['target_quantitative'])) {
                 return [
                     'valid' => false,
+<<<<<<< HEAD
                     'title' => 'Target Quantitative Tidak Boleh Kosong',
                     'message' => "Data pada index {$index} memiliki kuantitatif target yang kosong. Mohon isi dengan nilai yang valid.",
+=======
+                    'title' => 'Data Tidak Boleh Kosong',
+                    'message' => "Ada data yang masih kosong. Mohon mengisi data dengan benar.",
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
                     'data' => [
                         'header_id' => $headerId,
                         'invalid_index' => $index,
@@ -645,13 +707,21 @@ if (!function_exists('validate_bulk_monthly_constraints')) {
      * @param object $existingMonthly
      * @param bool $requireAllMonths
      * @param int $headerId
+<<<<<<< HEAD
      * @return array
      */
     function validate_bulk_monthly_constraints($processedMonthlyData, $existingMonthly, $requireAllMonths, $headerId)
+=======
+     * @param bool $bypassFinalization - parameter baru untuk bypass pengecekan finalisasi
+     * @return array
+     */
+    function validate_bulk_monthly_constraints($processedMonthlyData, $existingMonthly, $requireAllMonths, $headerId, $bypassFinalization = false)
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
     {
         $requestedMonths = collect($processedMonthlyData)->pluck('month')->toArray();
         $warnings = [];
 
+<<<<<<< HEAD
         // Check finalization
         $finalizedMonths = [];
         foreach ($processedMonthlyData as $monthData) {
@@ -671,6 +741,29 @@ if (!function_exists('validate_bulk_monthly_constraints')) {
                     'finalized_months' => $finalizedMonths
                 ]
             ];
+=======
+        // Check finalization - bisa di-bypass oleh role tertentu
+        if (!$bypassFinalization) {
+            $finalizedMonths = [];
+            foreach ($processedMonthlyData as $monthData) {
+                $month = $monthData['month'];
+                if (isset($existingMonthly[$month]) && $existingMonthly[$month]->is_finalize) {
+                    $finalizedMonths[] = $month;
+                }
+            }
+
+            if (!empty($finalizedMonths)) {
+                return [
+                    'valid' => false,
+                    'title' => 'Data Sudah Difinalisasi',
+                    'message' => 'Bulan berikut sudah difinalisasi dan tidak bisa diubah: ' . implode(', ', $finalizedMonths),
+                    'data' => [
+                        'header_id' => $headerId,
+                        'finalized_months' => $finalizedMonths
+                    ]
+                ];
+            }
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
         }
 
         // Check for duplicate months
@@ -977,6 +1070,33 @@ if (!function_exists('get_decrypted_name')) {
     }
 }
 
+<<<<<<< HEAD
+=======
+if (!function_exists('get_decrypted_email')) {
+    function get_decrypted_email($userObject)
+    {
+        if (!$userObject || empty($userObject->id)) {
+            return 'Email Tidak diketahui';
+        }
+
+        try {
+            $row = \DB::select("
+                SELECT CAST(AES_DECRYPT(email, CONCAT('SM', ?)) AS CHAR) as result
+                FROM users WHERE id = ? LIMIT 1
+            ", [$userObject->id, $userObject->id]);
+
+            if ($row && !empty($row[0]->result)) {
+                return clean_string($row[0]->result);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning("Error decrypt email for user ID {$userObject->id}: " . $e->getMessage());
+        }
+
+        return 'Email Tidak diketahui';
+    }
+}
+
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae
 if (!function_exists('get_month_name')) {
     /**
      * Ambil nama bulan dalam bahasa Indonesia berdasarkan nomor bulan.
@@ -1271,3 +1391,129 @@ if (!function_exists('check_role')) {
         return true;
     }
 }
+<<<<<<< HEAD
+=======
+
+if (!function_exists('detect_storage_disk')) {
+    /**
+     * Detect storage disk based on file URL
+     *
+     * @param string $filepath
+     * @return string
+     */
+    function detect_storage_disk($filepath)
+    {
+        // DigitalOcean Spaces
+        if (str_contains($filepath, 'digitaloceanspaces.com')) {
+            return 'do_spaces';
+        }
+
+        // AWS S3
+        if (str_contains($filepath, 's3.amazonaws.com') || str_contains($filepath, '.s3.')) {
+            return 's3';
+        }
+
+        // Google Cloud Storage
+        if (str_contains($filepath, 'storage.googleapis.com') || str_contains($filepath, 'storage.cloud.google.com')) {
+            return 'gcs';
+        }
+
+        // Local storage
+        if (str_contains($filepath, '/storage/') || !str_contains($filepath, 'http')) {
+            return 'public';
+        }
+
+        // Default fallback
+        return config('filesystems.default', 'public');
+    }
+}
+
+if (!function_exists('extract_storage_path')) {
+    /**
+     * Extract relative storage path from full URL
+     *
+     * @param string $filepath
+     * @param string|null $disk
+     * @return string
+     */
+    function extract_storage_path($filepath, $disk = null)
+    {
+        // Auto-detect disk if not provided
+        if ($disk === null) {
+            $disk = detect_storage_disk($filepath);
+        }
+
+        // Jika sudah relative path (tidak ada http/https), return as is
+        if (!str_contains($filepath, 'http://') && !str_contains($filepath, 'https://')) {
+            return $filepath;
+        }
+
+        switch ($disk) {
+            case 'do_spaces':
+                // Extract path dari DigitalOcean Spaces URL
+                // Format: https://fortisid.sgp1.digitaloceanspaces.com/semesta/filename.pdf
+                $pattern = '/https?:\/\/[^\/]+\/([^?]+)/';
+                if (preg_match($pattern, $filepath, $matches)) {
+                    return $matches[1];
+                }
+                break;
+
+            case 's3':
+                // Extract path dari AWS S3 URL
+                $parsed = parse_url($filepath);
+                return ltrim($parsed['path'] ?? '', '/');
+
+            case 'gcs':
+                // Extract path dari Google Cloud Storage URL
+                $parsed = parse_url($filepath);
+                $path = ltrim($parsed['path'] ?? '', '/');
+                $parts = explode('/', $path, 2);
+                return $parts[1] ?? $path;
+
+            case 'public':
+                // Extract path dari local storage URL
+                return str_replace([
+                    config('app.url') . '/storage/',
+                    url('/storage/'),
+                    '/storage/'
+                ], '', $filepath);
+
+            default:
+                // Fallback: try to extract anything after last domain/bucket part
+                $parsed = parse_url($filepath);
+                return ltrim($parsed['path'] ?? $filepath, '/');
+        }
+
+        // Fallback: return original if extraction failed
+        return $filepath;
+    }
+}
+
+if (!function_exists('delete_file_from_storage')) {
+    /**
+     * Delete file from storage safely (supports multiple storage providers)
+     *
+     * @param string $filepath
+     * @return bool
+     */
+    function delete_file_from_storage($filepath)
+    {
+        try {
+            $disk = detect_storage_disk($filepath);
+            $path = extract_storage_path($filepath, $disk);
+
+            if (Storage::disk($disk)->exists($path)) {
+                return Storage::disk($disk)->delete($path);
+            }
+
+            // File not exists, consider as success
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to delete file from storage: ' . $e->getMessage(), [
+                'filepath' => $filepath
+            ]);
+            return false;
+        }
+    }
+}
+>>>>>>> c25d44c91562d73f06dbf7a5ec1f721825bdbfae

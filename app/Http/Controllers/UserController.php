@@ -289,7 +289,6 @@ public function show(Request $request, $id)
         return json(404, 'false', 'not_found', 'User tidak ditemukan.', []);
     }
 
-    // Check role authorization - hanya role 1 dan 2 yang bisa update
     $currentUser = auth()->user();
     $roleCheck = check_role($currentUser, [1, 2]);
 
@@ -300,9 +299,7 @@ public function show(Request $request, $id)
     $currentUserRoleId = $currentUser->role_id;
     $currentUserDepartmentId = $currentUser->department_id;
 
-    // Validasi akses berdasarkan role
     if ($currentUserRoleId == 2) {
-        // Role 2 (admin) hanya bisa update user dengan role_id 2 atau 3 dan dari department yang sama
         if (!in_array($user->role_id, [2, 3])) {
             return json(400, 'false', 'forbidden', 'Anda tidak memiliki izin untuk mengubah user dengan role ini.', []);
         }
@@ -310,7 +307,6 @@ public function show(Request $request, $id)
             return json(400, 'false', 'forbidden', 'Anda tidak memiliki izin untuk mengubah user dari department lain.', []);
         }
     }
-    // Role 1 bebas mengupdate siapa saja (tidak ada batasan)
 
     $array_validation = [
         'name' => 'required|string|max:255',
@@ -322,13 +318,10 @@ public function show(Request $request, $id)
         'password' => 'nullable|string|min:6',
     ];
 
-    // Validasi tambahan untuk role 2
     if ($currentUserRoleId == 2) {
-        // Role 2 hanya bisa mengubah ke role_id 2 atau 3
         if (!in_array($request->role_id, [2, 3])) {
             return json(400, 'false', 'forbidden', 'Anda hanya dapat mengubah user menjadi role admin atau role 3.', []);
         }
-        // Role 2 hanya bisa mengubah ke department yang sama dengan dirinya
         if ($request->department_id != $currentUserDepartmentId) {
             return json(400, 'false', 'forbidden', 'Anda hanya dapat mengubah user ke department yang sama dengan Anda.', []);
         }
@@ -342,14 +335,14 @@ public function show(Request $request, $id)
     try {
         DB::beginTransaction();
 
-        // Cek duplikasi username jika diubah
+        // === FIX DUPLICATE CHECK ===
         if ($request->filled('username')) {
             $inputUsername = $request->username;
 
             $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputUsername) {
                 try {
-                    $decryptedUsername = encrypt_decrypt_db('dec', $otherUser->username, $otherUser->id);
-                    return $decryptedUsername === $inputUsername;
+                    $dec = encrypt_decrypt_db('dec', $otherUser->username, $otherUser->id);
+                    return $dec === $inputUsername;
                 } catch (\Throwable $e) {
                     return false;
                 }
@@ -361,15 +354,14 @@ public function show(Request $request, $id)
             }
         }
 
-        // Cek duplikasi email jika diubah
         if ($request->filled('email')) {
             $inputEmail = $request->email;
 
             $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputEmail) {
                 try {
                     if ($otherUser->email) {
-                        $decryptedEmail = encrypt_decrypt_db('dec', $otherUser->email, $otherUser->id);
-                        return $decryptedEmail === $inputEmail;
+                        $dec = encrypt_decrypt_db('dec', $otherUser->email, $otherUser->id);
+                        return $dec === $inputEmail;
                     }
                     return false;
                 } catch (\Throwable $e) {
@@ -383,27 +375,23 @@ public function show(Request $request, $id)
             }
         }
 
+        // === UPDATE KOLOM NON-ENCRYPT ===
         $user->role_id = $request->role_id;
         $user->department_id = $request->department_id;
         $user->status = $request->status === 'aktif' ? 1 : 0;
 
-        // Update password jika dikirim
         if (!empty($request->password)) {
             $user->password = bcrypt($request->password);
         }
 
         $user->save();
 
-        // Enkripsi dan update data yang terenkripsi menggunakan encrypt_decrypt_db
+        // === FIX UPDATE TIDAK BOLEH NULL & HARUS DB::raw ===
         try {
-            $encryptedName = encrypt_decrypt_db('enc', $request->name, $user->id);
-            $encryptedUsername = encrypt_decrypt_db('enc', $request->username, $user->id);
-            $encryptedEmail = encrypt_decrypt_db('enc', $request->email, $user->id);
-
             DB::table('users')->where('id', $user->id)->update([
-                'name' => DB::raw($encryptedName),
-                'username' => DB::raw($encryptedUsername),
-                'email' => DB::raw($encryptedEmail)
+                'name' => encrypt_decrypt_db('enc', $request->name, $user->id),
+                'username' => encrypt_decrypt_db('enc', $request->username, $user->id),
+                'email' => encrypt_decrypt_db('enc', $request->email, $user->id),
             ]);
         } catch (\Throwable $e) {
             Log::error("Gagal enkripsi data user ID {$user->id}: {$e->getMessage()}");
@@ -414,6 +402,7 @@ public function show(Request $request, $id)
         DB::commit();
 
         return json(200, 'true', 'success', 'User berhasil diperbarui.', []);
+
     } catch (\Exception $e) {
         DB::rollback();
         Log::error("Update user gagal ID {$user->id}: {$e->getMessage()}");
@@ -677,7 +666,7 @@ public function rejectUser($id)
         'nip' => 'nullable|string|max:100',
         'phone_number' => 'nullable|string|max:100',
         'gender' => 'nullable|in:male,female,other',
-        'profile_img' => 'nullable|string', // Ubah dari 'url' karena sekarang bisa base64
+        'profile_img' => 'nullable|string',
     ]);
 
     if ($validation[0] !== 0) return $validation[1];
@@ -685,234 +674,110 @@ public function rejectUser($id)
     try {
         DB::beginTransaction();
 
-        // Cek duplikasi username jika diisi
+        /* ---------------------- DUPLICATE USERNAME ---------------------- */
         if ($request->filled('username')) {
             $inputUsername = $request->username;
 
-            $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputUsername) {
-                try {
-                    $decryptedUsername = encrypt_decrypt_db('dec', $otherUser->username, $otherUser->id);
-                    return $decryptedUsername === $inputUsername;
-                } catch (\Throwable $e) {
-                    return false;
-                }
-            });
+            $duplicate = User::where('id', '!=', $user->id)
+                ->get()
+                ->some(function ($otherUser) use ($inputUsername) {
+                    try {
+                        $dec = encrypt_decrypt_db('dec', $otherUser->username, $otherUser->id);
+                        return $dec === $inputUsername;
+                    } catch (\Throwable $e) {
+                        return false;
+                    }
+                });
 
             if ($duplicate) {
                 DB::rollBack();
-                return json(400, 'false', 'duplicate_username', 'Username sudah digunakan oleh pengguna lain.', null);
+                return json(400, 'false', 'duplicate_username', 'Username sudah digunakan.', null);
             }
         }
 
-        // Cek duplikasi email jika diisi
+        /* ---------------------- DUPLICATE EMAIL ---------------------- */
         if ($request->filled('email')) {
             $inputEmail = $request->email;
 
-            $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputEmail) {
-                try {
-                    if ($otherUser->email) {
-                        $decryptedEmail = encrypt_decrypt_db('dec', $otherUser->email, $otherUser->id);
-                        return $decryptedEmail === $inputEmail;
+            $duplicate = User::where('id', '!=', $user->id)
+                ->get()
+                ->some(function ($otherUser) use ($inputEmail) {
+                    try {
+                        if (!$otherUser->email) return false;
+                        $dec = encrypt_decrypt_db('dec', $otherUser->email, $otherUser->id);
+                        return $dec === $inputEmail;
+                    } catch (\Throwable $e) {
+                        return false;
                     }
-                    return false;
-                } catch (\Throwable $e) {
-                    return false;
-                }
-            });
+                });
 
             if ($duplicate) {
                 DB::rollBack();
-                return json(400, 'false', 'duplicate_email', 'Email sudah digunakan oleh pengguna lain.', null);
+                return json(400, 'false', 'duplicate_email', 'Email sudah digunakan.', null);
             }
         }
 
-        // Update data biasa (tidak terenkripsi)
+        /* ---------------------- UPDATE DATA NON-ENCRYPT ---------------------- */
         $user->gender = $request->gender;
 
-        // Update profile_img jika ada (bisa URL atau base64)
         if ($request->filled('profile_img')) {
             $user->profile_img = $request->profile_img;
         }
 
         $user->save();
 
-        // Update field terenkripsi dengan encrypt_decrypt_db
-        if ($request->filled('name')) {
-            try {
-                $encryptedName = encrypt_decrypt_db('enc', $request->name, $user->id);
-                if ($encryptedName) {
-                    User::where('id', $user->id)->update([
-                        'name' => DB::raw($encryptedName)
-                    ]);
-                } else {
-                    logger("Name encryption failed for user {$user->id}");
-                }
-            } catch (\Exception $e) {
-                logger("Name encryption error: " . $e->getMessage());
-            }
-        }
+        /* ---------------------- UPDATE ENCRYPTED FIELDS ---------------------- */
+        $encFields = ['name', 'username', 'email', 'nip', 'phone_number'];
 
-        if ($request->filled('username')) {
-            try {
-                $encryptedUsername = encrypt_decrypt_db('enc', $request->username, $user->id);
-                if ($encryptedUsername) {
-                    User::where('id', $user->id)->update([
-                        'username' => DB::raw($encryptedUsername)
-                    ]);
-                    logger("Username updated successfully for user {$user->id}");
-                } else {
-                    logger("Username encryption failed for user {$user->id}");
-                }
-            } catch (\Exception $e) {
-                logger("Username encryption error: " . $e->getMessage());
-            }
-        }
-
-        if ($request->filled('email')) {
-            try {
-                $encryptedEmail = encrypt_decrypt_db('enc', $request->email, $user->id);
-                if ($encryptedEmail) {
-                    User::where('id', $user->id)->update([
-                        'email' => DB::raw($encryptedEmail)
-                    ]);
-                    logger("Email updated successfully for user {$user->id}");
-                } else {
-                    logger("Email encryption failed for user {$user->id}");
-                }
-            } catch (\Exception $e) {
-                logger("Email encryption error: " . $e->getMessage());
-            }
-        }
-
-        if ($request->filled('nip')) {
-            $inputNip = $request->nip;
-
-            // Cek duplikasi NIP
-            $duplicate = User::where('id', '!=', $user->id)->get()->some(function ($otherUser) use ($inputNip) {
+        foreach ($encFields as $field) {
+            if ($request->filled($field)) {
                 try {
-                    if ($otherUser->nip) {
-                        $decryptedNip = encrypt_decrypt_db('dec', $otherUser->nip, $otherUser->id);
-                        return $decryptedNip === $inputNip;
+                    $encrypted = encrypt_decrypt_db('enc', $request->$field, $user->id);
+
+                    if ($encrypted) {
+                        User::where('id', $user->id)->update([
+                            $field => $encrypted
+                        ]);
+                        logger(strtoupper($field) . " updated for user {$user->id}");
+                    } else {
+                        logger(strtoupper($field) . " encryption failed for user {$user->id}");
                     }
-                    return false;
-                } catch (\Throwable $e) {
-                    return false;
+                } catch (\Exception $e) {
+                    logger(strtoupper($field) . " encryption error: " . $e->getMessage());
                 }
-            });
-
-            if ($duplicate) {
-                DB::rollBack();
-                return json(400, 'false', 'duplicate_nip', 'NIP sudah digunakan oleh pengguna lain.', null);
-            }
-
-            // Enkripsi dan update NIP jika tidak ada duplikasi
-            try {
-                $encryptedNip = encrypt_decrypt_db('enc', $inputNip, $user->id);
-                if ($encryptedNip) {
-                    User::where('id', $user->id)->update([
-                        'nip' => DB::raw($encryptedNip)
-                    ]);
-                    logger("NIP updated successfully for user {$user->id}");
-                } else {
-                    logger("NIP encryption failed for user {$user->id}");
-                }
-            } catch (\Exception $e) {
-                logger("NIP encryption error: " . $e->getMessage());
-            }
-        }
-
-        if ($request->filled('phone_number')) {
-            try {
-                logger("Original phone_number: " . $request->phone_number);
-                $encryptedPhone = encrypt_decrypt_db('enc', $request->phone_number, $user->id);
-                logger("Encrypted phone_number: " . ($encryptedPhone ?? 'NULL'));
-
-                if ($encryptedPhone) {
-                    User::where('id', $user->id)->update([
-                        'phone_number' => DB::raw($encryptedPhone)
-                    ]);
-                    logger("Phone number updated successfully for user {$user->id}");
-                } else {
-                    logger("Phone number encryption failed for user {$user->id}");
-                }
-            } catch (\Exception $e) {
-                logger("Phone number encryption error: " . $e->getMessage());
             }
         }
 
         DB::commit();
 
-        // Ambil ulang data user setelah update
+        /* ---------------------- AMBIL ULANG DAN DECRYPT ---------------------- */
         $updatedUser = User::with(['role', 'department'])->find($user->id);
 
-        // Decrypt semua data yang terenkripsi dengan error handling
-        $nameDecrypted = null;
-        $usernameDecrypted = null;
-        $emailDecrypted = null;
-        $nipDecrypted = null;
-        $phoneDecrypted = null;
+        $decryptFields = ['name', 'username', 'email', 'nip', 'phone_number'];
+        $decrypted = [];
 
-        if ($updatedUser->name) {
+        foreach ($decryptFields as $field) {
             try {
-                $nameDecrypted = encrypt_decrypt_db('dec', $updatedUser->name, $updatedUser->id);
-            } catch (\Exception $e) {
-                logger("Name decryption error: " . $e->getMessage());
-            }
-        }
-
-        if ($updatedUser->username) {
-            try {
-                $usernameDecrypted = encrypt_decrypt_db('dec', $updatedUser->username, $updatedUser->id);
-            } catch (\Exception $e) {
-                logger("Username decryption error: " . $e->getMessage());
-            }
-        }
-
-        if ($updatedUser->email) {
-            try {
-                $emailDecrypted = encrypt_decrypt_db('dec', $updatedUser->email, $updatedUser->id);
-            } catch (\Exception $e) {
-                logger("Email decryption error: " . $e->getMessage());
-            }
-        }
-
-        if ($updatedUser->nip) {
-            try {
-                $nipDecrypted = encrypt_decrypt_db('dec', $updatedUser->nip, $updatedUser->id);
-                logger("NIP decryption result: " . ($nipDecrypted ?? 'NULL'));
-            } catch (\Exception $e) {
-                logger("NIP decryption error: " . $e->getMessage());
-            }
-        }
-
-        if ($updatedUser->phone_number) {
-            try {
-                logger("Encrypted phone from DB: " . $updatedUser->phone_number);
-                $phoneDecrypted = encrypt_decrypt_db('dec', $updatedUser->phone_number, $updatedUser->id);
-                logger("Decrypted phone result: " . ($phoneDecrypted ?? 'NULL'));
-
-                if (!$phoneDecrypted) {
-                    logger("First decryption failed, trying alternative methods...");
-                    $phoneDecrypted = trim($phoneDecrypted);
-                    if (empty($phoneDecrypted)) {
-                        logger("Phone decryption completely failed, setting to null");
-                        $phoneDecrypted = null;
-                    }
+                $value = $updatedUser->$field;
+                if ($value !== null) {
+                    $dec = encrypt_decrypt_db('dec', $value, $updatedUser->id);
+                    $decrypted[$field] = $dec ?: null;
+                } else {
+                    $decrypted[$field] = null;
                 }
-            } catch (\Exception $e) {
-                logger("Phone number decryption error: " . $e->getMessage());
-                logger("Stack trace: " . $e->getTraceAsString());
-                $phoneDecrypted = null;
+            } catch (\Throwable $e) {
+                logger("Decrypt error {$field}: " . $e->getMessage());
+                $decrypted[$field] = null;
             }
         }
 
         $result = [
             'id' => encrypt_decrypt_md5('enc', $updatedUser->id),
-            'name' => $nameDecrypted,
-            'username' => $usernameDecrypted,
-            'email' => $emailDecrypted,
-            'nip' => $nipDecrypted,
-            'phone_number' => $phoneDecrypted,
+            'name' => $decrypted['name'],
+            'username' => $decrypted['username'],
+            'email' => $decrypted['email'],
+            'nip' => $decrypted['nip'],
+            'phone_number' => $decrypted['phone_number'],
             'gender' => $updatedUser->gender,
             'profile_img' => $updatedUser->profile_img,
             'role_id' => $updatedUser->role?->id,
@@ -920,11 +785,11 @@ public function rejectUser($id)
         ];
 
         return json(200, 'success', 'update_success', 'Profil berhasil diperbarui.', $result);
+
     } catch (\Exception $e) {
         DB::rollBack();
         logger("Gagal update profil: " . $e->getMessage());
-        logger("Stack trace: " . $e->getTraceAsString());
-        return json(500, 'false', 'update_failed', 'Terjadi kesalahan saat memperbarui profil.', null);
+        return json(500, 'false', 'update_failed', 'Terjadi kesalahan sistem.', null);
     }
 }
 

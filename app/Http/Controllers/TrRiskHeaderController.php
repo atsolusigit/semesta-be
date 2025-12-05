@@ -893,8 +893,8 @@ public function store(Request $request)
         // SET DEPARTMENT SESUAI ROLE
         // ============================================
 
-        // Superadmin (role 1) boleh pilih departemen dari request
-        if ($currentUser->role_id == 1) {
+       // Superadmin (role 1, 4, 5) boleh pilih departemen dari request
+        if (in_array($currentUser->role_id, [1, 4, 5])) {
             $data['department_id'] = $request->input('department_id');
         } else {
             // Role lain (2, 3) selalu pakai department_id user

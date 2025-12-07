@@ -24,7 +24,7 @@ class TrRcsaHeaderController extends Controller
 
         $perPage = $request->input('per_page', 10);
 
-        $sortBy = $request->input('sortBy', 'id');
+        $sortBy = $request->input('sortBy', 'updated_at');
         $sortOrder = strtolower($request->input('sortOrder', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $query = TrRcsaHeader::with([
@@ -46,6 +46,9 @@ class TrRcsaHeaderController extends Controller
         })
         ->when($request->filled('tahun'), function ($q) use ($request) {
             $q->where('year', (int) $request->input('tahun'));
+        })
+        ->when($request->filled('unit_kerja'), function ($q) use ($request) {
+            $q->where('unit_kerja_id', (int) $request->input('unit_kerja'));
         })
         ->when($request->has('isMainRisk'), function ($q) use ($request) {
             $val = filter_var($request->input('isMainRisk'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
@@ -92,6 +95,7 @@ class TrRcsaHeaderController extends Controller
             'tahun' => 'year',
             'id' => 'id',
             'status' => 'status',
+            'updated_at' => 'updated_at',
         ];
 
         $sortColumn = $sortMap[$sortBy] ?? 'id';
@@ -1437,7 +1441,7 @@ class TrRcsaHeaderController extends Controller
 
     public function updateIsMainRisk(Request $request, $id)
     {
-        $result = check_role(auth()->user(), [1, 2, 3]);
+        $result = check_role(auth()->user(), [1, 2, 3, 4, 5, 6]);
         if ($result !== true) {
             return $result;
         }

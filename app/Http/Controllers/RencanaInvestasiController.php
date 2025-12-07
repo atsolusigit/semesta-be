@@ -611,6 +611,109 @@ class RencanaInvestasiController extends Controller
         return false;
     }
 
+    public function monitoring(Request $request)
+    {
+        $now = now();
+        $tahun = (int) ($request->integer('tahun') ?: $now->year);
+
+        $unitParam = $request->get('unit')
+            ?? $request->get('divisi')
+            ?? $request->get('risk_owner')
+            ?? $request->get('department_id')
+            ?? $request->get('unit_kerja_id')
+            ?? $request->get('department_name');
+
+        $query = RencanaInvestasi::query()
+            ->select('rencana_investasi.*', 'mst_email_unit_kerja.unit_kerja_nama as department_name_joined')
+            ->leftJoin('mst_email_unit_kerja', 'rencana_investasi.unit_kerja_id', '=', 'mst_email_unit_kerja.unit_kerja_id')
+            ->with(['createdBy:id,name,username'])
+            ->where('rencana_investasi.year', $tahun)
+            ->when(!is_null($unitParam), function ($q) use ($unitParam) {
+                if (is_numeric($unitParam)) {
+                    $id = (int)$unitParam;
+                    $q->where(function ($qq) use ($id) {
+                        $qq->where('rencana_investasi.department_id', $id)
+                           ->orWhere('rencana_investasi.unit_kerja_id', $id);
+                    });
+                } else {
+                    $name = trim((string)$unitParam);
+                    if ($name !== '') {
+                        $q->where(function ($qq) use ($name) {
+                            $qq->where('rencana_investasi.department_name', 'like', '%'.$name.'%')
+                               ->orWhere('mst_email_unit_kerja.unit_kerja_nama', 'like', '%'.$name.'%');
+                        });
+                    }
+                }
+            })
+            ->orderBy('rencana_investasi.department_name')
+            ->orderBy('mst_email_unit_kerja.unit_kerja_nama')
+            ->orderBy('rencana_investasi.nama_investasi');
+
+        $rows = $query->get();
+
+        if ($rows->isEmpty()) {
+            return json(404, false, 'Tidak Ada Data', 'Data rencana investasi tidak ditemukan.', null);
+        }
+
+        $timelineMap = RencanaInvestasiTimelineYear::whereIn('erkap_id', $rows->pluck('erkap_id')->filter()->unique())
+            ->where('year', $tahun)
+            ->get()
+            ->keyBy('erkap_id');
+
+        $data = $rows->map(function ($ri) use ($timelineMap) {
+            $timeline = $timelineMap[$ri->erkap_id]->timeline_json ?? [];
+
+            $monthly = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $monthly[$this->monthSlug($m)] = $this->collapseMonthStatus($timeline, $m);
+            }
+
+            $maker = $ri->createdBy?->name ?? $ri->createdBy?->username ?? null;
+            $departmentName = $ri->department_name_joined ?? $ri->department_name;
+
+            return [
+                'id' => $ri->id,
+                'erkap_id' => $ri->erkap_id,
+                'unit_divisi' => $departmentName,
+                'peristiwa_risiko' => $ri->nama_investasi,
+                'dibuat_oleh' => $maker,
+                'tahun' => $ri->year,
+                'realisasi_bulanan' => $monthly,
+            ];
+        });
+
+        return json(200, true, 'Data Ditemukan', 'Data realisasi bulanan berhasil diambil.', [
+            'tahun' => $tahun,
+            'data' => $data,
+        ]);
+    }
+
+    private function collapseMonthStatus(array $timeline, int $month): array
+    {
+        $entry = collect($timeline)->firstWhere('bulan_id', $month);
+        if (!is_array($entry)) {
+            return ['label' => null, 'color' => null];
+        }
+
+        for ($w = 4; $w >= 1; $w--) {
+            $label = $entry["week{$w}_label"] ?? null;
+            if ($label) {
+                return [
+                    'label' => $label,
+                    'color' => $entry["week{$w}_color"] ?? null,
+                ];
+            }
+        }
+
+        return ['label' => null, 'color' => null];
+    }
+
+    private function monthSlug(int $month): string
+    {
+        $map = [1=>'jan',2=>'feb',3=>'mar',4=>'apr',5=>'may',6=>'jun',7=>'jul',8=>'aug',9=>'sep',10=>'oct',11=>'nov',12=>'dec'];
+        return $map[$month] ?? (string)$month;
+    }
+
     public function timeline(Request $request)
     {
         $tahun   = (int) $request->query('tahun');

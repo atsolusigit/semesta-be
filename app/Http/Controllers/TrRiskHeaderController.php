@@ -1961,16 +1961,25 @@ public function getPendingApproval(Request $request)
         if ($request->has('search') && $request->search) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
-                $q->where('jenis_risiko', 'like', '%' . $searchTerm . '%')
-                    ->orWhere('sasaran', 'like', '%' . $searchTerm . '%')
+                $q->where('sasaran', 'like', '%' . $searchTerm . '%')
                     ->orWhere('peristiwa_risiko', 'like', '%' . $searchTerm . '%')
                     ->orWhere('penyebab_risiko', 'like', '%' . $searchTerm . '%')
                     ->orWhere('dampak_risiko', 'like', '%' . $searchTerm . '%')
                     ->orWhere('internal_control', 'like', '%' . $searchTerm . '%')
                     ->orWhere('mitigasi', 'like', '%' . $searchTerm . '%')
+                     ->orWhere('year', 'like', '%' . $searchTerm . '%')
+
+                    // CARI JENIS RISIKO DARI RELASI
+                    ->orWhereHas('jenisRisiko', function ($q) use ($searchTerm) {
+                        $q->where('nama_jenis_risiko', 'like', '%' . $searchTerm . '%');
+                    })
+
+                    // CARI DEPARTMENT
                     ->orWhereHas('department', function ($q) use ($searchTerm) {
                         $q->where('name', 'like', '%' . $searchTerm . '%');
                     })
+
+                    // CARI CREATED BY (terenkripsi)
                     ->orWhereHas('createdBy', function ($q) use ($searchTerm) {
                         $q->whereRaw("CAST(AES_DECRYPT(name, CONCAT('SM', id)) AS CHAR) LIKE ?", ['%' . $searchTerm . '%']);
                     });
@@ -2419,8 +2428,8 @@ public function reviewRiskHeader(Request $request, $id)
     try {
         $user = Auth::user();
 
-        // Hanya role 1 (superadmin) dan 5 (staf menrisk) yang boleh review
-        if (!in_array($user->role_id, [1, 5])) {
+        // Hanya role 1 (superadmin), 4 (SVP menrisk) & 5 (Team menrisk) yang boleh review
+        if (!in_array($user->role_id, [1, 4, 5])) {
             return json(403, false, 'Akses Ditolak', 'Anda tidak memiliki hak untuk mereview data ini.', null);
         }
 

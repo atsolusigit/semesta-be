@@ -1441,7 +1441,7 @@ class TrRcsaHeaderController extends Controller
 
     public function updateIsMainRisk(Request $request, $id)
     {
-        $result = check_role(auth()->user(), [1, 2, 3]);
+        $result = check_role(auth()->user(), [1, 2, 3, 4, 5, 6]);
         if ($result !== true) {
             return $result;
         }

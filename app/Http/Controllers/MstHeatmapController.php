@@ -241,9 +241,9 @@ class MstHeatmapController extends Controller
         $responseDepartmentName = $firstRiskHeader->department ? $firstRiskHeader->department->name : null;
     }
 
-    $inherentMatrix = initialize_risk_matrix();
-    $residualCurrentMatrix = initialize_risk_matrix();
-    $residualTargetMatrix = initialize_risk_matrix();
+    $inherentMatrixEvents = initialize_risk_event_matrix();
+    $residualCurrentMatrixEvents = initialize_risk_event_matrix();
+    $residualTargetMatrixEvents = initialize_risk_event_matrix();
 
     $inherentSummary = initialize_risk_summary();
     $residualCurrentSummary = initialize_risk_summary();
@@ -267,14 +267,19 @@ class MstHeatmapController extends Controller
     $residualTargetChart = array_fill(0, 12, 0);
     $monthCounts = array_fill(0, 12, 0);
 
-    foreach ($riskHeaders as $header) {
+    foreach ($riskHeaders as $index => $header) {
+        $order = $index + 1;
+
         // === INHERENT RISK ===
         if (in_array($type, ['inherent', 'all'])) {
             $impact = $header->inherent_risk_level_dampak ?? 0;
             $likelihood = $header->inherent_risk_level_kemungkinan ?? 0;
 
             if ($impact > 0 && $likelihood > 0) {
-                $inherentMatrix[$likelihood][$impact]++;
+                $inherentMatrixEvents[$likelihood][$impact][] = [
+                    'order' => $order,
+                    'peristiwa_risiko' => $header->peristiwa_risiko ?? ''
+                ];
                 $score = $impact * $likelihood;
                 $inherentSummary[get_risk_category_by_score($score)]++;
                 $processedData['inherent_processed']++;
@@ -301,7 +306,10 @@ class MstHeatmapController extends Controller
 
                     if ($impact > 0 && $likelihood > 0 && $monthIndex >= 0 && $monthIndex < 12) {
                         $score = $impact * $likelihood;
-                        $residualCurrentMatrix[$likelihood][$impact]++;
+                        $residualCurrentMatrixEvents[$likelihood][$impact][] = [
+                            'order' => $order,
+                            'peristiwa_risiko' => $header->peristiwa_risiko ?? ''
+                        ];
                         $residualCurrentSummary[get_risk_category_by_score($score)]++;
                         $processedData['residual_current_processed']++;
                         $tableSummary[get_risk_category_by_score($score)]++;
@@ -319,7 +327,10 @@ class MstHeatmapController extends Controller
 
             if ($impact > 0 && $likelihood > 0) {
                 $score = $impact * $likelihood;
-                $residualTargetMatrix[$likelihood][$impact]++;
+                $residualTargetMatrixEvents[$likelihood][$impact][] = [
+                    'order' => $order,
+                    'peristiwa_risiko' => $header->peristiwa_risiko ?? ''
+                ];
                 $residualTargetSummary[get_risk_category_by_score($score)]++;
                 $processedData['residual_target_processed']++;
                 $tableSummary[get_risk_category_by_score($score)]++;
@@ -366,17 +377,17 @@ class MstHeatmapController extends Controller
         'processing_info' => $processedData,
         'heatmap' => [
             'inherent' => [
-                'grid' => $inherentMatrix,
+                'grid' => $inherentMatrixEvents,
                 'summary' => $inherentSummary,
                 'total' => array_sum($inherentSummary)
             ],
             'residual_current' => [
-                'grid' => $residualCurrentMatrix,
+                'grid' => $residualCurrentMatrixEvents,
                 'summary' => $residualCurrentSummary,
                 'total' => array_sum($residualCurrentSummary)
             ],
             'residual_target' => [
-                'grid' => $residualTargetMatrix,
+                'grid' => $residualTargetMatrixEvents,
                 'summary' => $residualTargetSummary,
                 'total' => array_sum($residualTargetSummary)
             ]

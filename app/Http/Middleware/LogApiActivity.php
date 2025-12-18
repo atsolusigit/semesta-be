@@ -24,17 +24,9 @@ class LogApiActivity
 
         $durationMs = (int) round((hrtime(true) - $start) / 1_000_000);
 
-        $requestBody = $request->isJson()
-            ? (array) $request->json()->all()
-            : (array) $request->all();
-
-        $requestBody = Arr::except($requestBody, [
-            'password',
-            'password_confirmation',
-            'token',
-            'access_token',
-            'refresh_token',
-        ]);
+        $query = $request->query();
+        $qs = $query ? http_build_query($query) : '';
+        $safeUrl = $request->url() . ($qs ? ('?' . $qs) : '');
 
         $safeHeaders = [
             'Accept' => $request->header('Accept') ?? 'application/json',
@@ -50,12 +42,23 @@ class LogApiActivity
             fn ($v, $k) => "-H " . escapeshellarg($k . ': ' . $v)
         )->implode(' ');
 
-        $query = $request->query();
-        $qs = $query ? http_build_query($query) : '';
-        $safeUrl = $request->url() . ($qs ? ('?' . $qs) : '');
+        $requestBody = [];
+        if (!in_array($request->method(), ['GET', 'HEAD'], true)) {
+            $requestBody = $request->isJson()
+                ? (array) $request->json()->all()
+                : (array) $request->all();
+
+            $requestBody = Arr::except($requestBody, [
+                'password',
+                'password_confirmation',
+                'token',
+                'access_token',
+                'refresh_token',
+            ]);
+        }
 
         $curlBody = '';
-        if (!in_array($request->method(), ['GET', 'HEAD'], true)) {
+        if (!empty($requestBody)) {
             $curlBody = "-d " . escapeshellarg(json_encode($requestBody, JSON_UNESCAPED_SLASHES));
         }
 
@@ -67,16 +70,16 @@ class LogApiActivity
             $curlBody
         ));
 
-        $payload = [
-            'method' => $request->method(),
-            'path' => '/' . ltrim($request->path(), '/'),
-            'full_url' => $safeUrl,
-            'status_code' => $response->getStatusCode(),
-            'duration_ms' => $durationMs,
-            'query' => $query,
-            'body' => $requestBody,
-            'user_agent' => $request->userAgent(),
-        ];
+        $payload = null;
+        if (!in_array($request->method(), ['GET', 'HEAD'], true)) {
+            $payload = [
+                'path' => '/' . ltrim($request->path(), '/'),
+                'full_url' => $safeUrl,
+                'query' => $query,
+                'body' => $requestBody,
+                'user_agent' => $request->userAgent(),
+            ];
+        }
 
         $segments = explode('/', trim($request->path(), '/'));
         $logicalTable = 'api:' . ($segments[1] ?? 'general');
@@ -85,6 +88,7 @@ class LogApiActivity
             'user_id' => optional($request->user())->id,
             'actor_type' => $request->user() ? 'user' : 'guest',
             'action' => 'api_hit',
+            'method' => $request->method(),
             'status_code' => $response->getStatusCode(),
             'duration_ms' => $durationMs,
             'table' => $logicalTable,

@@ -1072,6 +1072,24 @@ if (!function_exists('initialize_risk_matrix')) {
     }
 }
 
+if (!function_exists('initialize_risk_event_matrix')) {
+    /**
+     * Inisialisasi matrix 5x5 berisi array kosong untuk menyimpan detail peristiwa risiko
+     *
+     * @return array Matrix 5x5 untuk daftar peristiwa risiko
+     */
+    function initialize_risk_event_matrix()
+    {
+        $matrix = [];
+        for ($likelihood = 1; $likelihood <= 5; $likelihood++) {
+            for ($impact = 1; $impact <= 5; $impact++) {
+                $matrix[$likelihood][$impact] = [];
+            }
+        }
+        return $matrix;
+    }
+}
+
 if (!function_exists('initialize_risk_summary')) {
     /**
      * Inisialisasi summary dengan kategori default

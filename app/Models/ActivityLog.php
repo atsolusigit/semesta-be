@@ -22,6 +22,7 @@ class ActivityLog extends Model
         'ip_address',
         'status_code',
         'duration_ms',
+        'method',
     ];
 
     protected $casts = [

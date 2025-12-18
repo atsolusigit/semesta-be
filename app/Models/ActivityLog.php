@@ -20,6 +20,8 @@ class ActivityLog extends Model
         'curl',
         'request_id',
         'ip_address',
+        'status_code',
+        'duration_ms',
     ];
 
     protected $casts = [

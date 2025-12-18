@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'jwt'  => CheckJWT::class,
             'auth' => Authenticate::class,
         ]);
+        $middleware->appendToGroup('api', \App\Http\Middleware\LogApiActivity::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthenticationException $e, Request $request) {

@@ -146,9 +146,9 @@ class MstHeatmapController extends Controller
 
     $departmentId = $request->department_id;
     $departmentName = $request->department_name;
-    $year = $request->year;
+    $year = $request->year !== null ? (int) $request->year : null;
     $riskCodes = $request->risk_code ?? $request->kode_risiko ?? [];
-    $month = $request->month;
+    $month = $request->month !== null ? (int) $request->month : null;
     $type = $request->type ?? 'all';
 
     $user = auth()->user();
@@ -199,6 +199,49 @@ class MstHeatmapController extends Controller
         $riskCategoriesForTable[$item->name] = $item->color;
     }
 
+    // Builder helper supaya filter konsisten di berbagai query
+    $applyCommonFilters = function ($q) use ($departmentId, $departmentName, $riskCodes) {
+        if ($departmentId) {
+            $q->where('department_id', $departmentId);
+        }
+
+        if ($departmentName) {
+            $q->whereHas('department', function($q) use ($departmentName) {
+                $q->where('name', 'like', '%' . $departmentName . '%');
+            });
+        }
+
+        if (!empty($riskCodes)) {
+            $q->where(function($q) use ($riskCodes) {
+                foreach ($riskCodes as $riskCode) {
+                    $q->orWhereRaw('FIND_IN_SET(?, risk_code)', [$riskCode]);
+                }
+            });
+        }
+    };
+
+    // Tentukan default year & month untuk residual_current bila tidak diisi
+    $filterOnlyQuery = TrRiskHeader::query();
+    $applyCommonFilters($filterOnlyQuery);
+
+    if (!$year) {
+        $latestYear = (clone $filterOnlyQuery)->max('year');
+        if ($latestYear) {
+            $year = $latestYear;
+        }
+    }
+
+    if (!$month && $year) {
+        $latestMonth = TrRiskMonthly::whereHas('header', function($q) use ($applyCommonFilters, $year) {
+            $applyCommonFilters($q);
+            $q->where('year', $year);
+        })->max('month');
+
+        if ($latestMonth) {
+            $month = $latestMonth;
+        }
+    }
+
     $query = TrRiskHeader::with([
         'monthlyData' => function($q) use ($month) {
             if ($month) {
@@ -209,26 +252,10 @@ class MstHeatmapController extends Controller
         'department'
     ]);
 
-    if ($departmentId) {
-        $query->where('department_id', $departmentId);
-    }
-
-    if ($departmentName) {
-        $query->whereHas('department', function($q) use ($departmentName) {
-            $q->where('name', 'like', '%' . $departmentName . '%');
-        });
-    }
+    $applyCommonFilters($query);
 
     if ($year) {
         $query->where('year', $year);
-    }
-
-    if (!empty($riskCodes)) {
-        $query->where(function($q) use ($riskCodes) {
-            foreach ($riskCodes as $riskCode) {
-                $q->orWhereRaw('FIND_IN_SET(?, risk_code)', [$riskCode]);
-            }
-        });
     }
 
     $riskHeaders = $query->get();

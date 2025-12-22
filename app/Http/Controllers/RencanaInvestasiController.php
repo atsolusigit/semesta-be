@@ -135,6 +135,15 @@ class RencanaInvestasiController extends Controller
                 }
             }
 
+            if (!$targetTimeline && $it->erkap_id) {
+                $targetTimeline = $this->fetchErkapTimelineWeek(
+                    (int) $it->erkap_id,
+                    (int) $tahun,
+                    (int) $bulan,
+                    (int) $week
+                );
+            }
+
             $realisasiTimeline = !empty($it->realisasi_timeline)
                 ? (is_string($it->realisasi_timeline)
                     ? $it->realisasi_timeline
@@ -300,9 +309,7 @@ class RencanaInvestasiController extends Controller
 
     public function update(Request $request, $id)
     {
-        // 🔐 REVISI ROLE:
-        // - update current risk investasi => manrisk (1,4,5,6)
-        // - update realisasi timeline => user unit + manrisk (1,3,4,5,6)
+
         $result = check_role(auth()->user(), [1, 3, 4, 5, 6]);
         if ($result !== true) return $result;
 
@@ -362,7 +369,6 @@ class RencanaInvestasiController extends Controller
             );
         }
 
-        // Jika setelah filter role tidak ada field yang boleh diupdate
         if (empty($payload)) {
             return json(
                 403,
@@ -595,6 +601,50 @@ class RencanaInvestasiController extends Controller
         return $map[$month] ?? (string)$month;
     }
 
+
+    private function fetchErkapTimelineWeek(int $erkapId, int $tahun, int $bulan, int $week): ?array
+    {
+        $base = rtrim(config('services.erkap.base_url', env('ERKAP_BASE_URL', '')), '/');
+        $auth = config('services.erkap.basic_auth', env('ERKAP_BASIC_AUTH', ''));
+
+        if (!$base || !$auth) {
+            return null;
+        }
+
+        $safeWeek = max(1, min($week, 4));
+
+        try {
+            $resp = Http::withHeaders(['Authorization' => $auth])
+                ->timeout(10)
+                ->get($base . '/api/semesta/capex-timeline', [
+                    'tahun' => $tahun,
+                    'capex_id' => $erkapId,
+                ]);
+
+            if (!$resp->successful()) {
+                return null;
+            }
+
+            $body = $resp->json();
+            $timeline = $body['result'][0]['timeline'] ?? null;
+            if (!is_array($timeline)) {
+                return null;
+            }
+
+            $bulanEntry = collect($timeline)->firstWhere('bulan_id', $bulan);
+            if (!is_array($bulanEntry)) {
+                return null;
+            }
+
+            $color = $bulanEntry["week{$safeWeek}_color"] ?? null;
+            $label = $bulanEntry["week{$safeWeek}_label"] ?? null;
+
+            return ($color || $label) ? ['color' => $color, 'label' => $label] : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     private function guessDepartmentName($rows, $filterDepartment)
     {
         if ($filterDepartment) {
@@ -610,7 +660,6 @@ class RencanaInvestasiController extends Controller
 
         return false;
     }
-
 
     public function monitoring(Request $request)
     {

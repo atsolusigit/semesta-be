@@ -132,273 +132,311 @@ class MstHeatmapController extends Controller
     }
 
    public function getHeatmapData(Request $request)
-{
-    // Validasi input - semua parameter menjadi optional, tambah department_name
-    $request->validate([
-        'department_id' => 'nullable|integer',
-        'department_name' => 'nullable|string',
-        'year' => 'nullable|integer',
-        'risk_code' => 'array',
-        'kode_risiko' => 'array',
-        'month' => 'nullable|integer|min:1|max:12',
-        'type' => 'nullable|string|in:inherent,residual,residual_current,residual_target,all'
-    ]);
+    {
+        // Validasi input - semua parameter menjadi optional, tambah department_name
+        $request->validate([
+            'department_id' => 'nullable|integer',
+            'department_name' => 'nullable|string',
+            'year' => 'nullable|integer',
+            'risk_code' => 'array',
+            'kode_risiko' => 'array',
+            'month' => 'nullable|integer|min:1|max:12',
+            'type' => 'nullable|string|in:inherent,residual,residual_current,residual_target,all'
+        ]);
 
-    $departmentId = $request->department_id;
-    $departmentName = $request->department_name;
-    $year = $request->year;
-    $riskCodes = $request->risk_code ?? $request->kode_risiko ?? [];
-    $month = $request->month;
-    $type = $request->type ?? 'all';
+        $departmentId = $request->department_id;
+        $departmentName = $request->department_name;
+        $year = $request->year !== null ? (int) $request->year : null;
+        $riskCodes = $request->risk_code ?? $request->kode_risiko ?? [];
+        $month = $request->month !== null ? (int) $request->month : null;
+        $type = $request->type ?? 'all';
 
-    $user = auth()->user();
-    $userRole = $user->role->id ?? $user->role_id ?? 1;
-    $userDepartmentId = $user->department_id ?? null;
+        $user = auth()->user();
+        $userRole = $user->role->id ?? $user->role_id ?? 1;
+        $userDepartmentId = $user->department_id ?? null;
 
-    if (in_array($userRole, [2, 3]) && $userDepartmentId) {
-        $departmentId = $userDepartmentId;
-        $departmentName = null;
-    }
+        if (in_array($userRole, [2, 3]) && $userDepartmentId) {
+            $departmentId = $userDepartmentId;
+            $departmentName = null;
+        }
 
-    $probabilitasLabels = [];
-    $dampakLabels = [];
-    $riskCategoriesArray = [];
-    $riskCategoriesForTable = [];
+        $probabilitasLabels = [];
+        $dampakLabels = [];
+        $riskCategoriesArray = [];
+        $riskCategoriesForTable = [];
 
-    $kemungkinanData = \DB::table('mst_heatmap_kemungkinan')
-        ->select('id', 'label')
-        ->orderBy('id')
-        ->get();
+        $kemungkinanData = \DB::table('mst_heatmap_kemungkinan')
+            ->select('id', 'label')
+            ->orderBy('id')
+            ->get();
 
-    foreach ($kemungkinanData as $item) {
-        $probabilitasLabels[(string)$item->id] = $item->label;
-    }
+        foreach ($kemungkinanData as $item) {
+            $probabilitasLabels[(string)$item->id] = $item->label;
+        }
 
-    $dampakData = \DB::table('mst_heatmap_dampak')
-        ->select('id', 'label')
-        ->orderBy('id')
-        ->get();
+        $dampakData = \DB::table('mst_heatmap_dampak')
+            ->select('id', 'label')
+            ->orderBy('id')
+            ->get();
 
-    foreach ($dampakData as $item) {
-        $dampakLabels[(string)$item->id] = $item->label;
-    }
+        foreach ($dampakData as $item) {
+            $dampakLabels[(string)$item->id] = $item->label;
+        }
 
-    $riskRangeData = \DB::table('mst_heatmap_risk_range')
-        ->select('name', 'start', 'end', 'color')
-        ->orderBy('start')
-        ->get();
+        $riskRangeData = \DB::table('mst_heatmap_risk_range')
+            ->select('name', 'start', 'end', 'color')
+            ->orderBy('start')
+            ->get();
 
-    foreach ($riskRangeData as $item) {
-        $riskCategoriesArray[] = [
-            'name' => $item->name,
-            'min_score' => $item->start,
-            'max_score' => $item->end,
-            'color' => $item->color
-        ];
+        foreach ($riskRangeData as $item) {
+            $riskCategoriesArray[] = [
+                'name' => $item->name,
+                'min_score' => $item->start,
+                'max_score' => $item->end,
+                'color' => $item->color
+            ];
 
-        $riskCategoriesForTable[$item->name] = $item->color;
-    }
+            $riskCategoriesForTable[$item->name] = $item->color;
+        }
 
-    $query = TrRiskHeader::with([
-        'monthlyData' => function($q) use ($month) {
-            if ($month) {
-                $q->where('month', $month);
+        // Builder helper supaya filter konsisten di berbagai query
+        $applyCommonFilters = function ($q) use ($departmentId, $departmentName, $riskCodes) {
+            if ($departmentId) {
+                $q->where('department_id', $departmentId);
             }
-            $q->orderBy('month', 'desc');
-        },
-        'department'
-    ]);
 
-    if ($departmentId) {
-        $query->where('department_id', $departmentId);
-    }
-
-    if ($departmentName) {
-        $query->whereHas('department', function($q) use ($departmentName) {
-            $q->where('name', 'like', '%' . $departmentName . '%');
-        });
-    }
-
-    if ($year) {
-        $query->where('year', $year);
-    }
-
-    if (!empty($riskCodes)) {
-        $query->where(function($q) use ($riskCodes) {
-            foreach ($riskCodes as $riskCode) {
-                $q->orWhereRaw('FIND_IN_SET(?, risk_code)', [$riskCode]);
+            if ($departmentName) {
+                $q->whereHas('department', function($q) use ($departmentName) {
+                    $q->where('name', 'like', '%' . $departmentName . '%');
+                });
             }
-        });
-    }
 
-    $riskHeaders = $query->get();
+            if (!empty($riskCodes)) {
+                $q->where(function($q) use ($riskCodes) {
+                    foreach ($riskCodes as $riskCode) {
+                        $q->orWhereRaw('FIND_IN_SET(?, risk_code)', [$riskCode]);
+                    }
+                });
+            }
+        };
 
-    $responseDepartmentName = null;
-    if ($departmentName) {
-        $responseDepartmentName = $departmentName;
-    } elseif ($departmentId && $riskHeaders->count() > 0) {
-        $firstRiskHeader = $riskHeaders->first();
-        $responseDepartmentName = $firstRiskHeader->department ? $firstRiskHeader->department->name : null;
-    }
+        // Tentukan default year & month untuk residual_current bila tidak diisi
+        $filterOnlyQuery = TrRiskHeader::query();
+        $applyCommonFilters($filterOnlyQuery);
 
-    $inherentMatrix = initialize_risk_matrix();
-    $residualCurrentMatrix = initialize_risk_matrix();
-    $residualTargetMatrix = initialize_risk_matrix();
-
-    $inherentSummary = initialize_risk_summary();
-    $residualCurrentSummary = initialize_risk_summary();
-    $residualTargetSummary = initialize_risk_summary();
-
-    $processedData = [
-        'inherent_processed' => 0,
-        'residual_current_processed' => 0,
-        'residual_target_processed' => 0,
-        'monthly_data_found' => 0,
-        'headers_with_monthly' => 0
-    ];
-
-    $tableData = [];
-    $tableSummary = initialize_risk_summary();
-
-    // === Tambahan untuk Line Chart ===
-    $months = range(1, 12);
-    $inherentChart = array_fill(0, 12, 0);
-    $residualCurrentChart = array_fill(0, 12, 0);
-    $residualTargetChart = array_fill(0, 12, 0);
-    $monthCounts = array_fill(0, 12, 0);
-
-    foreach ($riskHeaders as $header) {
-        // === INHERENT RISK ===
-        if (in_array($type, ['inherent', 'all'])) {
-            $impact = $header->inherent_risk_level_dampak ?? 0;
-            $likelihood = $header->inherent_risk_level_kemungkinan ?? 0;
-
-            if ($impact > 0 && $likelihood > 0) {
-                $inherentMatrix[$likelihood][$impact]++;
-                $score = $impact * $likelihood;
-                $inherentSummary[get_risk_category_by_score($score)]++;
-                $processedData['inherent_processed']++;
-                $tableSummary[get_risk_category_by_score($score)]++;
-
-                // Line chart (skor konstan tiap bulan)
-                foreach ($months as $i => $m) {
-                    $inherentChart[$i] += $score;
-                    $monthCounts[$i]++;
-                }
+        if (!$year) {
+            $latestYear = (clone $filterOnlyQuery)->max('year');
+            if ($latestYear) {
+                $year = $latestYear;
             }
         }
 
-        // === RESIDUAL CURRENT RISK ===
-        if (in_array($type, ['residual', 'residual_current', 'all'])) {
-            if ($header->monthlyData->count() > 0) {
-                $processedData['headers_with_monthly']++;
-                foreach ($header->monthlyData as $monthlyData) {
-                    $processedData['monthly_data_found']++;
+        if (!$month && $year) {
+            $latestMonth = TrRiskMonthly::whereHas('header', function($q) use ($applyCommonFilters, $year) {
+                $applyCommonFilters($q);
+                $q->where('year', $year);
+            })->max('month');
 
-                    $impact = $monthlyData->residual_risk_level_dampak ?? 0;
-                    $likelihood = $monthlyData->residual_risk_level_kemungkinan ?? 0;
-                    $monthIndex = ($monthlyData->month ?? 1) - 1;
+            if ($latestMonth) {
+                $month = $latestMonth;
+            }
+        }
 
-                    if ($impact > 0 && $likelihood > 0 && $monthIndex >= 0 && $monthIndex < 12) {
-                        $score = $impact * $likelihood;
-                        $residualCurrentMatrix[$likelihood][$impact]++;
-                        $residualCurrentSummary[get_risk_category_by_score($score)]++;
-                        $processedData['residual_current_processed']++;
-                        $tableSummary[get_risk_category_by_score($score)]++;
-                        $residualCurrentChart[$monthIndex] += $score;
-                        $monthCounts[$monthIndex]++;
+        $query = TrRiskHeader::with([
+            'monthlyData' => function($q) use ($month) {
+                if ($month) {
+                    $q->where('month', $month);
+                }
+                $q->orderBy('month', 'desc');
+            },
+            'department'
+        ]);
+
+        $applyCommonFilters($query);
+
+        if ($year) {
+            $query->where('year', $year);
+        }
+
+        $riskHeaders = $query->get();
+
+        $responseDepartmentName = null;
+        if ($departmentName) {
+            $responseDepartmentName = $departmentName;
+        } elseif ($departmentId && $riskHeaders->count() > 0) {
+            $firstRiskHeader = $riskHeaders->first();
+            $responseDepartmentName = $firstRiskHeader->department ? $firstRiskHeader->department->name : null;
+        }
+
+        $inherentMatrixEvents = initialize_risk_event_matrix();
+        $residualCurrentMatrixEvents = initialize_risk_event_matrix();
+        $residualTargetMatrixEvents = initialize_risk_event_matrix();
+
+        $inherentSummary = initialize_risk_summary();
+        $residualCurrentSummary = initialize_risk_summary();
+        $residualTargetSummary = initialize_risk_summary();
+
+        $processedData = [
+            'inherent_processed' => 0,
+            'residual_current_processed' => 0,
+            'residual_target_processed' => 0,
+            'monthly_data_found' => 0,
+            'headers_with_monthly' => 0
+        ];
+
+        $tableData = [];
+        $tableSummary = initialize_risk_summary();
+
+        // === Tambahan untuk Line Chart ===
+        $months = range(1, 12);
+        $inherentChart = array_fill(0, 12, 0);
+        $residualCurrentChart = array_fill(0, 12, 0);
+        $residualTargetChart = array_fill(0, 12, 0);
+        $monthCounts = array_fill(0, 12, 0);
+
+        foreach ($riskHeaders as $index => $header) {
+            $order = $index + 1;
+
+            // === INHERENT RISK ===
+            if (in_array($type, ['inherent', 'all'])) {
+                $impact = $header->inherent_risk_level_dampak ?? 0;
+                $likelihood = $header->inherent_risk_level_kemungkinan ?? 0;
+
+                if ($impact > 0 && $likelihood > 0) {
+                    $inherentMatrixEvents[$likelihood][$impact][] = [
+                        'order' => $order,
+                        'peristiwa_risiko' => $header->peristiwa_risiko ?? ''
+                    ];
+                    $score = $impact * $likelihood;
+                    $inherentSummary[get_risk_category_by_score($score)]++;
+                    $processedData['inherent_processed']++;
+                    $tableSummary[get_risk_category_by_score($score)]++;
+
+                    // Line chart (skor konstan tiap bulan)
+                    foreach ($months as $i => $m) {
+                        $inherentChart[$i] += $score;
+                        $monthCounts[$i]++;
+                    }
+                }
+            }
+
+            // === RESIDUAL CURRENT RISK ===
+            if (in_array($type, ['residual', 'residual_current', 'all'])) {
+                if ($header->monthlyData->count() > 0) {
+                    $processedData['headers_with_monthly']++;
+                    foreach ($header->monthlyData as $monthlyData) {
+                        $processedData['monthly_data_found']++;
+
+                        $impact = $monthlyData->residual_risk_level_dampak ?? 0;
+                        $likelihood = $monthlyData->residual_risk_level_kemungkinan ?? 0;
+                        $monthIndex = ($monthlyData->month ?? 1) - 1;
+
+                        if ($impact > 0 && $likelihood > 0 && $monthIndex >= 0 && $monthIndex < 12) {
+                            $score = $impact * $likelihood;
+                            $residualCurrentMatrixEvents[$likelihood][$impact][] = [
+                                'order' => $order,
+                                'peristiwa_risiko' => $header->peristiwa_risiko ?? ''
+                            ];
+                            $residualCurrentSummary[get_risk_category_by_score($score)]++;
+                            $processedData['residual_current_processed']++;
+                            $tableSummary[get_risk_category_by_score($score)]++;
+                            $residualCurrentChart[$monthIndex] += $score;
+                            $monthCounts[$monthIndex]++;
+                        }
+                    }
+                }
+            }
+
+            // === RESIDUAL TARGET RISK ===
+            if (in_array($type, ['residual', 'residual_target', 'all'])) {
+                $impact = $header->residual_target_level_dampak ?? 0;
+                $likelihood = $header->residual_target_level_kemungkinan ?? 0;
+
+                if ($impact > 0 && $likelihood > 0) {
+                    $score = $impact * $likelihood;
+                    $residualTargetMatrixEvents[$likelihood][$impact][] = [
+                        'order' => $order,
+                        'peristiwa_risiko' => $header->peristiwa_risiko ?? ''
+                    ];
+                    $residualTargetSummary[get_risk_category_by_score($score)]++;
+                    $processedData['residual_target_processed']++;
+                    $tableSummary[get_risk_category_by_score($score)]++;
+
+                    // Line chart (konstan tiap bulan)
+                    foreach ($months as $i => $m) {
+                        $residualTargetChart[$i] += $score;
                     }
                 }
             }
         }
 
-        // === RESIDUAL TARGET RISK ===
-        if (in_array($type, ['residual', 'residual_target', 'all'])) {
-            $impact = $header->residual_target_level_dampak ?? 0;
-            $likelihood = $header->residual_target_level_kemungkinan ?? 0;
-
-            if ($impact > 0 && $likelihood > 0) {
-                $score = $impact * $likelihood;
-                $residualTargetMatrix[$likelihood][$impact]++;
-                $residualTargetSummary[get_risk_category_by_score($score)]++;
-                $processedData['residual_target_processed']++;
-                $tableSummary[get_risk_category_by_score($score)]++;
-
-                // Line chart (konstan tiap bulan)
-                foreach ($months as $i => $m) {
-                    $residualTargetChart[$i] += $score;
-                }
-            }
+        // Hitung rata-rata per bulan agar lebih proporsional di chart
+        foreach ($months as $i => $m) {
+            $count = max($monthCounts[$i], 1);
+            $inherentChart[$i] = round($inherentChart[$i] / $count, 2);
+            $residualCurrentChart[$i] = round($residualCurrentChart[$i] / $count, 2);
+            $residualTargetChart[$i] = round($residualTargetChart[$i] / $count, 2);
         }
-    }
 
-    // Hitung rata-rata per bulan agar lebih proporsional di chart
-    foreach ($months as $i => $m) {
-        $count = max($monthCounts[$i], 1);
-        $inherentChart[$i] = round($inherentChart[$i] / $count, 2);
-        $residualCurrentChart[$i] = round($residualCurrentChart[$i] / $count, 2);
-        $residualTargetChart[$i] = round($residualTargetChart[$i] / $count, 2);
-    }
+        foreach ($riskCategoriesForTable as $category => $color) {
+            $tableData[] = [
+                'category' => $category,
+                'color' => $color,
+                'count' => $tableSummary[$category] ?? 0
+            ];
+        }
 
-    foreach ($riskCategoriesForTable as $category => $color) {
-        $tableData[] = [
-            'category' => $category,
-            'color' => $color,
-            'count' => $tableSummary[$category] ?? 0
-        ];
-    }
-
-    return response()->json([
-        'status' => true,
-        'message' => 'Heatmap data retrieved successfully',
-        'filters' => [
-            'department_id' => $departmentId,
-            'department_name' => $responseDepartmentName,
-            'year' => $year,
-            'month' => $month,
-            'risk_codes' => $riskCodes,
-            'kode_risiko' => $riskCodes,
-            'type' => $type,
-            'total_risks' => $riskHeaders->count(),
-            'user_role' => $userRole,
-            'access_restricted' => in_array($userRole, [2, 3])
-        ],
-        'processing_info' => $processedData,
-        'heatmap' => [
-            'inherent' => [
-                'grid' => $inherentMatrix,
-                'summary' => $inherentSummary,
-                'total' => array_sum($inherentSummary)
+        return response()->json([
+            'status' => true,
+            'message' => 'Heatmap data retrieved successfully',
+            'filters' => [
+                'department_id' => $departmentId,
+                'department_name' => $responseDepartmentName,
+                'year' => $year,
+                'month' => $month,
+                'risk_codes' => $riskCodes,
+                'kode_risiko' => $riskCodes,
+                'type' => $type,
+                'total_risks' => $riskHeaders->count(),
+                'user_role' => $userRole,
+                'access_restricted' => in_array($userRole, [2, 3])
             ],
-            'residual_current' => [
-                'grid' => $residualCurrentMatrix,
-                'summary' => $residualCurrentSummary,
-                'total' => array_sum($residualCurrentSummary)
+            'processing_info' => $processedData,
+            'heatmap' => [
+                'inherent' => [
+                    'grid' => $inherentMatrixEvents,
+                    'summary' => $inherentSummary,
+                    'total' => array_sum($inherentSummary)
+                ],
+                'residual_current' => [
+                    'grid' => $residualCurrentMatrixEvents,
+                    'summary' => $residualCurrentSummary,
+                    'total' => array_sum($residualCurrentSummary)
+                ],
+                'residual_target' => [
+                    'grid' => $residualTargetMatrixEvents,
+                    'summary' => $residualTargetSummary,
+                    'total' => array_sum($residualTargetSummary)
+                ]
             ],
-            'residual_target' => [
-                'grid' => $residualTargetMatrix,
-                'summary' => $residualTargetSummary,
-                'total' => array_sum($residualTargetSummary)
+            'table_data' => $tableData,
+            'legend' => [
+                'probabilitas_labels' => $probabilitasLabels,
+                'dampak_labels' => $dampakLabels,
+                'risk_categories' => $riskCategoriesArray
+            ],
+            'line_chart' => [
+                'title' => 'DIVISI MANAJEMEN RISIKO, TATAKELOLA & KEPATUHAN',
+                'data' => [
+                    'months' => $months,
+                    'labels' => ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
+                    'inherent_risk' => $inherentChart,
+                    'residual_current_risk' => $residualCurrentChart,
+                    'residual_target_risk' => $residualTargetChart
+                ]
             ]
-        ],
-        'table_data' => $tableData,
-        'legend' => [
-            'probabilitas_labels' => $probabilitasLabels,
-            'dampak_labels' => $dampakLabels,
-            'risk_categories' => $riskCategoriesArray
-        ],
-        'line_chart' => [
-            'title' => 'DIVISI MANAJEMEN RISIKO, TATAKELOLA & KEPATUHAN',
-            'data' => [
-                'months' => $months,
-                'labels' => ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
-                'inherent_risk' => $inherentChart,
-                'residual_current_risk' => $residualCurrentChart,
-                'residual_target_risk' => $residualTargetChart
-            ]
-        ]
-    ]);
-}
+        ]);
+    }
 
     public function getHeatmapDetailData(Request $request)
     {

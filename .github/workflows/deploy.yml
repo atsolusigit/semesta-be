@@ -1,46 +1,132 @@
-name: Deploy Laravel to Droplet
+name: Deploy DEV to 202.157.184.164
 
 on:
   push:
-    branches:
-      - master
+    branches: ["development"]
+  pull_request:
+    branches: ["development"]
+  workflow_dispatch:
+    inputs:
+      run_migrate:
+        description: "Force run php artisan migrate --force"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Jika lead menyimpan di Environment (mis. "dev"), uncomment baris berikut:
+    # environment: dev
+
+    env:
+      GIT_REPO_URL: https://github.com/atsolusigit/semesta-be.git
+      BRANCH: development
+      # Fallback: prefer Secrets, else Variables
+      SSH_HOST: ${{ secrets.SSH_HOST || vars.SSH_HOST }}
+      SSH_PORT: ${{ secrets.SSH_PORT || vars.SSH_PORT }}
+      SSH_USER: ${{ secrets.SSH_USER || vars.SSH_USER }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up SSH key
+      - name: Detect migration changes
+        id: detect
         run: |
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE="$(git rev-list --max-parents=0 HEAD | tail -n1)"
+          fi
+          if git diff --name-only "$BEFORE" "${{ github.sha }}" | grep -q '^database/migrations/'; then
+            echo "migrate=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "migrate=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Configure SSH client
+        run: |
+          if [ -z "${SSH_HOST}" ] || [ -z "${SSH_PORT}" ] || [ -z "${SSH_USER}" ]; then
+            echo "Missing SSH_HOST/SSH_PORT/SSH_USER (neither Secrets nor Variables)."; exit 1
+          fi
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
-          
+          printf "Host ${SSH_HOST}\n  HostName ${SSH_HOST}\n  User ${SSH_USER}\n  Port ${SSH_PORT}\n  StrictHostKeyChecking no\n" > ~/.ssh/config
 
-      - name: Deploy via SSH
+      - name: Debug SSH values
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.DROPLET_IP }} << 'EOF'
-            cd /root/project
+          echo "SSH_HOST=${SSH_HOST}"
+          echo "SSH_PORT=${SSH_PORT}"
+          echo "SSH_USER=${SSH_USER}"
 
-            # Pull the latest code from the repository
-            git pull origin master
-            git checkout master
+      - name: SSH connectivity test
+        run: |
+          ssh -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" "echo Connected OK"
 
-            # Build docker if needed
-            docker compose down
-            docker compose up -d --build
+      - name: Remote deploy (git hard reset + restart service)
+        env:
+          RUN_MIGRATIONS: ${{ inputs.run_migrate == 'true' || steps.detect.outputs.migrate == 'true' }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          # Translate boolean to numeric for remote shell
+          if [ "${RUN_MIGRATIONS}" = "true" ]; then MIGRATE=1; else MIGRATE=0; fi
 
-            # Laravel Commands
-            docker compose exec -T app php artisan migrate --force
-            docker compose exec -T app php artisan config:cache
-            docker compose exec -T app php artisan route:cache
-            docker compose exec -T app php artisan view:cache
+          # Pass flags as env to remote shell
+          ssh -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" "MIGRATE=${MIGRATE} GITHUB_SHA=${GITHUB_SHA} bash -lc '
+            set -e
+            REPO_DIR=/var/www/html/semesta-be
 
-            # 🧹 Cleanup Docker cache after build
-            docker builder prune -af
-            docker system prune -af --volumes
-          EOF
+            echo Updating repo in \$REPO_DIR
+            if [ ! -d \"\$REPO_DIR/.git\" ]; then
+              mkdir -p \"\$REPO_DIR\"
+              git clone ${GIT_REPO_URL} \"\$REPO_DIR\"
+              cd \"\$REPO_DIR\"
+              git checkout ${BRANCH} || git checkout -b ${BRANCH} origin/${BRANCH}
+            else
+              cd \"\$REPO_DIR\"
+              git fetch --all
+              git checkout ${BRANCH} || true
+              git reset --hard origin/${BRANCH}
+            fi
+
+            echo Installing dependencies...
+            if ! command -v composer >/dev/null 2>&1; then
+              echo Composer not found. Please install Composer on server.
+              exit 1
+            fi
+            composer install --prefer-dist --no-interaction
+
+            [ -f .env ] || { echo .env missing; exit 1; }
+
+            echo Clearing caches...
+            php artisan optimize:clear || true
+
+            if [ \"\$MIGRATE\" -eq 1 ]; then
+              echo Running php artisan migrate --force
+              php artisan migrate --force
+            else
+              echo Skip migrate \(no migration change detected\)
+            fi
+
+            date --iso-8601=seconds > public/deploy_time.txt
+            echo \"\$GITHUB_SHA\" > public/deploy_sha.txt
+
+            echo Restarting Laravel service...
+            if ! sudo -n systemctl restart semesta-be; then
+              echo Failed restart
+              exit 1
+            fi
+
+            echo Deployment done.
+          '"

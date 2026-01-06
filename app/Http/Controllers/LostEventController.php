@@ -1522,22 +1522,27 @@ public function destroy($id)
         return json(403, false, 'Forbidden', 'Anda tidak memiliki akses upload file.', null);
     }
 
+    $maxUploadMb = (int) env('UPLOAD_MAX_MB', 2);
+    if ($maxUploadMb <= 0) {
+        $maxUploadMb = 2;
+    }
+    $maxUploadKb = $maxUploadMb * 1024;
+
     $validator = Validator::make(
         $request->all(),
         [
             'file'   => 'required|array',
-            'file.*' => 'file|max:2048',
+            'file.*' => "file|max:{$maxUploadKb}",
         ],
         [
-            'file.*.max' => 'Ukuran file maksimal 2MB.',
+            'file.*.max' => "Ukuran file maksimal {$maxUploadMb}MB.",
+            'file.*.uploaded' => "File gagal diupload. Pastikan ukuran tidak melebihi {$maxUploadMb}MB",
         ]
     );
 
     if ($validator->fails()) {
         $errors = $validator->errors();
-        $message = $errors->first('file.*') === 'Ukuran file maksimal 2MB.'
-            ? 'Ukuran file maksimal 2MB.'
-            : 'File tidak valid.';
+        $message = $errors->first('file.*') ?? 'File tidak valid.';
 
         return json(400, false, 'Validasi Gagal', $message, $errors);
     }

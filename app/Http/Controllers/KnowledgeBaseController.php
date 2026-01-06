@@ -367,15 +367,22 @@ class KnowledgeBaseController extends Controller
             return json(400, false, 'invalid_type', 'Parameter type harus img_path atau doc_path', null);
         }
 
+        $maxUploadMb = (int) env('UPLOAD_MAX_MB', 2);
+        if ($maxUploadMb <= 0) {
+            $maxUploadMb = 20;
+        }
+        $maxUploadKb = $maxUploadMb * 1024;
+
         $rules = [
             'file' => 'required',
             'file.*' => ($type === 'img_path')
-                ? 'file|mimes:jpg,jpeg,png,webp|max:2048'
-                : 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:2048',
+                ? "file|mimes:jpg,jpeg,png,webp|max:{$maxUploadKb}"
+                : "file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:{$maxUploadKb}",
         ];
 
         $customMessages = [
-            'file.*.max' => 'Ukuran file maksimal 2MB.',
+            'file.*.max' => "Ukuran file maksimal {$maxUploadMb}MB.",
+            'file.*.uploaded' => "File gagal diupload. Pastikan ukuran tidak melebihi {$maxUploadMb}MB",
         ];
 
         $validate = check_validation($request->all(), $rules, $customMessages);

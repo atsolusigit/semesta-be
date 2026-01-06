@@ -16,19 +16,22 @@ if (!function_exists('check_validation')) {
      * @param string $currency
      * @return string
      */
-    function check_validation($request, $array_validation)
+    function check_validation($request, $array_validation, $customMessages = [])
     {
-        $rules = [
+        $rules = array_merge([
             'asdp.required'=> 'The asdp header is required', // custom message
-        ];
+        ], $customMessages);
 
         $validator = Validator::make($request, $array_validation, $rules);
 
         if ($validator->fails()) {
+            $firstError = $validator->errors()->first();
+            $message = ($firstError === 'Ukuran file maksimal 2MB.') ? $firstError : 'validasi gagal';
+
             $json = response()->json([
                 'code' => 400,
                 'status' => 'error_validation',
-                'message' => 'validasi gagal',
+                'message' => $message,
                 'data' => $validator->messages()
             ], 200);
 

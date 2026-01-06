@@ -1540,13 +1540,24 @@ public function bulkUpdateQuantitative(Request $request, $headerId)
     }
 
     // VALIDASI: file[] opsional
-    $validator = Validator::make($request->all(), [
-        'file'   => 'array',            // tidak wajib
-        'file.*' => 'file|max:4096',    // max 4MB per file
-    ]);
+    $validator = Validator::make(
+        $request->all(),
+        [
+            'file'   => 'array',            // tidak wajib
+            'file.*' => 'file|max:2048',    // max 2MB per file
+        ],
+        [
+            'file.*.max' => 'Ukuran file maksimal 2MB.',
+        ]
+    );
 
     if ($validator->fails()) {
-        return json(400, false, 'Validasi Gagal', 'Format upload tidak sesuai.', $validator->errors());
+        $errors = $validator->errors();
+        $message = $errors->first('file.*') === 'Ukuran file maksimal 2MB.'
+            ? 'Ukuran file maksimal 2MB.'
+            : 'Format upload tidak sesuai.';
+
+        return json(400, false, 'Validasi Gagal', $message, $errors);
     }
 
     // Jika tidak ada file sama sekali → langsung sukses

@@ -370,11 +370,15 @@ class KnowledgeBaseController extends Controller
         $rules = [
             'file' => 'required',
             'file.*' => ($type === 'img_path')
-                ? 'file|mimes:jpg,jpeg,png,webp|max:20480'
-                : 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:51200',
+                ? 'file|mimes:jpg,jpeg,png,webp|max:2048'
+                : 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:2048',
         ];
 
-        $validate = check_validation($request->all(), $rules);
+        $customMessages = [
+            'file.*.max' => 'Ukuran file maksimal 2MB.',
+        ];
+
+        $validate = check_validation($request->all(), $rules, $customMessages);
         if ($validate[0] !== 0) return $validate[1];
 
         try {

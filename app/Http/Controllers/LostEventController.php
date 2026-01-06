@@ -1522,13 +1522,24 @@ public function destroy($id)
         return json(403, false, 'Forbidden', 'Anda tidak memiliki akses upload file.', null);
     }
 
-    $validator = Validator::make($request->all(), [
-        'file'   => 'required|array',
-        'file.*' => 'file|max:10240',
-    ]);
+    $validator = Validator::make(
+        $request->all(),
+        [
+            'file'   => 'required|array',
+            'file.*' => 'file|max:2048',
+        ],
+        [
+            'file.*.max' => 'Ukuran file maksimal 2MB.',
+        ]
+    );
 
     if ($validator->fails()) {
-        return json(400, false, 'Validasi Gagal', 'File tidak valid.', $validator->errors());
+        $errors = $validator->errors();
+        $message = $errors->first('file.*') === 'Ukuran file maksimal 2MB.'
+            ? 'Ukuran file maksimal 2MB.'
+            : 'File tidak valid.';
+
+        return json(400, false, 'Validasi Gagal', $message, $errors);
     }
 
     $uploadedList = [];

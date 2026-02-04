@@ -212,7 +212,7 @@ class TrRcsaHeaderController extends Controller
 
         $currentUser = auth()->user();
         $roleId = $currentUser->role_id ?? null;
-         if (!in_array($roleId, [1, 2, 3, 4, 5])) {
+         if (!in_array($roleId, [1, 2, 3, 4, 5, 7])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk membuat data ini.', null);
         }
 
@@ -573,7 +573,7 @@ class TrRcsaHeaderController extends Controller
             return json(404, false, 'Data Tidak Ditemukan', 'RCSA tidak ditemukan.', null);
         }
 
-        if (!in_array($roleId, [1, 2, 3, 4, 5])) {
+        if (!in_array($roleId, [1, 2, 3, 4, 5, 7])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk update data ini.', null);
         }
 
@@ -625,7 +625,7 @@ class TrRcsaHeaderController extends Controller
 
             // VALIDASI HAK AKSES DELETE
             // semua role bisa delete kecuali VP
-            if (!in_array($currentUserRole, [1,2,3,4,5])) {
+            if (!in_array($currentUserRole, [1,2,3,4,5,7])) {
                 return json(404, false, 'Akses Ditolak', 'User VP tidak dapat menghapus data RCSA.', null);
             }
 
@@ -985,13 +985,13 @@ class TrRcsaHeaderController extends Controller
     {
         $currentUser = auth()->user();
 
-        $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5]);
+        $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5, 7]);
         if ($roleCheck !== true) {
             return $roleCheck;
         }
 
         $roleId = $currentUser->role_id ?? null;
-        if (!in_array($roleId, [1, 4, 5, 6])) {
+        if (!in_array($roleId, [1, 2, 3, 4, 5, 7])) {
             return json(403, false, 'Tidak Diizinkan', 'Anda tidak memiliki hak untuk submit data ini.', null);
         }
 

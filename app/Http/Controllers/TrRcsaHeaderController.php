@@ -883,7 +883,7 @@ class TrRcsaHeaderController extends Controller
                       $rsd4 = $itemRes['residual_skala_dampak'];
                       $rsp4 = $itemRes['residual_skala_probabilitas'];
                       $rlr4 = $itemRes['residual_level_risiko'];
-                      $rsr4 = $itemRes['residual_skala_risiko '];
+                      $rsr4 = $itemRes['residual_skala_risiko'];//change
                       break;
                     }
                 }

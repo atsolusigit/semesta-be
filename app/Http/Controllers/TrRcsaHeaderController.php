@@ -13,6 +13,7 @@ use App\Models\TrRcsaRencanaRisikoList;
 use PhpParser\Node\Stmt\TryCatch;
 use App\Models\MstJabatan;
 use App\Models\TrRiskHeader;
+use App\Models\MstHeatmap;
 
 class TrRcsaHeaderController extends Controller
 {
@@ -874,26 +875,46 @@ class TrRcsaHeaderController extends Controller
 
                 $rsd4 = 0;
                 $rsp4 = 0;
+                $rlr4 = "";
+                $rsr4 = 0;
                 foreach ($dataResidual as $itemRes) {
                     $kuartal = (int)($itemRes['kuartal'] ?? 0);
                     if($kuartal  === 4){
                       $rsd4 = $itemRes['residual_skala_dampak'];
                       $rsp4 = $itemRes['residual_skala_probabilitas'];
+                      $rlr4 = $itemRes['residual_level_risiko'];
+                      $rsr4 = $itemRes['residual_skala_risiko '];
                       break;
                     }
                 }
 
-                // Update existing approval entry
+                $residualRiskHeatmap = MstHeatmap::with('riskRange')
+                ->where('dampak', $rsd4)
+                ->where('kemungkinan', $rsp4)
+                ->first();
+
+                $inherentRiskHeatmap = MstHeatmap::with('riskRange')
+                ->where('dampak', $rcsaHeader->inherent_skala_dampak)
+                ->where('kemungkinan', $request->input('inherent_skala_probabilitas'))
+                ->first();
+
+                // Update existing Risk Header entry
                 $existRcsaInRiskHdr->update([
                     'peristiwa_risiko' => $rcsaHeader->peristiwa_risiko, 
                     'penyebab_risiko' => $rcsaHeader->penyebab_risiko,
-                    'dampak_risiko' => $rcsaHeader->dampak_risiko,
+                    'dampak_risiko' => $rcsaHeader->deskripsi_dampak,
                     'sasaran' => $rcsaHeader->pilihan_sasaran,
                     'inherent_risk_level_dampak' => $rcsaHeader->inherent_skala_dampak,
                     'inherent_risk_level_kemungkinan' => $rcsaHeader->inherent_skala_probabilitas,
                     'residual_target_level_dampak' => $rsd4,
                     'residual_target_level_kemungkinan' => $rsp4,
-                    'biaya_perlakuan_risiko' => $rcsaHeader->biaya_perlakuan_risiko
+                    'biaya_perlakuan_risiko' => $rcsaHeader->biaya_perlakuan_risiko,
+                    'inherent_risk_level_risiko' => $rcsaHeader->inherent_level_risiko,
+                    'inherent_risk_posisi_risiko' => $rcsaHeader->inherent_skala_risiko,
+                    'residual_target_level_risiko' => $rlr4,
+                    'residual_target_posisi_risiko' => $rsr4,
+                    'inherent_risk_posisi_risiko_color' =>$inherentRiskHeatmap->color,
+                    'residual_target_posisi_risiko_color' => $residualRiskHeatmap->color
                 ]);
             }
 

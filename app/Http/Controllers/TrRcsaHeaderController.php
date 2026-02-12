@@ -12,6 +12,7 @@ use App\Models\TrRcsaResidual;
 use App\Models\TrRcsaRencanaRisikoList;
 use PhpParser\Node\Stmt\TryCatch;
 use App\Models\MstJabatan;
+use App\Models\TrRiskHeader;
 
 class TrRcsaHeaderController extends Controller
 {
@@ -559,7 +560,7 @@ class TrRcsaHeaderController extends Controller
         $roleId = $currentUser->role_id ?? null;
 
         // Validasi role: hanya role 1, 2, 3 yang diizinkan
-        $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5, 6]);
+        $roleCheck = check_role($currentUser, [1, 2, 3, 4, 5, 7]);
         if ($roleCheck !== true) {
             return $roleCheck;
         }
@@ -865,6 +866,36 @@ class TrRcsaHeaderController extends Controller
         // dd($dataResidual);
         try {
             DB::beginTransaction();
+
+            // Cek apakah ada rcsa pada risk header
+            $existRcsaInRiskHdr = \App\Models\TrRiskHeader::where('rcsa_id', $rcsa_id)->first();
+
+            if ($existRcsaInRiskHdr) {
+
+                $rsd4 = 0;
+                $rsp4 = 0;
+                foreach ($dataResidual as $itemRes) {
+                    $kuartal = (int)($itemRes['kuartal'] ?? 0);
+                    if($kuartal  === 4){
+                      $rsd4 = $itemRes['residual_skala_dampak'];
+                      $rsp4 = $itemRes['residual_skala_probabilitas'];
+                      break;
+                    }
+                }
+
+                // Update existing approval entry
+                $existRcsaInRiskHdr->update([
+                    'peristiwa_risiko' => $rcsaHeader->peristiwa_risiko, 
+                    'penyebab_risiko' => $rcsaHeader->penyebab_risiko,
+                    'dampak_risiko' => $rcsaHeader->dampak_risiko,
+                    'sasaran' => $rcsaHeader->pilihan_sasaran,
+                    'inherent_risk_level_dampak' => $rcsaHeader->inherent_skala_dampak,
+                    'inherent_risk_level_kemungkinan' => $rcsaHeader->inherent_skala_probabilitas,
+                    'residual_target_level_dampak' => $rsd4,
+                    'residual_target_level_kemungkinan' => $rsp4,
+                    'biaya_perlakuan_risiko' => $rcsaHeader->biaya_perlakuan_risiko
+                ]);
+            }
 
             foreach ($dataResidual as $itemRes) {
                 $kuartal = (int)($itemRes['kuartal'] ?? 0);
